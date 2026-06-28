@@ -1,5 +1,7 @@
 # ArcAstraOneAru
 
+# Date : 28/06/2026
+
 ArcAstraOneAru is the project repository for the Astra launch work.
 
 ## Getting started
