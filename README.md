@@ -1,6 +1,6 @@
 # ArcAstraOneAru
 
-Date: 30/06/2026
+Date: 01/07/2026
 
 ## Project Goal
 
