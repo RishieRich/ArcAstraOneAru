@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+connector/.venv/
+.pytest_cache/
+*.egg-info/
+
+# Secrets / env
+.env
+*.env
+!config.example.toml
+
+# Local state & logs
+exports/
+connector/dist/
+connector/build/
+connector/config.toml
+connector/snapshot*.json
+**/state.json
+*.log
+
+# Editors / OS
+.vscode/
+.DS_Store
+Thumbs.db

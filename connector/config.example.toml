@@ -1,0 +1,13 @@
+[tally]
+host = "localhost"
+port = 9000
+company_name = "Pawan Engineering Works"   # must match Tally exactly; `doctor` lists available names
+
+[cloud]
+api_base_url = "https://<cloud-run-service>.run.app"
+
+[sync]
+interval_minutes = 60
+
+[logging]
+level = "INFO"    # party-level data only logged at DEBUG

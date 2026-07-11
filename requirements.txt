@@ -1,1 +1,10 @@
-# Add runtime dependencies here as the backend implementation grows.
+# Backend (FastAPI + Postgres/Neon) — M3
+fastapi>=0.134
+uvicorn[standard]>=0.30
+psycopg[binary]>=3.2
+pydantic>=2.7
+python-dotenv>=1.0
+
+# Tests
+pytest>=8.0
+httpx>=0.27

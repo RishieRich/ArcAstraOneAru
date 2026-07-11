@@ -1,13 +1,23 @@
 import logging
+import os
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 
-def setup_logging(log_dir: Path) -> logging.Logger:
+
+def default_log_dir() -> Path:
+    local_appdata = os.environ.get("LOCALAPPDATA", str(Path.home() / "AppData" / "Local"))
+    return Path(local_appdata) / "ARQ" / "logs"
+
+
+def setup_logging(level: str = "INFO", log_dir: Path | None = None) -> logging.Logger:
+    log_dir = log_dir or default_log_dir()
     log_dir.mkdir(parents=True, exist_ok=True)
-    logger = logging.getLogger("arcastra")
-    logger.setLevel(logging.INFO)
-    if logger.handlers:          # avoid duplicate handlers on repeat calls
+
+    logger = logging.getLogger("arq_connector")
+    logger.setLevel(level.upper())
+    if logger.handlers:
         return logger
+
     fmt = logging.Formatter("%(asctime)s %(levelname)s %(message)s")
 
     file_handler = RotatingFileHandler(
