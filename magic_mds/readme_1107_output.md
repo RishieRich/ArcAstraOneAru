@@ -113,6 +113,19 @@ python -m arq_connector.cli pull --config config.toml --out snapshot.json
 
 ---
 
-## 5. Next step (not started — paused here per plan + your instruction)
+## 5. M4 + M5 — DONE (second half of the session)
 
-**M4 — secure sync client**: `register` and `sync` CLI commands that actually call the backend (`sync/pusher.py`, `security/credentials.py` for Windows Credential Manager token storage). This needs `connector/config.toml`'s `[cloud] api_base_url` pointed at a real deployed backend (Cloud Run, or your machine's IP for local testing). Extraction (M2) is now functionally complete — company, ledgers, and bills all pull real data — so M4 is unblocked whenever you're ready.
+The missing wire and the packaging both got built and live-verified:
+
+- **`sync/pusher.py`** — register + push to the backend, with retries, idempotency UUID, and Tally-date → ISO-date conversion
+- **`security/credentials.py`** — device token in Windows Credential Manager (keyring), never on disk
+- **`runner.py`** — the one sync flow (doctor → pull → push) shared by the GUI button and headless mode
+- **`gui.py`** — a small Tkinter window: company dropdown (auto-detected from Tally), backend URL, one-time pairing-code registration, a **Push Now** button, and an auto-sync section (1–24h frequency, default 3h) that creates/removes a Windows Task Scheduler job
+- **`scheduler.py` / `lock.py`** — schtasks integration + a single-instance lock (verified: a second run while one holds the lock exits cleanly)
+- **`build.ps1`** → **`connector\dist\arq-connector.exe`** (~16 MB, one file, no Python needed)
+
+**Live end-to-end proof, twice:** a real tenant ("ARQ Code Test") + pairing code were created through the admin CLI, the device registered through the same code path the GUI uses, and a full sync ran — once via `python -m arq_connector.cli run` and once via **the built exe itself**. Both landed real rows in Neon (verified by querying `sync_runs`, `bills`, `ledgers` directly: Alpha Customer's bill with correctly converted dates, the ledger upserted). Config-less: settings live in `%LOCALAPPDATA%\ARQ\settings.json`, written by the GUI.
+
+**Cleanup done in the same pass:** deleted dead code (`state.py` AlterID tracking, the TOML config module + example file — replaced by the GUI-managed settings JSON, the empty `backend/app/core/` package, the leftover `exports/` folder), rewrote the stale root `README.md`, and untracked previously-committed `__pycache__` files.
+
+**How to use it:** see `magic_mds/USER_MANUAL.md`. Test counts after all this: connector 29/29, backend 10/10.

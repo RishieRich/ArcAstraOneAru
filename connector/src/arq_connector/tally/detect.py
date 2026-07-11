@@ -96,9 +96,9 @@ def run_doctor(host: str, port: int, configured_company: str) -> DoctorResult:
         return DoctorResult(
             exit_code=EXIT_MULTIPLE_COMPANIES,
             message=(
-                f"Kai companies khuli hain, config mein koi pin nahi / Multiple companies "
-                f"open and none pinned matches config: [{names}]. -> config.toml mein "
-                f"'company_name' sahi karo."
+                f"Kai companies khuli hain, koi selected se match nahi / Multiple companies "
+                f"open and none matches the selected one: [{names}]. -> App kholkar sahi "
+                f"company chuno (open the app and pick the right company)."
             ),
             companies=companies,
         )

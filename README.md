@@ -1,62 +1,22 @@
-# ArcAstraOneAru
+# ARQ Astra Launch
 
-Date: 05/07/2026
+Tally → cloud data pipeline. Two components:
 
-## Project Goal
+- **`connector/`** — Windows app (ships as a single `arq-connector.exe`). Talks to a locally running TallyPrime over its port-9000 XML gateway (read-only), extracts debtor ledgers + receivable bills, and pushes them to the backend. Has a small GUI for one-time setup and a "Push Now" button; after that a Windows scheduled task syncs automatically.
+- **`backend/`** — FastAPI API + Postgres (Neon in dev, Cloud SQL later). Receives synced data over device-token auth with per-tenant isolation. Admin CLI (`python -m app.admin`) creates tenants and issues pairing codes.
 
-Build a lightweight Tally connector application that can run on any Windows system where Tally is installed.
+Docs live in `magic_mds/`:
 
-The application should connect to the locally running Tally instance, allow data extraction for a selected company, and export the available Tally data into a local folder.
+- `readme_1107_base.md` — the original implementation plan
+- `readme_1107_output.md` — what was actually built and live-verified
+- `USER_MANUAL.md` — how to install, register, and use the exe
 
-The final application should eventually be packaged as a Windows `.exe`.
+Quick start for development:
 
-## Key Requirements
+```powershell
+# backend (needs backend\.env with DATABASE_URL)
+cd backend; ..\.venv\Scripts\Activate.ps1; uvicorn app.main:app --port 8000
 
-- Keep the backend clean, lightweight, and secure.
-- Avoid unnecessary heavy frameworks.
-- Connect to Tally running on the host system.
-- Support flexible extraction of available company data.
-- Export extracted data into a structured local folder.
-- Design the backend so it can later be packaged into a Windows executable.
-- Start with only the basic backend folder structure.
-
-## Current Folder Structure
-
-```text
-backend/
-  app/
-    core/
-    export/
-    schemas/
-    tally/
-  tests/
+# connector (own venv)
+cd connector; .venv\Scripts\Activate.ps1; python -m arq_connector.cli
 ```
-
-## Folder Purpose
-
-```text
-backend/
-  Main backend area for the Tally connector.
-
-backend/app/
-  Application source code.
-
-backend/app/core/
-  Core configuration, constants, security, and shared backend utilities.
-
-backend/app/tally/
-  Tally connection logic, request handling, company selection, and extraction logic.
-
-backend/app/export/
-  Export handling, output folder management, and file generation logic.
-
-backend/app/schemas/
-  Data structures and contracts used across the backend.
-
-backend/tests/
-  Backend tests for connector, export, and security behavior.
-```
-
-## Current Status
-
-Only the initial backend folder structure has been created. No implementation files are required at this stage.

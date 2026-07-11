@@ -1,90 +1,63 @@
+"""Entry point.
+
+No arguments  -> open the GUI (what a double-click on the exe does).
+`run`         -> headless sync (what the Windows scheduled task calls).
+`doctor`      -> print Tally health (debugging aid).
+"""
 import argparse
 import sys
-from pathlib import Path
 
-from .config import ConfigError, load_config
 from .logging_setup import setup_logging
-from .sync.snapshot import SnapshotError, pull_snapshot, write_snapshot
-from .tally.detect import run_doctor
+from .settings import load_settings
 
 
-def cmd_doctor(args: argparse.Namespace) -> int:
+def cmd_run() -> int:
+    from .lock import acquire_lock, release_lock
+    from .runner import run_sync
+
+    settings = load_settings()
+    logger = setup_logging(settings.get("log_level", "INFO"))
+
+    if not acquire_lock():
+        logger.info("another sync is already running; exiting")
+        return 0
     try:
-        config = load_config(Path(args.config))
-    except ConfigError as e:
-        print(f"Config error: {e}", file=sys.stderr)
-        return 1
+        outcome = run_sync(settings, logger)
+        return 0 if outcome.ok else 1
+    finally:
+        release_lock()
 
-    logger = setup_logging(config.logging.level)
-    logger.info(
-        "doctor: checking host=%s port=%s configured_company=%s",
-        config.tally.host, config.tally.port, config.tally.company_name,
-    )
 
+def cmd_doctor() -> int:
+    from .tally.detect import run_doctor
+
+    settings = load_settings()
+    logger = setup_logging(settings.get("log_level", "INFO"))
     result = run_doctor(
-        host=config.tally.host,
-        port=config.tally.port,
-        configured_company=config.tally.company_name,
+        host=settings["tally_host"],
+        port=int(settings["tally_port"]),
+        configured_company=settings["company_name"],
     )
-
-    print(f"[exit {result.exit_code}] {result.message}")
-    if result.companies:
-        print("Open companies:")
-        for c in result.companies:
-            marker = " <-- configured" if result.matched_company and c.name == result.matched_company.name else ""
-            print(f"  - {c.name}  (GUID={c.guid}){marker}")
-
     logger.info("doctor: exit_code=%s", result.exit_code)
+    print(f"[exit {result.exit_code}] {result.message}")
+    for c in result.companies:
+        print(f"  - {c.name}  (GUID={c.guid})")
     return result.exit_code
 
 
-def cmd_pull(args: argparse.Namespace) -> int:
-    try:
-        config = load_config(Path(args.config))
-    except ConfigError as e:
-        print(f"Config error: {e}", file=sys.stderr)
-        return 1
-
-    logger = setup_logging(config.logging.level)
-    try:
-        snapshot = pull_snapshot(
-            host=config.tally.host,
-            port=config.tally.port,
-            company_name=config.tally.company_name,
-        )
-    except SnapshotError as e:
-        print(f"Pull failed: {e}", file=sys.stderr)
-        logger.error("pull failed: %s", e)
-        return 1
-
-    out_path = Path(args.out)
-    write_snapshot(snapshot, out_path)
-    counts = f"{len(snapshot['ledgers'])} ledgers, {len(snapshot['bills'])} bills"
-    print(f"Wrote {out_path} ({counts})")
-    logger.info("pull: wrote %s (%s)", out_path, counts)
-    return 0
-
-
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="arq-connector")
-    sub = parser.add_subparsers(dest="command", required=True)
-
-    doctor_p = sub.add_parser("doctor", help="Check Tally health")
-    doctor_p.add_argument("--config", default="config.toml")
-    doctor_p.set_defaults(func=cmd_doctor)
-
-    pull_p = sub.add_parser("pull", help="Pull a local snapshot.json (no cloud calls)")
-    pull_p.add_argument("--config", default="config.toml")
-    pull_p.add_argument("--out", default="snapshot.json")
-    pull_p.set_defaults(func=cmd_pull)
-
-    return parser
-
-
 def main() -> int:
-    parser = build_parser()
+    parser = argparse.ArgumentParser(prog="arq-connector")
+    parser.add_argument("command", nargs="?", choices=["run", "doctor"], default=None)
     args = parser.parse_args()
-    return args.func(args)
+
+    if args.command == "run":
+        return cmd_run()
+    if args.command == "doctor":
+        return cmd_doctor()
+
+    from .gui import launch
+    launch()
+    return 0
 
 
 if __name__ == "__main__":
