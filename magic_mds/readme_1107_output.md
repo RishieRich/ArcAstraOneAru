@@ -36,34 +36,46 @@ Built instead, matching §7 and the M3 deliverables exactly:
 
 Built the full package layout from §5: `config.py`, `logging_setup.py`, `tally/{client,envelopes,parsers,detect}.py`, `sync/{snapshot,state}.py`, `cli.py` with `doctor` and `pull` subcommands. Has its own venv at `connector/.venv` (Python 3.13.2, per plan). `sync/pusher.py` and `security/credentials.py` (the cloud-push half, M4) were deliberately not built yet — that's the paused part.
 
-This is the part that mattered most to test live, because the plan's own XML skeletons were explicitly marked "unverified, don't trust the field names" — and sure enough, testing against your real Tally surfaced **four real bugs**, all now fixed:
+This is the part that mattered most to test live, because the plan's own XML skeletons were explicitly marked "unverified, don't trust the field names" — and sure enough, testing against your real Tally surfaced **five real bugs**, all now fixed:
 
-1. **UTF-16 decoding was backwards.** The plan assumed Tally always responds in UTF-16. Live testing showed a plain response came back as ASCII/UTF-8 instead — and blindly decoding ASCII bytes as UTF-16 doesn't throw an error, it just silently produces garbage text. Fixed with proper BOM/heuristic detection instead of "try UTF-16, fall back on failure."
+1. **UTF-16 decoding was backwards.** The plan assumed Tally always responds in UTF-16. Live testing showed a plain response came back as ASCII/UTF-8 instead — and blindly decoding ASCII bytes as UTF-16 doesn't throw an error, it just silently produces garbage text. Fixed with proper BOM/heuristic detection instead of "try UTF-16, fall back on failure." (A follow-up test also caught the BOM path itself not stripping the BOM bytes before decoding — fixed too.)
 2. **Company-list parser matched the wrong tag.** Tally's response has `<CMPINFO><COMPANY>0</COMPANY></CMPINFO>` (a summary count) alongside the real `<COMPANY NAME="...">` records elsewhere in the document. The parser was grabbing the summary count instead of real records. Fixed by scoping the search to the `<DATA>` section.
 3. **Naming collision with a Tally built-in report.** The envelope named its custom collection `"List of Companies"` — which collides with a name Tally already knows internally, so Tally silently ignored our field list (`FETCH`) and returned its own default fields instead (no GUID, no starting-from date). Renamed it to `"ARQ List of Companies"` (matching the pattern the plan already used for `"ARQ Debtor Ledgers"`) and the real GUID/starting-from date came through correctly.
 4. **Invalid XML character references weren't being stripped.** The plan warned "Tally emits `&#4;` and friends" — but that's a literal 4-character XML entity reference (`&`, `#`, `4`, `;`), not a raw control byte, and the original sanitizer only stripped raw bytes. A real ledger's `PARENT` field (`Profit & Loss A/c`) contained exactly this and crashed the XML parser. Fixed by stripping invalid numeric character references before parsing.
+5. **Bills Receivable envelope shape was wrong.** The plan's skeleton (`TYPE=Data`, `ID=Bills Receivable`) returns an empty `<ENVELOPE></ENVELOPE>` — Tally doesn't recognize it. The correct shape uses `TALLYREQUEST` = the exact two-word string `"Export Data"` with an `EXPORTDATA`/`REQUESTDESC`/`REPORTNAME` body. Confirmed against one real test voucher you created in "ARQ Code Test" (Alpha Customer, ₹508,989 pending, 62 days overdue) — see item 3 below.
 
 **What's confirmed working end-to-end, live, right now:**
 - `doctor` correctly detects "Tally not running" (exit 10) when only the background `tallyscheduler.exe` helper is up
 - `doctor` correctly detects "gateway on, no company open" once Tally's app was open but no company loaded
 - `doctor` correctly detects and matches your company by name, with the **real GUID**, once you loaded it — tested against all three of your open companies: `ARQ AA` (GUID `83dd7f81-1c9a-44c9-aaa7-839b9aeb843b`), `ARQ Code Test` (`da7e7890-ba54-455d-9dc6-93fc3f0ca2d8`), `ARQ Demo Traders` (`e218138b-4e93-4b06-be1e-946bc0358b63`)
-- `pull` correctly extracts real Sundry Debtor ledger data — found and correctly parsed "Alpha Customer" in `ARQ Code Test` (name, GUID, parent group, ₹0.00 balance, AlterID)
+- `pull` correctly extracts real Sundry Debtor ledger data — "Alpha Customer" in `ARQ Code Test` (name, GUID, parent group, balance, AlterID)
+- `pull` correctly extracts real Bills Receivable data — after you created one test sales voucher, it picked up the real bill: party, bill ref, bill date, due date, pending amount (₹508,989), and 62 overdue days
 - Rotating log file confirmed written to `%LOCALAPPDATA%\ARQ\logs\connector.log`
 
-The two live-captured responses (company list, debtor ledgers) are saved as real fixtures in `connector/tests/fixtures/` and used by a 17-test `pytest` suite that runs with **no Tally required** (mocks process/port checks, replays the real captured XML) — **17/17 passing**.
+Three live-captured responses (company list, debtor ledgers, bills receivable) are saved as real fixtures in `connector/tests/fixtures/` and used by an 18-test `pytest` suite that runs with **no Tally required** (mocks process/port checks, replays the real captured XML) — **18/18 passing**.
 
 ---
 
-## 2. What's not done — one real, known gap
+## 2. What's still a known limitation — not a bug, just unconfirmed at scale
 
-**Bills Receivable extraction is unverified and currently broken.** None of your three open companies (`ARQ AA`, `ARQ Code Test`, `ARQ Demo Traders`) have any vouchers or outstanding bills — they're all essentially blank test companies with just Tally's default chart of accounts. Two consequences:
+**Bills Receivable multi-bill grouping is inferred, not independently confirmed.** The real response for one bill looks like this (note: no per-bill wrapper element):
 
-1. There's no data to check parser output against even if the request worked.
-2. The request itself doesn't work yet: the plan's documented envelope shape (`TYPE=Data`, `ID=Bills Receivable`) returns an empty `<ENVELOPE></ENVELOPE>`, and a more standard alternative shape (`EXPORTDATA`/`REQUESTDESC`/`REPORTNAME`) returned `"Unknown Request, cannot be processed"`. Neither is right yet, and — per the plan's own rule 3 ("never invent Tally field names, dump and look") — this needs real bill data to iterate against rather than more guessing.
+```xml
+<ENVELOPE>
+ <BILLFIXED>
+  <BILLDATE>1-Apr-26</BILLDATE>
+  <BILLREF>2</BILLREF>
+  <BILLPARTY>Alpha Customer</BILLPARTY>
+ </BILLFIXED>
+ <BILLCL>-508989.00</BILLCL>
+ <BILLDUE>1-Apr-26</BILLDUE>
+ <BILLOVERDUE>62</BILLOVERDUE>
+</ENVELOPE>
+```
 
-**To unblock this:** create a couple of test sales vouchers with pending amounts in one of your companies (or open a company that already has real receivables, like a proper Pawan Engineering Works setup), then say the word and this gets finished and verified the same way everything else was.
+The parser assumes multiple bills repeat this `BILLFIXED` + 3-sibling group in sequence, which is a reasonable read of the structure but was only tested against exactly one bill. Also note `pending_amount` comes through as **negative** (Tally's internal sign convention) — the parser passes it through unchanged rather than guessing whether to flip the sign; worth checking against the actual Bills Receivable screen in Tally.
 
-Everything else in `bills_receivable()` / `parse_bills_receivable()` is still in the code, clearly flagged with comments explaining it's unverified — nothing was left silently broken.
+**To fully close this out:** create a second test voucher (different party or a second bill for Alpha Customer) and re-run `pull` — if 2 bills come back correctly, this is fully closed.
 
 ---
 
@@ -103,4 +115,4 @@ python -m arq_connector.cli pull --config config.toml --out snapshot.json
 
 ## 5. Next step (not started — paused here per plan + your instruction)
 
-**M4 — secure sync client**: `register` and `sync` CLI commands that actually call the backend (`sync/pusher.py`, `security/credentials.py` for Windows Credential Manager token storage). This needs `connector/config.toml`'s `[cloud] api_base_url` pointed at a real deployed backend (Cloud Run, or your machine's IP for local testing), and ideally the Bills Receivable gap closed first since a real sync should carry real bill data.
+**M4 — secure sync client**: `register` and `sync` CLI commands that actually call the backend (`sync/pusher.py`, `security/credentials.py` for Windows Credential Manager token storage). This needs `connector/config.toml`'s `[cloud] api_base_url` pointed at a real deployed backend (Cloud Run, or your machine's IP for local testing). Extraction (M2) is now functionally complete — company, ledgers, and bills all pull real data — so M4 is unblocked whenever you're ready.

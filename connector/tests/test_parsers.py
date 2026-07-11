@@ -2,7 +2,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from arq_connector.tally.client import decode_tally_response, strip_invalid_xml_chars
-from arq_connector.tally.parsers import parse_companies, parse_debtor_ledgers
+from arq_connector.tally.parsers import parse_bills_receivable, parse_companies, parse_debtor_ledgers
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -37,6 +37,20 @@ def test_parse_debtor_ledgers_from_live_fixture():
     assert ledger.parent_group == "Sundry Debtors"
     assert ledger.closing_balance == Decimal("0.00")
     assert ledger.tally_guid
+
+
+def test_parse_bills_receivable_from_live_fixture():
+    xml = (FIXTURES / "bills_receivable.xml").read_text(encoding="utf-8")
+    bills = parse_bills_receivable(xml)
+
+    assert len(bills) == 1
+    bill = bills[0]
+    assert bill.party_name == "Alpha Customer"
+    assert bill.bill_ref == "2"
+    assert bill.bill_date == "1-Apr-26"
+    assert bill.due_date == "1-Apr-26"
+    assert bill.pending_amount == Decimal("-508989.00")
+    assert bill.overdue_days == 62
 
 
 def test_strip_invalid_xml_chars_removes_raw_control_bytes():

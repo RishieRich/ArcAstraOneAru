@@ -63,23 +63,29 @@ def debtor_ledgers(company_name: str) -> str:
 </ENVELOPE>"""
 
 
-def bills_receivable(company_name: str, from_date: str, to_date: str) -> str:
-    """from_date/to_date in Tally's own format, e.g. '1-Apr-2025'."""
+def bills_receivable(company_name: str) -> str:
+    """LIVE-VERIFIED against a real TallyPrime instance with real bill data.
+
+    The plan doc's original skeleton (TYPE=Data, ID="Bills Receivable") returns
+    an empty <ENVELOPE></ENVELOPE> -- wrong shape. A more "standard" alternative
+    (EXPORTDATA/REQUESTDESC with TALLYREQUEST="EXPORT") returned
+    "Unknown Request, cannot be processed". What actually works: TALLYREQUEST
+    must be the two-word "Export Data", not "EXPORT" or "Export". No
+    date-range variables were needed to get the current outstanding bill.
+    """
     return f"""<ENVELOPE>
   <HEADER>
-    <VERSION>1</VERSION>
-    <TALLYREQUEST>Export</TALLYREQUEST>
-    <TYPE>Data</TYPE>
-    <ID>Bills Receivable</ID>
+    <TALLYREQUEST>Export Data</TALLYREQUEST>
   </HEADER>
   <BODY>
-    <DESC>
-      <STATICVARIABLES>
-        <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
-        <SVCURRENTCOMPANY>{company_name}</SVCURRENTCOMPANY>
-        <SVFROMDATE TYPE="Date">{from_date}</SVFROMDATE>
-        <SVTODATE TYPE="Date">{to_date}</SVTODATE>
-      </STATICVARIABLES>
-    </DESC>
+    <EXPORTDATA>
+      <REQUESTDESC>
+        <REPORTNAME>Bills Receivable</REPORTNAME>
+        <STATICVARIABLES>
+          <SVCURRENTCOMPANY>{company_name}</SVCURRENTCOMPANY>
+          <SVEXPORTFORMAT>$$SysName:XML</SVEXPORTFORMAT>
+        </STATICVARIABLES>
+      </REQUESTDESC>
+    </EXPORTDATA>
   </BODY>
 </ENVELOPE>"""

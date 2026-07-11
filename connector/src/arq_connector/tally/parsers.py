@@ -1,18 +1,10 @@
 """XML -> dataclass parsers for Tally responses.
 
-WARNING: field/tag names here follow the plan doc's documented skeletons but
-have NOT been checked against a real Tally response (no live gateway was
-available while this was written). Per the plan's rule 3 in section 10:
-"Never invent Tally field names. When a parser fails, dump raw XML to a
-debug file and inspect." Before relying on this in production:
-  1. Run `arq-connector pull` against live Tally.
-  2. Dump the raw XML into tests/fixtures/ (client.py already gives you the
-     decoded, control-char-stripped text).
-  3. Compare actual tag names to the ones referenced below and fix any
-     mismatches.
-`parse_bills_receivable` is the least certain of the three: the plan's XML
-skeleton for it is a full report export with no FETCH field list, so the tag
-names it looks for are best-effort guesses, not confirmed values.
+`parse_companies` and `parse_debtor_ledgers` are live-verified against a real
+TallyPrime instance (see tests/fixtures/). `parse_bills_receivable` is also
+live-verified, but only against a single real bill -- its assumption about
+how multiple bills repeat in the response is inferred, not independently
+confirmed (see that function's docstring).
 """
 from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
@@ -117,34 +109,73 @@ def parse_debtor_ledgers(xml_text: str) -> list[LedgerRecord]:
     return ledgers
 
 
-_BILL_ELEMENT_CANDIDATES = ("BILLDETAILS", "BILL", "BILLALLOCATIONS.LIST")
-
-
 def parse_bills_receivable(xml_text: str) -> list[BillRecord]:
-    """Best-effort parse — see module docstring. Validate against a live fixture."""
+    """LIVE-VERIFIED against a real TallyPrime "Bills Receivable" export.
+
+    The response shape is flat and unusual: no per-bill wrapper element.
+    Instead <BILLFIXED>(date, ref, party)</BILLFIXED> is followed by sibling
+    <BILLCL> (pending amount), <BILLDUE> (due date), <BILLOVERDUE> (overdue
+    days) elements directly under <ENVELOPE>, e.g.:
+
+        <ENVELOPE>
+         <BILLFIXED>
+          <BILLDATE>1-Apr-26</BILLDATE>
+          <BILLREF>2</BILLREF>
+          <BILLPARTY>Alpha Customer</BILLPARTY>
+         </BILLFIXED>
+         <BILLCL>-508989.00</BILLCL>
+         <BILLDUE>1-Apr-26</BILLDUE>
+         <BILLOVERDUE>62</BILLOVERDUE>
+        </ENVELOPE>
+
+    Confirmed against exactly one real bill. The repeating-group assumption
+    for multiple bills (another BILLFIXED + trailing siblings appearing again
+    in document order) is inferred, not independently confirmed -- verify
+    against a company with 2+ outstanding bills before fully trusting this
+    with multiple rows.
+
+    Note pending_amount is returned exactly as Tally sends it (here,
+    negative) -- no sign flip is applied since the correct convention wasn't
+    independently confirmed. Check this against the Bills Receivable screen
+    in Tally directly.
+    """
     root = ET.fromstring(xml_text)
     bills = []
-    for tag in _BILL_ELEMENT_CANDIDATES:
-        for el in root.iter(tag):
-            party_name = (
-                _text(el, "PARTYNAME") or _text(el, "BILLPARTYNAME") or _text(el, "NAME")
-            )
-            pending = _decimal(
-                _text(el, "PENDINGAMOUNT") or _text(el, "CLOSINGBALANCE") or _text(el, "AMOUNT")
-            )
-            if not party_name or pending is None:
-                continue
-            bills.append(
-                BillRecord(
-                    party_guid=_text(el, "PARTYGUID") or _text(el, "GUID"),
-                    party_name=party_name,
-                    bill_ref=_text(el, "BILLREF") or _text(el, "NAME"),
-                    bill_date=_text(el, "BILLDATE") or _text(el, "DATE"),
-                    due_date=_text(el, "DUEDATE") or _text(el, "BILLDUEDATE"),
-                    pending_amount=pending,
-                    overdue_days=_int(_text(el, "OVERDUEDAYS")),
-                )
-            )
-        if bills:
-            break
-    return bills
+    current: dict | None = None
+
+    for el in root:
+        if el.tag == "BILLFIXED":
+            if current is not None:
+                bills.append(current)
+            current = {
+                "bill_date": (el.findtext("BILLDATE") or "").strip() or None,
+                "bill_ref": (el.findtext("BILLREF") or "").strip() or None,
+                "party_name": (el.findtext("BILLPARTY") or "").strip() or None,
+                "due_date": None,
+                "pending_amount": None,
+                "overdue_days": None,
+            }
+        elif current is not None:
+            if el.tag == "BILLCL":
+                current["pending_amount"] = _decimal(el.text)
+            elif el.tag == "BILLDUE":
+                current["due_date"] = (el.text or "").strip() or None
+            elif el.tag == "BILLOVERDUE":
+                current["overdue_days"] = _int(el.text)
+
+    if current is not None:
+        bills.append(current)
+
+    return [
+        BillRecord(
+            party_guid=None,
+            party_name=b["party_name"],
+            bill_ref=b["bill_ref"],
+            bill_date=b["bill_date"],
+            due_date=b["due_date"],
+            pending_amount=b["pending_amount"],
+            overdue_days=b["overdue_days"],
+        )
+        for b in bills
+        if b["party_name"] and b["pending_amount"] is not None
+    ]

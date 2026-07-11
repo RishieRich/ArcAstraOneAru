@@ -34,10 +34,7 @@ def pull_snapshot(host: str, port: int, company_name: str) -> dict:
     ledgers_xml = client.post_envelope(debtor_ledgers(company_name))
     ledgers = parse_debtor_ledgers(ledgers_xml)
 
-    books_from = doctor.matched_company.starting_from or "1-Apr-2025"
-    now = datetime.now()
-    today = f"{now.day}-{now.strftime('%b-%Y')}"  # Tally date format, e.g. "6-Jul-2026"
-    bills_xml = client.post_envelope(bills_receivable(company_name, books_from, today))
+    bills_xml = client.post_envelope(bills_receivable(company_name))
     bills = parse_bills_receivable(bills_xml)
 
     return {
