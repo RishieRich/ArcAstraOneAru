@@ -15,6 +15,8 @@ DEFAULTS = {
     "api_base_url": "http://127.0.0.1:8000",
     "interval_hours": 3,
     "log_level": "INFO",
+    "auto_start_tally": True,   # scheduled runs may launch Tally if it's closed
+    "tally_exe_path": "",       # blank = auto-detect common install locations
 }
 
 

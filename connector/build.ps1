@@ -8,6 +8,9 @@ $ErrorActionPreference = "Stop"
 pyinstaller --noconfirm --clean --onefile --windowed `
     --name arq-connector `
     --paths src `
+    --icon src\arq_connector\assets\arq.ico `
+    --add-data "src\arq_connector\assets\arq.ico;assets" `
+    --add-data "src\arq_connector\assets\arq_logo.png;assets" `
     --hidden-import keyring.backends.Windows `
     src\arq_connector\__main__.py
 

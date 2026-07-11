@@ -49,9 +49,22 @@ That data is now in the database. Press it any time you want a fresh push — re
 ## 4. Turn on auto-sync (so it runs by itself)
 
 1. Set the frequency (default **every 3 hours** — anything 1–24).
-2. Press **Enable Auto-Sync**.
+2. Press **Enable**.
 
 That's it. Windows Task Scheduler now runs the sync silently on that schedule whenever the machine is on — the window doesn't need to stay open, and nobody needs to touch anything again. To change the frequency, open the app, change the number, press Enable again. **Disable** turns it off.
+
+### Auto-opening Tally
+
+The checkbox **"Open Tally automatically if it's closed when a sync runs"** (on by default) makes scheduled syncs self-healing: if Tally isn't running when the timer fires, the app launches Tally itself, waits up to 2 minutes for it to be ready, then syncs.
+
+For this to be **fully** hands-free, Tally must also load the company by itself after starting. On a **licensed** TallyPrime, open `tally.ini` (in Tally's install folder, usually `C:\Program Files\TallyPrime\`) and make sure these two lines exist:
+
+```ini
+Default Companies=Yes
+Load=<company number>     ; the folder name under Tally's data directory, e.g. 100001
+```
+
+**Educational-mode Tally** (no license) always stops at its startup screen and waits for a keypress — Tally ignores the preload setting there. In that case the sync completes on the next run after someone opens Tally. This is a Tally limitation, not a connector setting.
 
 ---
 

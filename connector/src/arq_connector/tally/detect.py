@@ -39,6 +39,8 @@ def is_tally_process_running() -> bool:
             capture_output=True,
             text=True,
             timeout=10,
+            stdin=subprocess.DEVNULL,       # windowed exe: no valid std handles
+            creationflags=0x08000000,       # CREATE_NO_WINDOW — no console flash
         ).stdout.lower()
     except (OSError, subprocess.SubprocessError):
         return False

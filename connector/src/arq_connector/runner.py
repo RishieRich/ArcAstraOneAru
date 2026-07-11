@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from .security import credentials
 from .sync.pusher import PushError, push_snapshot
 from .sync.snapshot import SnapshotError, pull_snapshot
-from .tally.detect import run_doctor, EXIT_HEALTHY
+from .tally.detect import run_doctor, EXIT_HEALTHY, EXIT_NOT_RUNNING, EXIT_NO_COMPANY
+from .tally.launcher import ensure_tally_ready
 
 
 @dataclass(frozen=True)
@@ -35,6 +36,10 @@ def run_sync(settings: dict, logger: logging.Logger) -> SyncOutcome:
         port=int(settings["tally_port"]),
         configured_company=company,
     )
+    if doctor.exit_code in (EXIT_NOT_RUNNING, EXIT_NO_COMPANY):
+        # Tally closed (or still loading its company) — try to rescue the run
+        # by launching Tally and waiting for it, if the setting allows.
+        doctor = ensure_tally_ready(settings, doctor, logger)
     if doctor.exit_code != EXIT_HEALTHY:
         logger.warning("sync skipped: doctor exit=%s", doctor.exit_code)
         return SyncOutcome(ok=False, message=doctor.message)

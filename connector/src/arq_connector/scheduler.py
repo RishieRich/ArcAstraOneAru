@@ -27,6 +27,7 @@ def _schtasks(*args: str) -> subprocess.CompletedProcess:
         ["schtasks", *args],
         capture_output=True,
         text=True,
+        stdin=subprocess.DEVNULL,  # windowed exe: no valid std handles
         creationflags=_NO_WINDOW,
     )
 
