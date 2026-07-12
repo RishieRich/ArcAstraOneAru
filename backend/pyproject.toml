@@ -1,0 +1,10 @@
+[project]
+name = "arq-tally-backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+
+# Vercel's FastAPI preset auto-scans for an ASGI `app` and refuses to guess when
+# it finds several (api/index.py, app/main.py, tests/conftest.py). Name it.
+# Path is relative to the Vercel Root Directory, which MUST be set to `backend`.
+[tool.vercel]
+entrypoint = "api.index:app"
