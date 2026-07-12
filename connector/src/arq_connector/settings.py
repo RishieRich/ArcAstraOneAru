@@ -13,7 +13,7 @@ from pathlib import Path
 # machine but this one. Override at build time with ARQ_API_BASE_URL if you
 # prefer not to edit the file.
 DEFAULT_API_BASE_URL = os.environ.get(
-    "ARQ_API_BASE_URL", "https://arq-tally-backend.vercel.app"
+    "ARQ_API_BASE_URL", "https://arcastraone.vercel.app"
 )
 
 DEFAULTS = {
