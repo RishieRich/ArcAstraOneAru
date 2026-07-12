@@ -11,11 +11,16 @@ which is what "outstanding" means to the reader.
 """
 from decimal import Decimal
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.dashauth import require_dashboard_user
 from app.db import get_connection
 
-router = APIRouter(prefix="/v1/dashboard", tags=["dashboard"])
+router = APIRouter(
+    prefix="/v1/dashboard",
+    tags=["dashboard"],
+    dependencies=[Depends(require_dashboard_user)],
+)
 
 
 def _num(value) -> float:
@@ -85,11 +90,15 @@ def metrics(tenant_id: str) -> dict:
             "tenant_name": tenant_name,
             "has_data": False,
             "totals": {
-                "outstanding": 0.0, "overdue": 0.0, "bill_count": 0,
+                "outstanding": 0.0, "overdue": 0.0, "not_due": 0.0, "bill_count": 0,
                 "party_count": 0, "ledger_count": ledger_count,
                 "ledger_balance": _num(ledger_balance),
+                "avg_overdue_days": 0, "max_overdue_days": 0,
+                "overdue_bill_count": 0, "concentration_pct": 0,
+                "top_party": None, "largest_bill": None,
             },
-            "aging": [], "top_debtors": [], "bills": [],
+            "aging": [], "top_debtors": [], "bills": [], "due_timeline": [],
+            "oldest_bills": [], "alerts": [], "notes": [],
             "last_sync_at": ledgers_updated.isoformat() if ledgers_updated else None,
         }
         if run_id is None:
@@ -100,12 +109,16 @@ def metrics(tenant_id: str) -> dict:
             select count(*),
                    coalesce(sum(abs(pending_amount)), 0),
                    coalesce(sum(abs(pending_amount)) filter (where coalesce(overdue_days, 0) > 0), 0),
-                   count(distinct party_name)
+                   count(distinct party_name),
+                   count(*) filter (where coalesce(overdue_days, 0) > 0),
+                   coalesce(max(coalesce(overdue_days, 0)), 0),
+                   coalesce(avg(overdue_days) filter (where coalesce(overdue_days, 0) > 0), 0)
             from bills where tenant_id = %s and sync_run_id = %s
             """,
             (tenant_id, run_id),
         )
-        bill_count, outstanding, overdue, party_count = cur.fetchone()
+        (bill_count, outstanding, overdue, party_count,
+         overdue_bill_count, max_overdue, avg_overdue) = cur.fetchone()
 
         # Aging buckets. Ordered, so the dashboard renders them as an ordinal ramp.
         cur.execute(
@@ -143,9 +156,53 @@ def metrics(tenant_id: str) -> dict:
             """,
             (tenant_id, run_id),
         )
+        total_out = _num(outstanding) or 1.0
         top_debtors = [
-            {"party": p, "amount": _num(amt), "max_overdue_days": days, "bills": n}
+            {
+                "party": p,
+                "amount": _num(amt),
+                "max_overdue_days": days,
+                "bills": n,
+                "pct": round(_num(amt) / total_out * 100, 1),
+            }
             for p, amt, days, n in cur.fetchall()
+        ]
+
+        # Money due per calendar month (past months = should already have come
+        # in; future = collection outlook), split by overdue vs on-track.
+        cur.execute(
+            """
+            select to_char(date_trunc('month', due_date), 'YYYY-MM') as ym,
+                   coalesce(sum(abs(pending_amount)) filter (where coalesce(overdue_days, 0) > 0), 0),
+                   coalesce(sum(abs(pending_amount)) filter (where coalesce(overdue_days, 0) <= 0), 0),
+                   count(*)
+            from bills
+            where tenant_id = %s and sync_run_id = %s and due_date is not null
+            group by 1 order by 1
+            """,
+            (tenant_id, run_id),
+        )
+        due_timeline = [
+            {"month": ym, "overdue": _num(od), "on_track": _num(ok), "bills": n}
+            for ym, od, ok, n in cur.fetchall()
+        ]
+
+        cur.execute(
+            """
+            select party_name, bill_ref, due_date, abs(pending_amount), coalesce(overdue_days, 0)
+            from bills where tenant_id = %s and sync_run_id = %s and coalesce(overdue_days, 0) > 0
+            order by overdue_days desc, abs(pending_amount) desc
+            limit 5
+            """,
+            (tenant_id, run_id),
+        )
+        oldest_bills = [
+            {
+                "party": p, "bill_ref": ref,
+                "due_date": dd.isoformat() if dd else None,
+                "amount": _num(amt), "overdue_days": days,
+            }
+            for p, ref, dd, amt, days in cur.fetchall()
         ]
 
         cur.execute(
@@ -176,6 +233,46 @@ def metrics(tenant_id: str) -> dict:
         finished, started = cur.fetchone()
         last_sync = finished or started
 
+    largest_bill = bills[0] if bills else None  # bills come back sorted by amount desc
+    top_party = top_debtors[0] if top_debtors else None
+    concentration_pct = top_party["pct"] if top_party else 0
+    overdue_share = _num(overdue) / total_out * 100 if bill_count else 0
+    ninety_plus = [b for b in bills if b["overdue_days"] > 90]
+
+    # Language-neutral alert facts; the dashboard renders them in the UI language.
+    alerts = []
+    if concentration_pct >= 35 and party_count > 1:
+        alerts.append({
+            "id": "concentration", "severity": "urgent" if concentration_pct >= 50 else "watch",
+            "data": {"party": top_party["party"], "pct": concentration_pct,
+                     "amount": top_party["amount"]},
+        })
+    if ninety_plus:
+        alerts.append({
+            "id": "ninety_plus", "severity": "urgent",
+            "data": {"count": len(ninety_plus),
+                     "amount": round(sum(b["amount"] for b in ninety_plus), 2),
+                     "oldest_days": max(b["overdue_days"] for b in ninety_plus)},
+        })
+    if overdue_share >= 35 and bill_count > 0:
+        alerts.append({
+            "id": "overdue_share", "severity": "urgent" if overdue_share >= 60 else "watch",
+            "data": {"pct": round(overdue_share), "amount": _num(overdue)},
+        })
+    if largest_bill and bill_count > 1 and largest_bill["amount"] / total_out >= 0.5:
+        alerts.append({
+            "id": "big_bill", "severity": "watch",
+            "data": {"party": largest_bill["party"], "ref": largest_bill["bill_ref"],
+                     "amount": largest_bill["amount"],
+                     "pct": round(largest_bill["amount"] / total_out * 100)},
+        })
+
+    notes = [
+        {"id": "snapshot", "data": {"bills": bill_count, "parties": party_count}},
+        {"id": "sign", "data": {}},
+        {"id": "scope", "data": {}},
+    ]
+
     return {
         "tenant_id": tenant_id,
         "tenant_name": tenant_name,
@@ -183,13 +280,24 @@ def metrics(tenant_id: str) -> dict:
         "totals": {
             "outstanding": _num(outstanding),
             "overdue": _num(overdue),
+            "not_due": round(_num(outstanding) - _num(overdue), 2),
             "bill_count": bill_count,
             "party_count": party_count,
             "ledger_count": ledger_count,
             "ledger_balance": _num(ledger_balance),
+            "avg_overdue_days": round(_num(avg_overdue)),
+            "max_overdue_days": max_overdue,
+            "overdue_bill_count": overdue_bill_count,
+            "concentration_pct": concentration_pct,
+            "top_party": top_party["party"] if top_party else None,
+            "largest_bill": largest_bill,
         },
         "aging": aging,
         "top_debtors": top_debtors,
         "bills": bills,
+        "due_timeline": due_timeline,
+        "oldest_bills": oldest_bills,
+        "alerts": alerts,
+        "notes": notes,
         "last_sync_at": last_sync.isoformat() if last_sync else None,
     }

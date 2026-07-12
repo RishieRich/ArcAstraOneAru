@@ -1,12 +1,11 @@
 import { formatMoney } from "../api";
+import { IconFile } from "../icons";
 
 export default function BillsTable({ bills, t }) {
   return (
     <div className="card">
-      <h3>{t.billsTable}</h3>
-      <p className="sub">
-        {bills.length} {bills.length === 1 ? "bill" : "bills"}
-      </p>
+      <h3><span className="ico"><IconFile /></span>{t.billsTable}</h3>
+      <p className="sub">{t.invoices(bills.length)}</p>
 
       {bills.length === 0 ? (
         <div className="empty-mini">{t.empty}</div>

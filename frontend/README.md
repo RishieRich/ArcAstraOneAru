@@ -2,9 +2,26 @@
 
 React (Vite) dashboard on top of the same Neon database the connector pushes into.
 Reads live data through the backend's `/v1/dashboard/*` endpoints and answers
-natural-language questions through `/v1/ask`.
+natural-language questions through `/v1/ask`. English / Hinglish / Gujarati UI.
 
 Deploys to Vercel as its **own project**, separate from `backend/`.
+
+---
+
+## Login (email + 4-digit PIN)
+
+The dashboard is behind a login. Create users from `backend/` with the venv active:
+
+```
+python -m app.admin create-dashboard-user --email someone@x.com --pin 4321 --name "Someone"
+python -m app.admin list-dashboard-users
+python -m app.admin delete-dashboard-user --email someone@x.com
+```
+
+Re-running `create-dashboard-user` for an existing email **resets that user's PIN**.
+Sessions last 7 days; `/v1/dashboard/*` and `/v1/ask` reject requests without a
+valid session token. The signing secret is `DASHBOARD_SECRET` if set (recommended
+in Vercel), otherwise derived from `DATABASE_URL`.
 
 ---
 

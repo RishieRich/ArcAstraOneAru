@@ -10,13 +10,18 @@ Gujarati-English. No key configured -> 503 with a fixable message, never a 500.
 import json
 import os
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
+from app.dashauth import require_dashboard_user
 from app.db import get_connection
 from app.routers.dashboard import metrics
 from app.schemas_ask import AskRequest, AskResponse
 
-router = APIRouter(prefix="/v1/ask", tags=["ask"])
+router = APIRouter(
+    prefix="/v1/ask",
+    tags=["ask"],
+    dependencies=[Depends(require_dashboard_user)],
+)
 
 MODEL = "claude-opus-4-8"
 

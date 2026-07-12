@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.db import get_connection
-from app.routers import ask, dashboard, devices, sync
+from app.routers import ask, auth_dashboard, dashboard, devices, sync
 
 app = FastAPI(title="ARQ Tally Connector API")
 
@@ -23,6 +23,7 @@ app.include_router(devices.router)
 app.include_router(sync.router)
 app.include_router(dashboard.router)
 app.include_router(ask.router)
+app.include_router(auth_dashboard.router)
 
 
 @app.get("/health")

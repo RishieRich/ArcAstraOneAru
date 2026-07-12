@@ -1,4 +1,5 @@
 import { formatMoney } from "../api";
+import { IconClock } from "../icons";
 
 /* Aging buckets are ordered, so they get the ordinal blue ramp:
    light = fresh, dark = old. Each bar is directly labelled, and the
@@ -11,7 +12,7 @@ export default function AgingChart({ aging, t }) {
 
   return (
     <div className="card">
-      <h3>{t.aging}</h3>
+      <h3><span className="ico"><IconClock /></span>{t.aging}</h3>
       <p className="sub">{t.agingSub}</p>
 
       {!anyAmount ? (
@@ -36,9 +37,7 @@ export default function AgingChart({ aging, t }) {
                 </div>
                 <div className="val">
                   {formatMoney(bucket.amount, { compact: true })}
-                  <small>
-                    {bucket.bills} {bucket.bills === 1 ? "bill" : "bills"}
-                  </small>
+                  <small>{t.invoices(bucket.bills)}</small>
                 </div>
               </div>
             ))}
