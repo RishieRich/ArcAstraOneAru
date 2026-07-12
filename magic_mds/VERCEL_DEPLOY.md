@@ -8,8 +8,8 @@ Goal: backend live on Vercel → bake that URL into the exe → hand the exe to 
 
 | File | Why |
 |---|---|
-| `backend/api/index.py` | **New.** Vercel's Python runtime looks for `api/*.py` exposing an ASGI `app`. Adds `backend/` to `sys.path` then imports the existing FastAPI app — no rewrite of your app code. |
-| `backend/vercel.json` | **New.** Rewrites every path to `/api/index` so `/v1/sync`, `/v1/devices/register`, `/health` all reach FastAPI. |
+| `backend/api/index.py` | **New.** The ASGI entrypoint. Adds `backend/` to `sys.path` then imports the existing FastAPI app — no rewrite of your app code. |
+| `backend/pyproject.toml` | **New.** Vercel CLI 55 auto-detects FastAPI and **refuses to build if several modules expose an `app`** (ours: `api/index.py`, `app/main.py`, `tests/conftest.py`). `[tool.vercel] entrypoint = "api.index:app"` names the right one. |
 | `backend/requirements.txt` | **New.** Runtime deps only (no uvicorn/pytest) for faster cold starts. Vercel installs from the Root Directory, so it must live here — the repo-root `requirements.txt` stays for local dev/tests. |
 | `backend/app/db.py` | `DATABASE_URL` is now read **at call time**, not import time, and a missing `.env` is no longer fatal. On Vercel there is no `.env`; the var is injected by the platform. |
 | `backend/app/main.py` | Added CORS (for the future JSX dashboard) + a `GET /health/db` endpoint that proves the deployment can actually reach Neon. |
@@ -103,6 +103,7 @@ So: **exe + pairing code from you = works.** Exe alone = they can't pair.
 
 ## If something breaks
 
+- **`No FastAPI entrypoint found in default locations`** → `backend/pyproject.toml` is missing or Root Directory isn't `backend`. If the error lists paths as `backend/api/index.py` (with the `backend/` prefix), that's the tell: Vercel is scanning from the repo root, so Root Directory was never set.
 - **404 on every route** → Root Directory wasn't set to `backend`.
 - **500 / `FUNCTION_INVOCATION_FAILED`** → check Vercel → your project → **Logs**. Usually a missing `DATABASE_URL`.
 - **`/health` works but `/health/db` doesn't** → env var problem, not a code problem.
