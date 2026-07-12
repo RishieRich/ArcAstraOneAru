@@ -1,0 +1,7 @@
+# Runtime deps for the Vercel deployment (backend/ is the Vercel Root Directory).
+# Kept lean on purpose — no uvicorn/pytest — to keep serverless cold starts fast.
+# Local dev + tests still use the repo-root requirements.txt.
+fastapi>=0.134
+psycopg[binary]>=3.2
+pydantic>=2.7
+python-dotenv>=1.0

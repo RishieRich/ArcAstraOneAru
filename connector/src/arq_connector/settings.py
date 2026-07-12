@@ -8,11 +8,19 @@ import json
 import os
 from pathlib import Path
 
+# The backend the shipped exe talks to. Set this to the Vercel URL before
+# running build.ps1 — an exe built with the localhost default will fail on any
+# machine but this one. Override at build time with ARQ_API_BASE_URL if you
+# prefer not to edit the file.
+DEFAULT_API_BASE_URL = os.environ.get(
+    "ARQ_API_BASE_URL", "https://arq-tally-backend.vercel.app"
+)
+
 DEFAULTS = {
     "tally_host": "localhost",
     "tally_port": 9000,
     "company_name": "",
-    "api_base_url": "http://127.0.0.1:8000",
+    "api_base_url": DEFAULT_API_BASE_URL,
     "interval_hours": 3,
     "log_level": "INFO",
     "auto_start_tally": True,   # scheduled runs may launch Tally if it's closed
