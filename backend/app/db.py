@@ -1,4 +1,5 @@
 import os
+import time
 from pathlib import Path
 
 import psycopg
@@ -22,4 +23,15 @@ def get_database_url() -> str:
 def get_connection() -> psycopg.Connection:
     # Read at call time, not import time: on Vercel the module may be imported
     # during the build, before env vars are injected into the runtime.
-    return psycopg.connect(get_database_url())
+    url = get_database_url()
+    # Neon suspends its free-tier compute after ~5 min idle; the first connect
+    # during wake-up can fail transiently. Retry instead of crashing the
+    # invocation (which surfaced to connectors as FUNCTION_INVOCATION_FAILED).
+    last_error: psycopg.OperationalError | None = None
+    for attempt in range(3):
+        try:
+            return psycopg.connect(url, connect_timeout=10)
+        except psycopg.OperationalError as e:
+            last_error = e
+            time.sleep(1 + attempt)
+    raise last_error

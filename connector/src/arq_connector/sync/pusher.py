@@ -11,8 +11,15 @@ from datetime import date, datetime
 
 import httpx
 
-REQUEST_TIMEOUT_SECONDS = 15.0
+# Generous timeout: a first-ever push of a big company is thousands of rows,
+# and the backend DB (Neon free tier) adds a cold-start pause after idling.
+REQUEST_TIMEOUT_SECONDS = 60.0
 MAX_ATTEMPTS = 3
+
+# Transient server-side statuses worth retrying. Safe for /v1/sync because the
+# sync_run_id makes retries idempotent, and harmless for register (a retry of
+# a *failed* registration never issued a token).
+_RETRYABLE_STATUSES = {500, 502, 503, 504}
 
 # Formats seen from live Tally: "1-Apr-26" (Bills Receivable report),
 # "20260401" (STARTINGFROM). "%d-%b-%Y" included defensively for full-year
@@ -69,14 +76,21 @@ def build_payload(snapshot: dict, sync_run_id: str | None = None) -> dict:
 
 def _post_with_retries(url: str, json_body: dict, headers: dict, transport=None) -> httpx.Response:
     last_error: Exception | None = None
+    last_response: httpx.Response | None = None
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             with httpx.Client(timeout=REQUEST_TIMEOUT_SECONDS, transport=transport) as client:
-                return client.post(url, json=json_body, headers=headers)
+                resp = client.post(url, json=json_body, headers=headers)
         except httpx.RequestError as e:
             last_error = e
-            if attempt < MAX_ATTEMPTS:
-                time.sleep(2 ** (attempt - 1))  # 1s, 2s backoff
+        else:
+            if resp.status_code not in _RETRYABLE_STATUSES:
+                return resp
+            last_response = resp  # transient backend hiccup — retry
+        if attempt < MAX_ATTEMPTS:
+            time.sleep(2 ** (attempt - 1))  # 1s, 2s backoff
+    if last_response is not None:
+        return last_response
     raise PushError(f"Could not reach the backend at {url}: {last_error}")
 
 
@@ -84,6 +98,10 @@ def _error_detail(resp: httpx.Response) -> str:
     try:
         return resp.json().get("detail", resp.text[:200])
     except ValueError:
+        # Vercel's plain-text error pages (FUNCTION_INVOCATION_FAILED etc.)
+        # mean the backend briefly fell over — say so in plain words.
+        if "FUNCTION_" in resp.text or "A server error has occurred" in resp.text:
+            return "the backend had a temporary server error — wait a minute and push again"
         return resp.text[:200]
 
 

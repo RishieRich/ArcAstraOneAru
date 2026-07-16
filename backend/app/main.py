@@ -1,12 +1,32 @@
+import logging
 import os
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app.db import get_connection
 from app.routers import ask, auth_dashboard, dashboard, devices, sync
 
+logger = logging.getLogger("arq.api")
+
 app = FastAPI(title="ARQ Tally Connector API")
+
+
+# On Vercel's Python runtime an exception that escapes the ASGI app kills the
+# whole invocation — clients get Vercel's opaque FUNCTION_INVOCATION_FAILED
+# page instead of a JSON error. Catch everything here so the connector always
+# receives a parseable {"detail": ...} body it can show and retry on.
+@app.middleware("http")
+async def json_errors_for_unhandled_exceptions(request: Request, call_next):
+    try:
+        return await call_next(request)
+    except Exception as exc:  # noqa: BLE001 — last-resort boundary
+        logger.exception("unhandled error on %s %s", request.method, request.url.path)
+        return JSONResponse(
+            status_code=500,
+            content={"detail": f"Internal error ({type(exc).__name__}): {exc}"},
+        )
 
 # The connector (a desktop exe) is not a browser and ignores CORS, but the
 # planned JSX metrics dashboard is. Set CORS_ORIGINS in Vercel to a
