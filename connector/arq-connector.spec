@@ -5,7 +5,7 @@ a = Analysis(
     ['src\\arq_connector\\__main__.py'],
     pathex=['src'],
     binaries=[],
-    datas=[('src/arq_connector/assets/arq.ico', 'assets'), ('src/arq_connector/assets/arq_logo.png', 'assets')],
+    datas=[('src\\arq_connector\\assets\\arq.ico', 'assets'), ('src\\arq_connector\\assets\\arq_logo.png', 'assets')],
     hiddenimports=['keyring.backends.Windows'],
     hookspath=[],
     hooksconfig={},
