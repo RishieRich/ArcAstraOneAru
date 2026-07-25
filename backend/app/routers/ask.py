@@ -1,14 +1,22 @@
 """Natural-language Q&A over one company's receivables.
 
 The whole snapshot for a tenant is small (a few hundred bills at most), so it is
-serialised into the prompt rather than given to Claude as a query tool. If a
+serialised into the prompt rather than given to the model as a query tool. If a
 tenant ever outgrows that, swap this for tool-use against the DB.
 
+LLM routing: Google Gemini is primary, Groq is the fallback. Both speak the
+OpenAI chat-completions dialect, so one request/response shape serves both — only
+the base URL, key, and model name differ. If the primary errors (or is
+unconfigured) we transparently try the fallback; if neither is configured the
+endpoint returns a fixable 503, never a 500.
+
 Answers mirror the language the user wrote in: English, Hinglish, or
-Gujarati-English. No key configured -> 503 with a fixable message, never a 500.
+Gujarati-English.
 """
 import json
 import os
+import urllib.error
+import urllib.request
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -23,7 +31,20 @@ router = APIRouter(
     dependencies=[Depends(require_dashboard_user)],
 )
 
-MODEL = "claude-opus-4-8"
+# Primary provider. Gemini exposes an OpenAI-compatible surface at this path.
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+# "gemini-flash-latest" is an alias that always resolves to the current stable
+# Flash model, so it never goes stale the way a pinned version can.
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+
+# Fallback provider.
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+# Per-request wall-clock budget. Comfortably under Vercel's 300s function limit
+# while still letting a slow first token through.
+REQUEST_TIMEOUT = 45
+MAX_TOKENS = 1200
 
 SYSTEM = """You are the ARQ receivables assistant. You help Indian small-business \
 owners understand who owes them money, according to their Tally data.
@@ -54,14 +75,56 @@ outside receivables (purchases, stock, profit, GST), tell them this tool only se
 Sundry Debtors and unpaid sales bills."""
 
 
-def _api_key() -> str:
-    key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
-    if not key:
-        raise HTTPException(
-            status_code=503,
-            detail="AI is not configured on the server. Set ANTHROPIC_API_KEY and restart.",
-        )
-    return key
+class _ProviderError(Exception):
+    """A single provider failed; carries enough context to log and fall back."""
+
+    def __init__(self, provider: str, message: str):
+        super().__init__(f"{provider}: {message}")
+        self.provider = provider
+        self.message = message
+
+
+def _providers() -> list[tuple[str, str, str, str]]:
+    """Configured providers in priority order: (name, url, key, model)."""
+    out: list[tuple[str, str, str, str]] = []
+    gemini = os.environ.get("GEMINI_API_KEY", "").strip()
+    if gemini:
+        out.append(("gemini", GEMINI_URL, gemini, GEMINI_MODEL))
+    groq = os.environ.get("GROQ_API_KEY", "").strip()
+    if groq:
+        out.append(("groq", GROQ_URL, groq, GROQ_MODEL))
+    return out
+
+
+def _call(provider: str, url: str, key: str, model: str, messages: list[dict]) -> str:
+    """POST one OpenAI-style chat completion, return the assistant text."""
+    body = json.dumps(
+        {
+            "model": model,
+            "messages": messages,
+            "max_tokens": MAX_TOKENS,
+            "temperature": 0.3,
+        }
+    ).encode()
+    req = urllib.request.Request(
+        url,
+        data=body,
+        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
+            data = json.loads(resp.read())
+    except urllib.error.HTTPError as e:
+        detail = e.read().decode("utf-8", "replace")[:300]
+        raise _ProviderError(provider, f"HTTP {e.code}: {detail}")
+    except (urllib.error.URLError, TimeoutError, OSError) as e:
+        raise _ProviderError(provider, f"network error: {e}")
+
+    try:
+        return (data["choices"][0]["message"]["content"] or "").strip()
+    except (KeyError, IndexError, TypeError):
+        raise _ProviderError(provider, f"unexpected response shape: {str(data)[:200]}")
 
 
 def build_context(tenant_id: str) -> str:
@@ -96,40 +159,39 @@ def build_context(tenant_id: str) -> str:
 
 @router.post("", response_model=AskResponse)
 def ask(payload: AskRequest) -> AskResponse:
-    import anthropic
-
-    key = _api_key()
-    context = build_context(payload.tenant_id)
-
-    client = anthropic.Anthropic(api_key=key)
-    try:
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=1200,
-            thinking={"type": "adaptive"},
-            output_config={"effort": "medium"},
-            system=[
-                {"type": "text", "text": SYSTEM},
-                {
-                    "type": "text",
-                    "text": f"<receivables_data>\n{context}\n</receivables_data>",
-                    "cache_control": {"type": "ephemeral"},
-                },
-            ],
-            messages=[
-                *[{"role": m.role, "content": m.content} for m in payload.history],
-                {"role": "user", "content": payload.question},
-            ],
+    providers = _providers()
+    if not providers:
+        raise HTTPException(
+            status_code=503,
+            detail="AI is not configured on the server. Set GEMINI_API_KEY "
+            "(and optionally GROQ_API_KEY) and redeploy.",
         )
-    except anthropic.AuthenticationError:
-        raise HTTPException(status_code=503, detail="ANTHROPIC_API_KEY is invalid.")
-    except anthropic.RateLimitError:
-        raise HTTPException(status_code=429, detail="AI is busy right now. Try again in a moment.")
-    except anthropic.APIError as e:
-        raise HTTPException(status_code=502, detail=f"AI request failed: {e}")
 
-    if response.stop_reason == "refusal":
-        raise HTTPException(status_code=422, detail="The assistant declined to answer that.")
+    context = build_context(payload.tenant_id)
+    messages = [
+        {
+            "role": "system",
+            "content": f"{SYSTEM}\n\n<receivables_data>\n{context}\n</receivables_data>",
+        },
+        *[{"role": m.role, "content": m.content} for m in payload.history],
+        {"role": "user", "content": payload.question},
+    ]
 
-    answer = "".join(b.text for b in response.content if b.type == "text").strip()
-    return AskResponse(answer=answer or "I could not answer that from the synced data.")
+    failures: list[str] = []
+    for provider, url, key, model in providers:
+        try:
+            answer = _call(provider, url, key, model, messages)
+        except _ProviderError as e:
+            print(f"[ask] provider failed, falling back if possible -> {e}")
+            failures.append(str(e))
+            continue
+        if answer:
+            return AskResponse(answer=answer)
+        failures.append(f"{provider}: empty answer")
+
+    # Every configured provider failed.
+    print(f"[ask] all providers failed: {failures}")
+    raise HTTPException(
+        status_code=502,
+        detail="AI is temporarily unavailable. Please try again in a moment.",
+    )
