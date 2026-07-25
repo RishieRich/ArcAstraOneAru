@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.db import get_connection
-from app.routers import ask, auth_dashboard, dashboard, devices, sync
+from app.routers import ask, auth_dashboard, dashboard, devices, imports, sync
 
 logger = logging.getLogger("arq.api")
 
@@ -44,6 +44,7 @@ app.include_router(sync.router)
 app.include_router(dashboard.router)
 app.include_router(ask.router)
 app.include_router(auth_dashboard.router)
+app.include_router(imports.router)
 
 
 @app.get("/health")

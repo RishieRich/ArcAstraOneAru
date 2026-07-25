@@ -49,3 +49,12 @@ export const IconSpark = (p) => (
 export const IconShield = (p) => (
   <svg {...base} {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10" /></svg>
 );
+export const IconUpload = (p) => (
+  <svg {...base} {...p}><path d="M12 16V4M7 9l5-5 5 5" /><path d="M5 20h14a2 2 0 0 0 2-2v-3M3 15v3a2 2 0 0 0 2 2" /></svg>
+);
+export const IconWallet = (p) => (
+  <svg {...base} {...p}><path d="M20 7V5a2 2 0 0 0-2-2H5a3 3 0 0 0 0 6h16v10a2 2 0 0 1-2 2H5a3 3 0 0 1-3-3V6" /><path d="M16 14h2" /></svg>
+);
+export const IconBox = (p) => (
+  <svg {...base} {...p}><path d="m21 8-9 5-9-5 9-5z" /><path d="m3 8 9 5 9-5v8l-9 5-9-5zM12 13v8" /></svg>
+);

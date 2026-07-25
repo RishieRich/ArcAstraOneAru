@@ -9,6 +9,7 @@ dependencies = [
   "psycopg[binary]>=3.2",
   "pydantic>=2.7",
   "python-dotenv>=1.0",
+  "openpyxl>=3.1",
   # LLM calls (Gemini primary, Groq fallback) go over their OpenAI-compatible
   # REST endpoints via stdlib urllib — no vendor SDK, keeping cold starts lean.
 ]

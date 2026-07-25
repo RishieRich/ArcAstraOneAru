@@ -1,8 +1,8 @@
-"""Natural-language Q&A over one company's receivables.
+"""Natural-language Q&A over one company's receivables and optional uploads.
 
-The whole snapshot for a tenant is small (a few hundred bills at most), so it is
-serialised into the prompt rather than given to the model as a query tool. If a
-tenant ever outgrows that, swap this for tool-use against the DB.
+The normalized snapshot for a tenant is small, so it is serialised into the
+prompt rather than giving the model direct database access. If a tenant ever
+outgrows that, swap this for tool-use against the DB.
 
 LLM routing: Google Gemini is primary, Groq is the fallback. Both speak the
 OpenAI chat-completions dialect, so one request/response shape serves both — only
@@ -46,8 +46,8 @@ GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
 REQUEST_TIMEOUT = 45
 MAX_TOKENS = 1200
 
-SYSTEM = """You are the ARQ receivables assistant. You help Indian small-business \
-owners understand who owes them money, according to their Tally data.
+SYSTEM = """You are the ARQ business-books assistant. You help Indian small-business \
+owners understand receivables and any sales, purchase or expense workbooks they uploaded.
 
 LANGUAGE — this matters most:
 Reply in the SAME language and script the user wrote in. Three cases:
@@ -70,9 +70,11 @@ the user asks for a list.
 TRUTHFULNESS:
 - Answer ONLY from the data given below. Never invent a party, bill or number.
 - If the data cannot answer the question, say so plainly and say what IS available.
-- The data is a snapshot from the last Tally sync; if the user asks about anything \
-outside receivables (purchases, stock, profit, GST), tell them this tool only sees \
-Sundry Debtors and unpaid sales bills."""
+- Receivables come from the latest Tally connector snapshot. Sales, purchases and \
+expenses come only from the uploaded workbook kinds listed in financials.kinds.
+- If a requested data kind was not uploaded, say it is not available.
+- financials.totals.net_flow means sales minus purchases minus expenses. Never call it \
+profit because the uploaded data is not a complete P&L."""
 
 
 class _ProviderError(Exception):
@@ -128,7 +130,7 @@ def _call(provider: str, url: str, key: str, model: str, messages: list[dict]) -
 
 
 def build_context(tenant_id: str) -> str:
-    """The company's whole receivables snapshot, as JSON, for the prompt."""
+    """The company's normalized books snapshot, as JSON, for the prompt."""
     data = metrics(tenant_id)
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
@@ -142,15 +144,52 @@ def build_context(tenant_id: str) -> str:
             {"name": n, "group": g, "closing_balance": float(b) if b is not None else None}
             for n, g, b in cur.fetchall()
         ]
+        cur.execute(
+            """
+            select kind, txn_date, voucher_number, voucher_type, party_name,
+                   category, gross_amount, net_amount, tax_amount
+            from financial_transactions
+            where tenant_id = %s
+            order by txn_date desc nulls last, id desc
+            limit 300
+            """,
+            (tenant_id,),
+        )
+        uploaded_transactions = [
+            {
+                "kind": kind,
+                "date": txn_date.isoformat() if txn_date else None,
+                "voucher_number": voucher_number,
+                "voucher_type": voucher_type,
+                "party": party,
+                "category": category,
+                "gross_amount": float(gross),
+                "net_amount": float(net),
+                "tax_amount": float(tax),
+            }
+            for (
+                kind,
+                txn_date,
+                voucher_number,
+                voucher_type,
+                party,
+                category,
+                gross,
+                net,
+                tax,
+            ) in cur.fetchall()
+        ]
 
     return json.dumps(
         {
             "company": data["tenant_name"],
             "last_sync_at": data["last_sync_at"],
-            "totals": data["totals"],
+            "receivables_totals": data["totals"],
             "aging_buckets": data["aging"],
             "outstanding_bills": data["bills"],
             "customer_ledgers": ledgers,
+            "financials": data["financials"],
+            "uploaded_transactions": uploaded_transactions,
         },
         indent=2,
         default=str,
@@ -171,7 +210,7 @@ def ask(payload: AskRequest) -> AskResponse:
     messages = [
         {
             "role": "system",
-            "content": f"{SYSTEM}\n\n<receivables_data>\n{context}\n</receivables_data>",
+            "content": f"{SYSTEM}\n\n<business_data>\n{context}\n</business_data>",
         },
         *[{"role": m.role, "content": m.content} for m in payload.history],
         {"role": "user", "content": payload.question},

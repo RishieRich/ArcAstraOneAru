@@ -61,6 +61,18 @@ export async function login(email, pin) {
 export const fetchCompanies = () => request("/v1/dashboard/companies");
 export const fetchMetrics = (tenantId) => request(`/v1/dashboard/metrics/${tenantId}`);
 
+export function uploadFinancialFile({ tenantId, kind, file }) {
+  const params = new URLSearchParams({ tenant_id: tenantId, declared_kind: kind });
+  return request(`/v1/imports/financials?${params}`, {
+    method: "POST",
+    headers: {
+      "Content-Type": file.type || "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "X-File-Name": encodeURIComponent(file.name),
+    },
+    body: file,
+  });
+}
+
 export function askAI({ tenantId, question, history }) {
   return request("/v1/ask", {
     method: "POST",

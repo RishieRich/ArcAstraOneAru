@@ -6,6 +6,7 @@ import {
 import { LANGS, T } from "./i18n";
 import {
   IconAlarm, IconChart, IconFile, IconLogout, IconRupee, IconUsers,
+  IconUpload,
 } from "./icons";
 import AgingChart from "./components/AgingChart";
 import Alerts from "./components/Alerts";
@@ -14,6 +15,8 @@ import ChaseList from "./components/ChaseList";
 import Copilot from "./components/Copilot";
 import DataNotes from "./components/DataNotes";
 import DueTimeline from "./components/DueTimeline";
+import FinancialOverview from "./components/FinancialOverview";
+import FinancialUpload from "./components/FinancialUpload";
 import StatTile from "./components/StatTile";
 import TopDebtors from "./components/TopDebtors";
 import Login from "./pages/Login";
@@ -46,14 +49,17 @@ function Dashboard({ t, lang, setLang, session, onLogout }) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showUpload, setShowUpload] = useState(false);
+  const [view, setView] = useState("receivables");
 
   useEffect(() => {
     fetchCompanies()
       .then((list) => {
         setCompanies(list);
-        // Land on a company that actually has bills, so the first screen isn't empty.
+        // Prefer a company with useful data so the first screen is not empty.
         const best =
           [...list].reverse().find((c) => c.has_bills) ||
+          [...list].reverse().find((c) => c.has_financials) ||
           [...list].reverse().find((c) => c.last_sync_at) ||
           list[0];
         setTenantId(best?.id || "");
@@ -71,13 +77,31 @@ function Dashboard({ t, lang, setLang, session, onLogout }) {
     setLoading(true);
     setError("");
     fetchMetrics(tenantId)
-      .then(setData)
+      .then((next) => {
+        setData(next);
+        if (!next.has_receivables_data && next.has_financial_data) setView("financial");
+      })
       .catch((e) => {
         if (e instanceof AuthError) return onLogout();
         setError(e.message);
       })
       .finally(() => setLoading(false));
   }, [tenantId]);
+
+  async function handleImported() {
+    try {
+      const [next, companyList] = await Promise.all([
+        fetchMetrics(tenantId),
+        fetchCompanies(),
+      ]);
+      setData(next);
+      setCompanies(companyList);
+      setView("financial");
+    } catch (refreshError) {
+      if (refreshError instanceof AuthError) return onLogout();
+      setError(refreshError.message);
+    }
+  }
 
   const totals = data?.totals;
 
@@ -102,12 +126,29 @@ function Dashboard({ t, lang, setLang, session, onLogout }) {
 
         <div className="picker">
           <label htmlFor="company">{t.company}</label>
-          <select id="company" value={tenantId} onChange={(e) => setTenantId(e.target.value)}>
+          <select
+            id="company"
+            value={tenantId}
+            onChange={(event) => {
+              setView("receivables");
+              setTenantId(event.target.value);
+            }}
+          >
             {companies.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
         </div>
+
+        <button
+          className="icon-btn upload-trigger"
+          type="button"
+          onClick={() => setShowUpload((open) => !open)}
+          aria-expanded={showUpload}
+        >
+          <IconUpload width={15} height={15} />
+          {t.uploadExcel}
+        </button>
 
         <button className="icon-btn" onClick={onLogout} title={session.email}>
           <IconLogout width={15} height={15} />
@@ -119,7 +160,7 @@ function Dashboard({ t, lang, setLang, session, onLogout }) {
         <div className="content">
           {error && (
             <div className="card state">
-              <h3>Could not reach the backend</h3>
+              <h3>{t.backendError}</h3>
               <p>{error}</p>
             </div>
           )}
@@ -132,87 +173,47 @@ function Dashboard({ t, lang, setLang, session, onLogout }) {
                 <h2>{data.tenant_name}</h2>
                 <span className="meta">
                   <span className="dot-live" />
-                  {t.lastSync}: {formatWhen(data.last_sync_at)}
+                  {t.lastUpdated}: {formatWhen(data.last_activity_at || data.last_sync_at)}
                 </span>
               </div>
 
-              {!data.has_data ? (
+              {showUpload && (
+                <FinancialUpload
+                  tenantId={tenantId}
+                  t={t}
+                  onImported={handleImported}
+                  onClose={() => setShowUpload(false)}
+                />
+              )}
+
+              {data.has_financial_data && (
+                <nav className="view-tabs" aria-label={t.dashboardViews}>
+                  <button
+                    type="button"
+                    aria-pressed={view === "receivables"}
+                    onClick={() => setView("receivables")}
+                  >
+                    {t.receivablesView}
+                  </button>
+                  <button
+                    type="button"
+                    aria-pressed={view === "financial"}
+                    onClick={() => setView("financial")}
+                  >
+                    {t.financialView}
+                  </button>
+                </nav>
+              )}
+
+              {view === "financial" && data.has_financial_data ? (
+                <FinancialOverview financials={data.financials} t={t} />
+              ) : !data.has_receivables_data ? (
                 <div className="card state">
                   <h3>{t.noData}</h3>
                   <p>{t.noDataBody}</p>
                 </div>
               ) : (
-                <>
-                  <div className="tiles">
-                    <StatTile
-                      label={t.outstanding}
-                      value={formatMoney(totals.outstanding, { compact: true })}
-                      foot={formatMoney(totals.outstanding)}
-                      icon={<IconRupee />}
-                      delay={0}
-                    />
-                    <StatTile
-                      label={t.overdue}
-                      value={formatMoney(totals.overdue, { compact: true })}
-                      foot={
-                        totals.outstanding > 0
-                          ? t.ofTotal(Math.round((totals.overdue / totals.outstanding) * 100))
-                          : "—"
-                      }
-                      footTone={totals.overdue > 0 ? "alert" : "ok"}
-                      icon={<IconAlarm />}
-                      tone={totals.overdue > 0 ? "bad" : "good"}
-                      delay={40}
-                    />
-                    <StatTile
-                      label={t.avgOverdue}
-                      value={`${totals.avg_overdue_days} ${t.daysShort}`}
-                      foot={`max ${totals.max_overdue_days} ${t.daysShort}`}
-                      icon={<IconChart />}
-                      tone={totals.avg_overdue_days > 45 ? "bad" : undefined}
-                      delay={80}
-                    />
-                    <StatTile
-                      label={t.bills}
-                      value={totals.bill_count}
-                      foot={`${totals.overdue_bill_count} ${t.overdue.toLowerCase()}`}
-                      footTone={totals.overdue_bill_count > 0 ? "alert" : undefined}
-                      icon={<IconFile />}
-                      delay={120}
-                    />
-                    <StatTile
-                      label={t.customers}
-                      value={totals.party_count}
-                      foot={
-                        totals.top_party
-                          ? `${totals.top_party} · ${totals.concentration_pct}%`
-                          : undefined
-                      }
-                      icon={<IconUsers />}
-                      delay={160}
-                    />
-                  </div>
-
-                  <Alerts alerts={data.alerts} t={t} />
-
-                  <div className="grid-2">
-                    <AgingChart aging={data.aging} t={t} />
-                    <DueTimeline timeline={data.due_timeline} t={t} />
-                  </div>
-
-                  <div className="grid-2">
-                    <TopDebtors debtors={data.top_debtors} t={t} />
-                    <ChaseList bills={data.oldest_bills} t={t} />
-                  </div>
-
-                  <BillsTable bills={data.bills} t={t} />
-
-                  <DataNotes notes={data.notes} t={t} />
-
-                  <div className="footer-note">
-                    ARQ Tally Connector · {t.lastSync}: {formatWhen(data.last_sync_at)}
-                  </div>
-                </>
+                <ReceivablesView data={data} totals={totals} t={t} />
               )}
             </>
           )}
@@ -221,6 +222,81 @@ function Dashboard({ t, lang, setLang, session, onLogout }) {
         <Copilot tenantId={tenantId} t={t} onAuthError={onLogout} />
       </div>
     </div>
+  );
+}
+
+function ReceivablesView({ data, totals, t }) {
+  return (
+    <>
+      <div className="tiles">
+        <StatTile
+          label={t.outstanding}
+          value={formatMoney(totals.outstanding, { compact: true })}
+          foot={formatMoney(totals.outstanding)}
+          icon={<IconRupee />}
+          delay={0}
+        />
+        <StatTile
+          label={t.overdue}
+          value={formatMoney(totals.overdue, { compact: true })}
+          foot={
+            totals.outstanding > 0
+              ? t.ofTotal(Math.round((totals.overdue / totals.outstanding) * 100))
+              : "—"
+          }
+          footTone={totals.overdue > 0 ? "alert" : "ok"}
+          icon={<IconAlarm />}
+          tone={totals.overdue > 0 ? "bad" : "good"}
+          delay={40}
+        />
+        <StatTile
+          label={t.avgOverdue}
+          value={`${totals.avg_overdue_days} ${t.daysShort}`}
+          foot={t.maxOverdue(totals.max_overdue_days)}
+          icon={<IconChart />}
+          tone={totals.avg_overdue_days > 45 ? "bad" : undefined}
+          delay={80}
+        />
+        <StatTile
+          label={t.bills}
+          value={totals.bill_count}
+          foot={`${totals.overdue_bill_count} ${t.overdue.toLowerCase()}`}
+          footTone={totals.overdue_bill_count > 0 ? "alert" : undefined}
+          icon={<IconFile />}
+          delay={120}
+        />
+        <StatTile
+          label={t.customers}
+          value={totals.party_count}
+          foot={
+            totals.top_party
+              ? `${totals.top_party} · ${totals.concentration_pct}%`
+              : undefined
+          }
+          icon={<IconUsers />}
+          delay={160}
+        />
+      </div>
+
+      <Alerts alerts={data.alerts} t={t} />
+
+      <div className="grid-2">
+        <AgingChart aging={data.aging} t={t} />
+        <DueTimeline timeline={data.due_timeline} t={t} />
+      </div>
+
+      <div className="grid-2">
+        <TopDebtors debtors={data.top_debtors} t={t} />
+        <ChaseList bills={data.oldest_bills} t={t} />
+      </div>
+
+      <BillsTable bills={data.bills} t={t} />
+      <DataNotes notes={data.notes} t={t} />
+
+      <div className="footer-note">
+        ARQ Tally Connector · {t.lastSync}: {formatWhen(data.last_sync_at)}
+      </div>
+    </>
   );
 }
 

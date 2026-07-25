@@ -27,6 +27,11 @@ def _num(value) -> float:
     return float(value) if isinstance(value, Decimal) else (value or 0)
 
 
+def _latest_iso(*values: str | None) -> str | None:
+    present = [value for value in values if value]
+    return max(present) if present else None
+
+
 def latest_sync_run_id(cur, tenant_id: str) -> str | None:
     cur.execute(
         "select sync_run_id from bills where tenant_id = %s order by id desc limit 1",
@@ -34,6 +39,175 @@ def latest_sync_run_id(cur, tenant_id: str) -> str | None:
     )
     row = cur.fetchone()
     return row[0] if row else None
+
+
+def _empty_financials() -> dict:
+    return {
+        "has_data": False,
+        "kinds": [],
+        "totals": {
+            "sales": 0.0,
+            "purchase": 0.0,
+            "expense": 0.0,
+            "net_flow": 0.0,
+            "tax": 0.0,
+            "transactions": 0,
+        },
+        "monthly": [],
+        "breakdown": {"sales": [], "purchase": [], "expense": []},
+        "counterparties": {"sales": [], "purchase": [], "expense": []},
+        "imports": [],
+        "date_range": {"from": None, "to": None},
+        "last_import_at": None,
+    }
+
+
+def financial_metrics(cur, tenant_id: str) -> dict:
+    """Optional uploaded-book metrics; empty when this tenant uses only Tally sync."""
+    cur.execute(
+        """
+        select kind, count(*), coalesce(sum(gross_amount), 0),
+               coalesce(sum(net_amount), 0), coalesce(sum(tax_amount), 0),
+               min(txn_date), max(txn_date)
+        from financial_transactions
+        where tenant_id = %s
+        group by kind
+        """,
+        (tenant_id,),
+    )
+    summaries = cur.fetchall()
+    if not summaries:
+        return _empty_financials()
+
+    by_kind = {
+        kind: {
+            "transactions": count,
+            "gross": _num(gross),
+            "net": _num(net),
+            "tax": _num(tax),
+            "from": first_date,
+            "to": last_date,
+        }
+        for kind, count, gross, net, tax, first_date, last_date in summaries
+    }
+    sales = by_kind.get("sales", {}).get("gross", 0.0)
+    purchase = by_kind.get("purchase", {}).get("gross", 0.0)
+    expense = by_kind.get("expense", {}).get("gross", 0.0)
+
+    cur.execute(
+        """
+        select to_char(date_trunc('month', txn_date), 'YYYY-MM'), kind,
+               coalesce(sum(gross_amount), 0)
+        from financial_transactions
+        where tenant_id = %s and txn_date is not null
+        group by 1, kind
+        order by 1
+        """,
+        (tenant_id,),
+    )
+    monthly_map: dict[str, dict] = {}
+    for month, kind, amount in cur.fetchall():
+        point = monthly_map.setdefault(
+            month,
+            {"month": month, "sales": 0.0, "purchase": 0.0, "expense": 0.0},
+        )
+        point[kind] = _num(amount)
+    monthly = []
+    for point in monthly_map.values():
+        point["net_flow"] = round(
+            point["sales"] - point["purchase"] - point["expense"], 2
+        )
+        monthly.append(point)
+
+    cur.execute(
+        """
+        select ft.kind, fl.name, coalesce(sum(fl.amount), 0)
+        from financial_transaction_lines fl
+        join financial_transactions ft on ft.id = fl.transaction_id
+        where ft.tenant_id = %s and fl.line_type in ('item', 'category')
+        group by ft.kind, fl.name
+        order by ft.kind, 3 desc
+        """,
+        (tenant_id,),
+    )
+    breakdown = {"sales": [], "purchase": [], "expense": []}
+    for kind, name, amount in cur.fetchall():
+        if len(breakdown[kind]) < 7:
+            breakdown[kind].append({"name": name, "amount": _num(amount)})
+
+    cur.execute(
+        """
+        select kind, party_name, coalesce(sum(gross_amount), 0), count(*)
+        from financial_transactions
+        where tenant_id = %s and party_name is not null and party_name <> ''
+        group by kind, party_name
+        order by kind, 3 desc
+        """,
+        (tenant_id,),
+    )
+    counterparties = {"sales": [], "purchase": [], "expense": []}
+    for kind, party, amount, count in cur.fetchall():
+        if len(counterparties[kind]) < 6:
+            counterparties[kind].append(
+                {"party": party, "amount": _num(amount), "transactions": count}
+            )
+
+    cur.execute(
+        """
+        select id, source_filename, detected_kind, classification_confidence,
+               transaction_count, min_date, max_date, created_at
+        from financial_imports
+        where tenant_id = %s
+        order by created_at desc
+        limit 8
+        """,
+        (tenant_id,),
+    )
+    imports = [
+        {
+            "id": str(import_id),
+            "filename": filename,
+            "kind": kind,
+            "confidence": float(confidence),
+            "transactions": count,
+            "date_from": min_date.isoformat() if min_date else None,
+            "date_to": max_date.isoformat() if max_date else None,
+            "created_at": created_at.isoformat(),
+        }
+        for (
+            import_id,
+            filename,
+            kind,
+            confidence,
+            count,
+            min_date,
+            max_date,
+            created_at,
+        ) in cur.fetchall()
+    ]
+    first_dates = [summary["from"] for summary in by_kind.values() if summary["from"]]
+    last_dates = [summary["to"] for summary in by_kind.values() if summary["to"]]
+    return {
+        "has_data": True,
+        "kinds": [kind for kind in ("sales", "purchase", "expense") if kind in by_kind],
+        "totals": {
+            "sales": sales,
+            "purchase": purchase,
+            "expense": expense,
+            "net_flow": round(sales - purchase - expense, 2),
+            "tax": round(sum(summary["tax"] for summary in by_kind.values()), 2),
+            "transactions": sum(summary["transactions"] for summary in by_kind.values()),
+        },
+        "monthly": monthly,
+        "breakdown": breakdown,
+        "counterparties": counterparties,
+        "imports": imports,
+        "date_range": {
+            "from": min(first_dates).isoformat() if first_dates else None,
+            "to": max(last_dates).isoformat() if last_dates else None,
+        },
+        "last_import_at": imports[0]["created_at"] if imports else None,
+    }
 
 
 @router.get("/companies")
@@ -46,7 +220,11 @@ def companies() -> list[dict]:
                    (select count(*) from devices d
                      where d.tenant_id = t.id and d.revoked_at is null),
                    (select max(started_at) from sync_runs s where s.tenant_id = t.id),
-                   (select count(*) from bills b where b.tenant_id = t.id)
+                   (select count(*) from bills b where b.tenant_id = t.id),
+                   (select max(created_at) from financial_imports fi
+                     where fi.tenant_id = t.id),
+                   exists(select 1 from financial_transactions ft
+                     where ft.tenant_id = t.id)
             from tenants t
             order by t.created_at
             """
@@ -60,8 +238,20 @@ def companies() -> list[dict]:
                 "devices": devices,
                 "last_sync_at": last_sync.isoformat() if last_sync else None,
                 "has_bills": bill_count > 0,
+                "last_import_at": last_import.isoformat() if last_import else None,
+                "has_financials": has_financials,
             }
-            for tid, name, guid, created_at, devices, last_sync, bill_count in cur.fetchall()
+            for (
+                tid,
+                name,
+                guid,
+                created_at,
+                devices,
+                last_sync,
+                bill_count,
+                last_import,
+                has_financials,
+            ) in cur.fetchall()
         ]
 
 
@@ -84,11 +274,15 @@ def metrics(tenant_id: str) -> dict:
             (tenant_id,),
         )
         ledger_count, ledger_balance, ledgers_updated = cur.fetchone()
+        financials = financial_metrics(cur, tenant_id)
+        ledger_updated_iso = ledgers_updated.isoformat() if ledgers_updated else None
 
         empty = {
             "tenant_id": tenant_id,
             "tenant_name": tenant_name,
-            "has_data": False,
+            "has_data": financials["has_data"],
+            "has_receivables_data": False,
+            "has_financial_data": financials["has_data"],
             "totals": {
                 "outstanding": 0.0, "overdue": 0.0, "not_due": 0.0, "bill_count": 0,
                 "party_count": 0, "ledger_count": ledger_count,
@@ -99,7 +293,11 @@ def metrics(tenant_id: str) -> dict:
             },
             "aging": [], "top_debtors": [], "bills": [], "due_timeline": [],
             "oldest_bills": [], "alerts": [], "notes": [],
-            "last_sync_at": ledgers_updated.isoformat() if ledgers_updated else None,
+            "financials": financials,
+            "last_sync_at": ledger_updated_iso,
+            "last_activity_at": _latest_iso(
+                ledger_updated_iso, financials["last_import_at"]
+            ),
         }
         if run_id is None:
             return empty
@@ -270,13 +468,20 @@ def metrics(tenant_id: str) -> dict:
     notes = [
         {"id": "snapshot", "data": {"bills": bill_count, "parties": party_count}},
         {"id": "sign", "data": {}},
-        {"id": "scope", "data": {}},
+        (
+            {"id": "scope_extended", "data": {"kinds": financials["kinds"]}}
+            if financials["has_data"]
+            else {"id": "scope", "data": {}}
+        ),
     ]
+    last_sync_iso = last_sync.isoformat() if last_sync else None
 
     return {
         "tenant_id": tenant_id,
         "tenant_name": tenant_name,
-        "has_data": bill_count > 0,
+        "has_data": bill_count > 0 or financials["has_data"],
+        "has_receivables_data": bill_count > 0,
+        "has_financial_data": financials["has_data"],
         "totals": {
             "outstanding": _num(outstanding),
             "overdue": _num(overdue),
@@ -299,5 +504,7 @@ def metrics(tenant_id: str) -> dict:
         "oldest_bills": oldest_bills,
         "alerts": alerts,
         "notes": notes,
-        "last_sync_at": last_sync.isoformat() if last_sync else None,
+        "financials": financials,
+        "last_sync_at": last_sync_iso,
+        "last_activity_at": _latest_iso(last_sync_iso, financials["last_import_at"]),
     }

@@ -14,7 +14,8 @@ Last verified against the repo: **2026-07-25** (commit `c0e67a9`).
 **ARQ Astra** — a Tally → cloud receivables product for Indian small businesses. A Windows
 exe reads TallyPrime read-only on the client's PC, pushes receivables to a FastAPI backend
 on Neon Postgres, and the owner sees who owes them money in a trilingual web dashboard with
-an AI copilot.
+an AI copilot. The dashboard also accepts optional Tally-style `.xlsx` exports for sales,
+purchases and expenses; these add business-flow metrics without changing connector sync.
 
 Three components, **one repo** (`github.com/RishieRich/ArcAstraOneAru`), three deploy targets:
 
@@ -31,7 +32,9 @@ Three components, **one repo** (`github.com/RishieRich/ArcAstraOneAru`), three d
                                              ▼
                                         backend (FastAPI) ──────▶  tenants, ledgers,
                                              ▲                      bills, sync_runs,
-                     browser ──PIN login──┘                        dashboard_users
+                     browser ──PIN login──┘                        dashboard_users,
+                        │                                         financial_imports,
+                        └──optional .xlsx upload─────────────────▶ financial_transactions
                      frontend (React)
 ```
 
@@ -57,6 +60,7 @@ Three components, **one repo** (`github.com/RishieRich/ArcAstraOneAru`), three d
 | `POST /v1/auth/login` | email + 4-digit PIN | returns stateless HMAC dashboard token |
 | `GET /v1/dashboard/companies` | `Bearer <dashboard token>` | tenant list |
 | `GET /v1/dashboard/metrics/{tenant_id}` | `Bearer <dashboard token>` | all dashboard numbers |
+| `POST /v1/imports/financials` | `Bearer <dashboard token>` | classify + import one Tally `.xlsx` workbook |
 | `POST /v1/ask` | `Bearer <dashboard token>` | AI copilot Q&A over the tenant's snapshot |
 
 Routers live in `backend/app/routers/`; wiring is in `backend/app/main.py`.
@@ -130,6 +134,8 @@ configuration lives in `backend/pyproject.toml`:
 
 - Vercel's Python builder installs from `[project].dependencies` and **ignores
   `requirements.txt`** — keep both lists in sync or the build silently lacks a package.
+- Excel ingestion uses `openpyxl`; it is a deliberate runtime dependency and must remain
+  in both `backend/pyproject.toml` and `backend/requirements.txt`.
 - `[tool.vercel] entrypoint = "api.index:app"` is required: the FastAPI preset finds several
   ASGI `app` objects (`api/index.py`, `app/main.py`, `tests/conftest.py`) and refuses to guess.
 - Root Directory **must** be `backend` for the backend project, `frontend` for the frontend.
@@ -153,6 +159,9 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 5. **`/v1/sync` is idempotent by run ID** — retries return the earlier result rather than
    duplicating rows. Preserve that when touching `routers/sync.py`.
 6. **`gh` CLI is not authenticated** on this dev machine; GitHub work is manual.
+7. **Apply `0003_financial_imports.sql` before deploying code that queries finance data.**
+   Imports accept `.xlsx` up to 5 MB, never store the original file, reject mixed/wrong
+   voucher types, deduplicate exact files by SHA-256, and upsert vouchers by Tally GUID.
 
 ## 9. Open items
 
@@ -162,6 +171,9 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
   bill layout. Needs their real-company push or raw XML to resolve.
 - **Bills dedup migration** (`magic_mds/DATA_MODEL.md`) — repeated syncs stack duplicate bill
   rows. Designed, awaiting the owner's go-ahead. Do not apply unilaterally.
+- **Excel voucher removals/cancellations** — re-exports update vouchers that retain the same
+  Tally GUID, but a voucher absent from a later workbook is not automatically deleted. Add an
+  explicit snapshot/reconciliation workflow before treating imports as a cancellation ledger.
 
 ## 10. Documentation index (`magic_mds/`)
 
@@ -178,6 +190,7 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 | `readme_1107_base.md` | original implementation plan |
 | `readme_1107_output.md` | build log of what was actually shipped and verified |
 | `AI_ERA_REVIEW_PLAYBOOK.md` | review playbook |
+| `EXCEL_IMPORT_SETUP.md` | Neon migration, deploy and verification steps for optional workbook imports |
 
 ## 11. Working agreement for agents
 
