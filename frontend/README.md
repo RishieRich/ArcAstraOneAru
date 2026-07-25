@@ -1,24 +1,33 @@
-# ARQ Receivables — dashboard
+# ARQ Astra — dashboard
 
 React (Vite) dashboard on top of the same Neon database the connector pushes into.
 Reads live data through the backend's `/v1/dashboard/*` endpoints and answers
-natural-language questions through `/v1/ask`. English / Hinglish / Gujarati UI.
+natural-language questions through `/v1/ask`. It also accepts Tally-style Sales,
+Purchase and Expense `.xlsx` exports and turns them into complete-period business
+analytics. English / Hinglish / Gujarati-Roman UI; light mode is the default and
+dark mode is user-selectable.
 
 Deploys to Vercel as its **own project**, separate from `backend/`.
 
 ---
 
-## Login (email + 4-digit PIN)
+## Login and company access
 
 The dashboard is behind a login. Create users from `backend/` with the venv active:
 
 ```
-python -m app.admin create-dashboard-user --email someone@x.com --pin 4321 --name "Someone"
+python -m app.admin create-dashboard-user --email someone@x.com --password "strong-password" --name "Someone"
+python -m app.admin grant-dashboard-access --email someone@x.com --tenant-id <tenant-uuid>
 python -m app.admin list-dashboard-users
 python -m app.admin delete-dashboard-user --email someone@x.com
 ```
 
-Re-running `create-dashboard-user` for an existing email **resets that user's PIN**.
+New users are deny-by-default until a company is granted. Migration 0004 explicitly
+marks pre-existing owner accounts as all-company users. Re-running
+`create-dashboard-user` for an existing email resets that user's password without
+changing its access grants. Legacy four-digit PIN hashes still verify so existing
+accounts are not locked out.
+
 Sessions last 7 days; `/v1/dashboard/*` and `/v1/ask` reject requests without a
 valid session token. The signing secret is `DASHBOARD_SECRET` if set (recommended
 in Vercel), otherwise derived from `DATABASE_URL`.
@@ -46,17 +55,18 @@ npm run dev               # http://localhost:5173
 
 ---
 
-## Turning on the AI ("Ask about your money")
+## Turning on the AI ("Ask ARQ AI")
 
-The ask box needs an Anthropic API key **on the backend**, not here — the key must
-never reach the browser. Add to `backend/.env`:
+The chat drawer needs at least one provider key **on the backend**, never in the
+browser. Gemini is primary and Groq is the automatic fallback:
 
 ```
-ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=...
+GROQ_API_KEY=...
 ```
 
-and restart the backend. For the deployed backend, add the same variable in
-Vercel → the backend project → Settings → Environment Variables.
+and restart the backend. For production, configure the same variables in the
+backend Vercel project.
 
 Without a key the dashboard still works fully; the ask box just replies
 "AI is not configured on the server."
@@ -94,10 +104,15 @@ dashboard has a stable URL.
 - **How old is the money** — outstanding by aging bucket (ordinal blue ramp; each bar directly labelled).
 - **Who owes the most** — top customers by pending amount.
 - **Every unpaid bill** — the full table, also the accessible fallback for the charts.
-- **Ask about your money** — questions in English, Hinglish, or Gujarati-English; the answer comes back in the same language.
+- **Excel business view** — Sales, Purchases, Expenses, estimated operating result,
+  margin, tax, category drivers, counterparties, import history, highs/lows, and
+  a zero-filled chart/table spanning the complete uploaded date range.
+- **Ask ARQ AI** — a full chat drawer grounded in synced Tally receivables and
+  normalized uploaded workbook data. Questions and answers follow the selected
+  English, Hinglish, or Gujarati-Roman language.
 
-Language toggle (English / Hinglish / Gujarati) switches the whole UI. Light and
-dark mode both follow the OS setting.
+Language and theme selections persist in the browser. Light is always the first-run
+default; dark mode is an explicit user choice.
 
 ## Data note
 

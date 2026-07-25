@@ -19,6 +19,11 @@ The original workbook is **not stored**. ARQ stores normalized voucher totals an
 item/category lines. Exact file re-uploads are idempotent, and vouchers with the
 same Tally GUID are updated instead of duplicated.
 
+The dashboard zero-fills every calendar month between the earliest and latest
+uploaded dates. A one-year workbook therefore produces a complete one-year chart,
+including inactive months. Estimated operating profit/loss is shown only after all
+three book types are present; partial uploads are labelled as partial results.
+
 ## 1. Apply the Neon migration first
 
 Do this **before deploying the backend code**, because the new dashboard queries
@@ -31,11 +36,12 @@ cd backend
 ..\.venv\Scripts\python.exe migrations\run_migration.py
 ```
 
-The runner applies every migration in filename order. The older migrations are
-idempotent, and the new file is:
+The runner applies every migration in filename order. The migrations are
+idempotent. The Excel data model and dashboard-access additions are:
 
 ```text
 migrations/0003_financial_imports.sql
+migrations/0004_dashboard_user_access.sql
 ```
 
 This creates:
@@ -43,12 +49,17 @@ This creates:
 - `financial_imports` — import audit trail and file hash.
 - `financial_transactions` — one current normalized row per Tally voucher.
 - `financial_transaction_lines` — item, expense-category and tax detail.
+- `dashboard_users.all_tenants` — explicit owner-wide access.
+- `dashboard_user_tenants` — per-company grants for client logins.
 
-No existing table is dropped, truncated or altered.
+No existing table is dropped or truncated. Migration 0004 additively alters
+`dashboard_users`: pre-existing accounts become explicit all-company owners and
+new accounts default to no access.
 
 If you prefer the Neon SQL Editor, open
-`backend/migrations/0003_financial_imports.sql`, paste the complete file, and run
-it once against the production database.
+`backend/migrations/0003_financial_imports.sql` and
+`backend/migrations/0004_dashboard_user_access.sql`, paste each complete file in
+order, and run them once against the production database.
 
 ## 2. Deploy
 
@@ -96,8 +107,9 @@ Then:
 3. Click **Upload Excel**.
 4. Use the matching Sales, Purchases or Expenses tile.
 5. After import, open **Sales & spending**.
-6. Confirm the total, date range, monthly chart, category/item mix, counterparties
-   and import history.
+6. Confirm the total, full date range, complete-tenure chart, Sales/Purchase/Expense
+   lines, monthly profit/loss bars, performance highs/lows, category/item mix,
+   counterparties, period table and import history.
 7. Re-upload the exact same file once. The UI should report that it was already
    imported and totals must not double.
 8. Switch back to **Receivables** and confirm the original Tally dashboard is
@@ -121,13 +133,18 @@ These checks avoid displaying party names or amounts.
 
 ## Operating notes
 
-- The dashboard token authorizes imports, just as it authorizes viewing all
-  companies in the current dashboard security model.
+- Dashboard users are scoped. New users cannot list, view, upload to, or ask AI
+  about a company until `grant-dashboard-access` adds that tenant.
 - A file/type mismatch is rejected before any insert.
 - Sales, purchase and expense totals are gross voucher values. Tax is also shown
   separately where Tally exposes tax ledger lines.
-- **Net flow** is `sales - purchases - expenses`. It is intentionally not labelled
-  profit because an uploaded set may not be a complete P&L.
+- With all three book types, **estimated operating result** is
+  `sales - purchases - expenses`. Positive and negative monthly results are
+  summarized separately as profit/loss periods. It is still an operating estimate,
+  not a statutory P&L; stock adjustments, depreciation, finance cost, tax
+  provisions and missing uploads may change the accounting result.
+- With one or two book types, the same arithmetic is labelled only as a **partial
+  uploaded result**, never profit/loss.
 - Re-exporting an existing voucher updates it by Tally GUID. A voucher removed
   from a later workbook is not automatically deleted; removal tooling should be
   added before using imports as a cancellation ledger.

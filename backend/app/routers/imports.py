@@ -5,7 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 
-from app.dashauth import require_dashboard_user
+from app.dashauth import ensure_dashboard_tenant_access, require_dashboard_user
 from app.db import get_connection
 from app.spreadsheet_import import (
     ImportValidationError,
@@ -37,6 +37,7 @@ async def upload_financials(
         cur.execute("select 1 from tenants where id = %s", (str(tenant_id),))
         if cur.fetchone() is None:
             raise HTTPException(status_code=404, detail="No such company")
+        ensure_dashboard_tenant_access(cur, uploaded_by, str(tenant_id))
 
         cur.execute(
             """

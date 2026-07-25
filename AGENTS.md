@@ -5,7 +5,7 @@ different agents on the same page. Codex CLI loads `AGENTS.md` automatically; Cl
 loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way — one file,
 not two drifting copies.
 
-Last verified against the repo: **2026-07-25** (commit `c0e67a9`).
+Last verified against the repo: **2026-07-26** (commit `cebbcbc`).
 
 ---
 
@@ -32,7 +32,7 @@ Three components, **one repo** (`github.com/RishieRich/ArcAstraOneAru`), three d
                                              ▼
                                         backend (FastAPI) ──────▶  tenants, ledgers,
                                              ▲                      bills, sync_runs,
-                     browser ──PIN login──┘                        dashboard_users,
+                browser ──password login──┘                        dashboard_users,
                         │                                         financial_imports,
                         └──optional .xlsx upload─────────────────▶ financial_transactions
                      frontend (React)
@@ -57,7 +57,7 @@ Three components, **one repo** (`github.com/RishieRich/ArcAstraOneAru`), three d
 | `GET /health`, `GET /health/db` | none | liveness / Neon reachability |
 | `POST /v1/devices/register` | pairing code in body | exchange one-time code for a device token |
 | `POST /v1/sync` | `Authorization: Bearer <device token>` | receive one snapshot (ledgers + bills) |
-| `POST /v1/auth/login` | email + 4-digit PIN | returns stateless HMAC dashboard token |
+| `POST /v1/auth/login` | email + password (legacy 4-digit PIN still accepted) | returns stateless HMAC dashboard token |
 | `GET /v1/dashboard/companies` | `Bearer <dashboard token>` | tenant list |
 | `GET /v1/dashboard/metrics/{tenant_id}` | `Bearer <dashboard token>` | all dashboard numbers |
 | `POST /v1/imports/financials` | `Bearer <dashboard token>` | classify + import one Tally `.xlsx` workbook |
@@ -72,8 +72,14 @@ Routers live in `backend/app/routers/`; wiring is in `backend/app/main.py`.
   Manager** (never a file); backend stores only its hash (`app/security.py`).
 - **Company GUID binding** — a tenant is permanently bound to the first Tally company GUID
   it registers with. Valid token + wrong company = 403.
-- **Dashboard auth** — email + 4-digit PIN (`dashboard_users`, migration 0002). Session is a
-  stateless HMAC token; secret = `DASHBOARD_SECRET`, else derived from `DATABASE_URL`.
+- **Dashboard auth** — email + password (`dashboard_users`, migration 0002); legacy 4-digit
+  PINs still verify. Hash is PBKDF2-HMAC-SHA256, 200k iterations, salted. Session is a
+  stateless HMAC token (7-day TTL); secret = `DASHBOARD_SECRET`, else derived from `DATABASE_URL`.
+- **Per-company access scoping** — `dashboard_users.all_tenants` plus
+  `dashboard_user_tenants` (migration 0004). Existing owner accounts are explicitly promoted
+  to all-company access; new accounts default to no access until granted a tenant. Enforced by
+  `ensure_dashboard_tenant_access` on `/metrics`, `/imports`, `/ask`, and inside the `/companies`
+  query. Grant with `python -m app.admin grant-dashboard-access`.
 - **The exe never writes to Tally** — only read/export XML requests. Keep it that way.
 - **No secrets in files or logs**; logs carry counts and statuses, never party names or amounts.
 
@@ -119,12 +125,13 @@ python -m app.admin create-tenant --name "Acme"
 python -m app.admin issue-pairing-code --tenant-id <id>
 python -m app.admin list-tenants
 python -m app.admin revoke-device --device-id <id>
-python -m app.admin create-dashboard-user --email x@y.com --pin 1234
+python -m app.admin create-dashboard-user --email x@y.com --password "strong-password"
+python -m app.admin grant-dashboard-access --email x@y.com --tenant-id <id>
 python -m app.admin list-dashboard-users
 python -m app.admin delete-dashboard-user --email x@y.com
 
 # DB migrations
-cd backend; python migrations\run_migration.py migrations\0002_dashboard_users.sql
+cd backend; python migrations\run_migration.py
 ```
 
 ## 7. Deploy
@@ -194,6 +201,7 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 
 | File | What it is |
 |---|---|
+| `SOLUTION_ARCHITECTURE.md` | **ARB-ready end-to-end architecture**: C4 L1–L3, sequence flows, ERD, threat model, ADRs, risks. Self-contained — hand it to any LLM to generate an architecture deck. |
 | `HOW_IT_ALL_WORKS.md` | plain-language system tour (⚠️ its "next steps" section predates the Vercel deploy) |
 | `USER_MANUAL.md` | end-user install / register / use of the exe |
 | `CONNECTOR_SETUP.md` | connector installation detail |

@@ -46,11 +46,11 @@ async function request(path, options = {}) {
   return res.json();
 }
 
-export async function login(email, pin) {
+export async function login(email, password) {
   const res = await fetch(`${BASE}/v1/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, pin }),
+    body: JSON.stringify({ email, password }),
   });
   if (!res.ok) throw new Error(await detail(res));
   const session = await res.json();
@@ -73,11 +73,11 @@ export function uploadFinancialFile({ tenantId, kind, file }) {
   });
 }
 
-export function askAI({ tenantId, question, history }) {
+export function askAI({ tenantId, question, history, language }) {
   return request("/v1/ask", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ tenant_id: tenantId, question, history }),
+    body: JSON.stringify({ tenant_id: tenantId, question, history, language }),
   }).then((body) => body.answer);
 }
 

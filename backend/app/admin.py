@@ -5,7 +5,8 @@ Usage (from backend/, with venv active):
   python -m app.admin issue-pairing-code --tenant-id <uuid> [--expires-hours 72]
   python -m app.admin revoke-device --device-id <uuid>
   python -m app.admin list-tenants
-  python -m app.admin create-dashboard-user --email a@b.com --pin 1234 [--name "A B"]
+  python -m app.admin create-dashboard-user --email a@b.com --password "..." [--name "A B"]
+  python -m app.admin grant-dashboard-access --email a@b.com --tenant-id <uuid>
   python -m app.admin list-dashboard-users
   python -m app.admin delete-dashboard-user --email a@b.com
 """
@@ -14,7 +15,7 @@ import re
 import secrets
 from datetime import datetime, timedelta, timezone
 
-from app.dashauth import hash_pin
+from app.dashauth import hash_password
 from app.db import get_connection
 from app.security import hash_token
 
@@ -65,10 +66,10 @@ def list_tenants() -> None:
             print(f"{tenant_id}  {name!r:30s}  guid={guid}  created={created_at}")
 
 
-def create_dashboard_user(email: str, pin: str, name: str | None) -> None:
+def create_dashboard_user(email: str, password: str, name: str | None) -> None:
     email = email.strip().lower()
-    if not re.fullmatch(r"\d{4}", pin):
-        raise SystemExit("PIN must be exactly 4 digits")
+    if len(password) < 8 and not re.fullmatch(r"\d{4}", password):
+        raise SystemExit("Password must be at least 8 characters (legacy PINs are 4 digits)")
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             """
@@ -78,19 +79,50 @@ def create_dashboard_user(email: str, pin: str, name: str | None) -> None:
               set pin_hash = excluded.pin_hash,
                   display_name = coalesce(excluded.display_name, dashboard_users.display_name)
             """,
-            (email, hash_pin(pin), name),
+            (email, hash_password(password), name),
         )
         conn.commit()
-    print(f"dashboard user ready: {email} (PIN set)")
+    print(
+        f"dashboard user ready: {email} (password set; "
+        "new accounts need a company access grant)"
+    )
+
+
+def grant_dashboard_access(email: str, tenant_id: str) -> None:
+    email = email.strip().lower()
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            insert into dashboard_user_tenants (user_email, tenant_id)
+            values (%s, %s)
+            on conflict do nothing
+            """,
+            (email, tenant_id),
+        )
+        granted = cur.rowcount
+        conn.commit()
+    print(f"dashboard access ready: email={email} tenant_id={tenant_id} added={granted}")
 
 
 def list_dashboard_users() -> None:
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
-            "select email, display_name, created_at, last_login_at from dashboard_users order by created_at"
+            """
+            select du.email, du.display_name, du.all_tenants, count(dut.tenant_id),
+                   du.created_at, du.last_login_at
+            from dashboard_users du
+            left join dashboard_user_tenants dut on dut.user_email = du.email
+            group by du.email, du.display_name, du.all_tenants, du.created_at,
+                     du.last_login_at
+            order by du.created_at
+            """
         )
-        for email, name, created_at, last_login in cur.fetchall():
-            print(f"{email}  {name or '-':24s}  created={created_at}  last_login={last_login}")
+        for email, name, all_tenants, grants, created_at, last_login in cur.fetchall():
+            scope = "all" if all_tenants else f"{grants} grant(s)"
+            print(
+                f"{email}  {name or '-':24s}  scope={scope:12s}  "
+                f"created={created_at}  last_login={last_login}"
+            )
 
 
 def delete_dashboard_user(email: str) -> None:
@@ -119,8 +151,14 @@ def main() -> None:
 
     p = sub.add_parser("create-dashboard-user")
     p.add_argument("--email", required=True)
-    p.add_argument("--pin", required=True)
+    credentials = p.add_mutually_exclusive_group(required=True)
+    credentials.add_argument("--password")
+    credentials.add_argument("--pin")
     p.add_argument("--name", default=None)
+
+    p = sub.add_parser("grant-dashboard-access")
+    p.add_argument("--email", required=True)
+    p.add_argument("--tenant-id", required=True)
 
     sub.add_parser("list-dashboard-users")
 
@@ -138,7 +176,9 @@ def main() -> None:
     elif args.command == "list-tenants":
         list_tenants()
     elif args.command == "create-dashboard-user":
-        create_dashboard_user(args.email, args.pin, args.name)
+        create_dashboard_user(args.email, args.password or args.pin, args.name)
+    elif args.command == "grant-dashboard-access":
+        grant_dashboard_access(args.email, args.tenant_id)
     elif args.command == "list-dashboard-users":
         list_dashboard_users()
     elif args.command == "delete-dashboard-user":

@@ -1,11 +1,10 @@
-"""Login for the dashboard: email + 4-digit PIN -> bearer token."""
-import re
+"""Login for the dashboard: email + password (legacy PINs still work)."""
 import time
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from app.dashauth import issue_token, verify_pin
+from app.dashauth import issue_token, verify_password
 from app.db import get_connection
 
 router = APIRouter(prefix="/v1/auth", tags=["auth"])
@@ -13,7 +12,8 @@ router = APIRouter(prefix="/v1/auth", tags=["auth"])
 
 class LoginRequest(BaseModel):
     email: str = Field(min_length=3, max_length=254)
-    pin: str = Field(min_length=4, max_length=4)
+    password: str | None = Field(default=None, min_length=4, max_length=128)
+    pin: str | None = Field(default=None, min_length=4, max_length=4)
 
 
 class LoginResponse(BaseModel):
@@ -26,8 +26,9 @@ class LoginResponse(BaseModel):
 @router.post("/login", response_model=LoginResponse)
 def login(payload: LoginRequest) -> LoginResponse:
     email = payload.email.strip().lower()
-    if not re.fullmatch(r"\d{4}", payload.pin):
-        raise HTTPException(status_code=400, detail="PIN must be exactly 4 digits")
+    credential = payload.password if payload.password is not None else payload.pin
+    if not credential:
+        raise HTTPException(status_code=400, detail="Password is required")
 
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
@@ -35,11 +36,11 @@ def login(payload: LoginRequest) -> LoginResponse:
             (email,),
         )
         row = cur.fetchone()
-        # Same delay and same error whether the email exists or the PIN is
-        # wrong — a 4-digit PIN cannot survive a fast oracle.
-        if row is None or not verify_pin(payload.pin, row[0]):
+        # Same delay and same error whether the email exists or the credential
+        # is wrong, so the endpoint does not become an account oracle.
+        if row is None or not verify_password(credential, row[0]):
             time.sleep(0.8)
-            raise HTTPException(status_code=401, detail="Wrong email or PIN")
+            raise HTTPException(status_code=401, detail="Wrong email or password")
         (_, display_name) = row
 
         cur.execute(

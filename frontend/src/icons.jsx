@@ -58,3 +58,30 @@ export const IconWallet = (p) => (
 export const IconBox = (p) => (
   <svg {...base} {...p}><path d="m21 8-9 5-9-5 9-5z" /><path d="m3 8 9 5 9-5v8l-9 5-9-5zM12 13v8" /></svg>
 );
+export const IconSun = (p) => (
+  <svg {...base} {...p}><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42M17.65 17.65l1.42 1.42M2 12h2M20 12h2M4.93 19.07l1.42-1.42M17.65 6.35l1.42-1.42" /></svg>
+);
+export const IconMoon = (p) => (
+  <svg {...base} {...p}><path d="M21 12.8A8.4 8.4 0 1 1 11.2 3 6.5 6.5 0 0 0 21 12.8z" /></svg>
+);
+export const IconEye = (p) => (
+  <svg {...base} {...p}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+);
+export const IconEyeOff = (p) => (
+  <svg {...base} {...p}><path d="m3 3 18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.9 4.2A10.7 10.7 0 0 1 12 4c6.5 0 10 8 10 8a17.6 17.6 0 0 1-2.1 3.2M6.6 6.6C3.7 8.4 2 12 2 12s3.5 8 10 8a10.5 10.5 0 0 0 4.1-.8" /></svg>
+);
+export const IconMessage = (p) => (
+  <svg {...base} {...p}><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" /><path d="M8 9h8M8 13h5" /></svg>
+);
+export const IconClose = (p) => (
+  <svg {...base} {...p}><path d="m6 6 12 12M18 6 6 18" /></svg>
+);
+export const IconTrendUp = (p) => (
+  <svg {...base} {...p}><path d="m3 17 6-6 4 4 8-8" /><path d="M15 7h6v6" /></svg>
+);
+export const IconTrendDown = (p) => (
+  <svg {...base} {...p}><path d="m3 7 6 6 4-4 8 8" /><path d="M15 17h6v-6" /></svg>
+);
+export const IconRefresh = (p) => (
+  <svg {...base} {...p}><path d="M20 7h-5V2M4 17h5v5" /><path d="M18 4.9A9 9 0 0 0 4.6 8M5.9 19.1A9 9 0 0 0 19.4 16" /></svg>
+);

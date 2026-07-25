@@ -6,11 +6,12 @@ import {
 import { LANGS, T } from "./i18n";
 import {
   IconAlarm, IconChart, IconFile, IconLogout, IconRupee, IconUsers,
-  IconUpload,
+  IconMessage, IconSpark, IconUpload,
 } from "./icons";
 import AgingChart from "./components/AgingChart";
 import Alerts from "./components/Alerts";
 import BillsTable from "./components/BillsTable";
+import BrandLogo from "./components/BrandLogo";
 import ChaseList from "./components/ChaseList";
 import Copilot from "./components/Copilot";
 import DataNotes from "./components/DataNotes";
@@ -18,17 +19,34 @@ import DueTimeline from "./components/DueTimeline";
 import FinancialOverview from "./components/FinancialOverview";
 import FinancialUpload from "./components/FinancialUpload";
 import StatTile from "./components/StatTile";
+import ThemeToggle from "./components/ThemeToggle";
 import TopDebtors from "./components/TopDebtors";
 import Login from "./pages/Login";
 
 export default function App() {
-  const [lang, setLang] = useState(() => localStorage.getItem("arq.lang") || "en");
+  const [lang, setLang] = useState(() => {
+    const saved = localStorage.getItem("arq.lang");
+    return saved && T[saved] ? saved : "en";
+  });
+  const [theme, setTheme] = useState(() =>
+    localStorage.getItem("arq.theme") === "dark" ? "dark" : "light",
+  );
   const [session, setSession] = useState(loadSession);
   const t = T[lang];
 
   useEffect(() => {
     localStorage.setItem("arq.lang", lang);
+    document.documentElement.lang = lang;
   }, [lang]);
+
+  useEffect(() => {
+    localStorage.setItem("arq.theme", theme);
+    document.documentElement.dataset.theme = theme;
+    document.documentElement.style.colorScheme = theme;
+    document
+      .querySelector('meta[name="theme-color"]')
+      ?.setAttribute("content", theme === "dark" ? "#0d0d0d" : "#f7f7f4");
+  }, [theme]);
 
   function logout() {
     clearSession();
@@ -36,14 +54,31 @@ export default function App() {
   }
 
   if (!session) {
-    return <Login t={t} lang={lang} setLang={setLang} onSuccess={setSession} />;
+    return (
+      <Login
+        t={t}
+        lang={lang}
+        setLang={setLang}
+        theme={theme}
+        setTheme={setTheme}
+        onSuccess={setSession}
+      />
+    );
   }
   return (
-    <Dashboard t={t} lang={lang} setLang={setLang} session={session} onLogout={logout} />
+    <Dashboard
+      t={t}
+      lang={lang}
+      setLang={setLang}
+      theme={theme}
+      setTheme={setTheme}
+      session={session}
+      onLogout={logout}
+    />
   );
 }
 
-function Dashboard({ t, lang, setLang, session, onLogout }) {
+function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
   const [companies, setCompanies] = useState([]);
   const [tenantId, setTenantId] = useState("");
   const [data, setData] = useState(null);
@@ -51,6 +86,7 @@ function Dashboard({ t, lang, setLang, session, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [view, setView] = useState("receivables");
+  const [chatOpen, setChatOpen] = useState(false);
 
   useEffect(() => {
     fetchCompanies()
@@ -108,9 +144,9 @@ function Dashboard({ t, lang, setLang, session, onLogout }) {
   return (
     <div className="app">
       <header className="header">
-        <div className="logo">ARQ</div>
+        <BrandLogo compact />
         <div className="brand">
-          <h1>ARQ Receivables</h1>
+          <h1>ARQ Astra</h1>
           <p>{t.tagline}</p>
         </div>
 
@@ -140,6 +176,17 @@ function Dashboard({ t, lang, setLang, session, onLogout }) {
           </select>
         </div>
 
+        <ThemeToggle theme={theme} setTheme={setTheme} t={t} compact />
+
+        <button
+          className="icon-btn ai-trigger"
+          type="button"
+          onClick={() => setChatOpen(true)}
+        >
+          <IconSpark width={15} height={15} />
+          {t.askArq}
+        </button>
+
         <button
           className="icon-btn upload-trigger"
           type="button"
@@ -166,6 +213,13 @@ function Dashboard({ t, lang, setLang, session, onLogout }) {
           )}
 
           {!error && loading && <LoadingSkeleton t={t} />}
+
+          {!error && !loading && !tenantId && (
+            <div className="card state">
+              <h3>{t.noCompanyAccess}</h3>
+              <p>{t.noCompanyAccessBody}</p>
+            </div>
+          )}
 
           {!error && !loading && data && (
             <>
@@ -219,8 +273,29 @@ function Dashboard({ t, lang, setLang, session, onLogout }) {
           )}
         </div>
 
-        <Copilot tenantId={tenantId} t={t} onAuthError={onLogout} />
       </div>
+
+      <Copilot
+        tenantId={tenantId}
+        t={t}
+        lang={lang}
+        open={chatOpen}
+        hasFinancialData={Boolean(data?.has_financial_data)}
+        onClose={() => setChatOpen(false)}
+        onAuthError={onLogout}
+      />
+
+      {!chatOpen && (
+        <button
+          className="chat-launcher"
+          type="button"
+          onClick={() => setChatOpen(true)}
+          aria-label={t.openChat}
+        >
+          <IconMessage />
+          <span>{t.askArq}</span>
+        </button>
+      )}
     </div>
   );
 }

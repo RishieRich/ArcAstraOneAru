@@ -1,48 +1,36 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { login } from "../api";
+import BrandLogo from "../components/BrandLogo";
+import ThemeToggle from "../components/ThemeToggle";
 import { LANGS } from "../i18n";
+import { IconEye, IconEyeOff, IconShield } from "../icons";
 
-export default function Login({ t, lang, setLang, onSuccess }) {
+export default function Login({
+  t,
+  lang,
+  setLang,
+  theme,
+  setTheme,
+  onSuccess,
+}) {
   const [email, setEmail] = useState("");
-  const [digits, setDigits] = useState(["", "", "", ""]);
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const boxes = [useRef(), useRef(), useRef(), useRef()];
 
-  const pin = digits.join("");
-  const ready = /\S+@\S+\.\S+/.test(email) && pin.length === 4 && !busy;
+  const ready = /\S+@\S+\.\S+/.test(email) && password.length >= 4 && !busy;
 
-  function setDigit(i, raw) {
-    const v = raw.replace(/\D/g, "");
-    const next = [...digits];
-    if (v.length > 1) {
-      // pasted several digits — spread them across the boxes
-      v.slice(0, 4 - i).split("").forEach((ch, k) => (next[i + k] = ch));
-      setDigits(next);
-      boxes[Math.min(i + v.length, 3)].current?.focus();
-      return;
-    }
-    next[i] = v;
-    setDigits(next);
-    if (v && i < 3) boxes[i + 1].current?.focus();
-  }
-
-  function onKey(i, e) {
-    if (e.key === "Backspace" && !digits[i] && i > 0) boxes[i - 1].current?.focus();
-    if (e.key === "Enter" && ready) submit();
-  }
-
-  async function submit(e) {
-    e?.preventDefault();
+  async function submit(event) {
+    event?.preventDefault();
     if (!ready) return;
     setBusy(true);
     setError("");
     try {
-      onSuccess(await login(email.trim().toLowerCase(), pin));
-    } catch (err) {
-      setError(err.message);
-      setDigits(["", "", "", ""]);
-      boxes[0].current?.focus();
+      onSuccess(await login(email.trim().toLowerCase(), password));
+    } catch (loginError) {
+      setError(loginError.message);
+      setPassword("");
     } finally {
       setBusy(false);
     }
@@ -50,49 +38,66 @@ export default function Login({ t, lang, setLang, onSuccess }) {
 
   return (
     <div className="login-screen">
+      <div className="login-theme">
+        <ThemeToggle theme={theme} setTheme={setTheme} t={t} />
+      </div>
+
       <form className={`login-card${error ? " error" : ""}`} onSubmit={submit}>
         <div className="login-brand">
-          <div className="logo">ARQ</div>
+          <BrandLogo />
           <div>
-            <h1>ARQ Receivables</h1>
+            <h1>ARQ Astra</h1>
             <p>{t.tagline}</p>
           </div>
         </div>
 
         <div className="login-lang">
           <div className="lang-group">
-            {LANGS.map((l) => (
-              <button type="button" key={l.id} onClick={() => setLang(l.id)}
-                      aria-pressed={lang === l.id}>
-                {l.label}
+            {LANGS.map((language) => (
+              <button
+                type="button"
+                key={language.id}
+                onClick={() => setLang(language.id)}
+                aria-pressed={lang === language.id}
+              >
+                {language.label}
               </button>
             ))}
           </div>
         </div>
 
+        <span className="login-eyebrow">{t.secureWorkspace}</span>
         <h2>{t.loginTitle}</h2>
         <p className="sub">{t.loginSub}</p>
 
         <label htmlFor="email">{t.email}</label>
         <input
-          id="email" type="email" autoComplete="email" autoFocus
+          id="email"
+          type="email"
+          autoComplete="email"
+          autoFocus
           placeholder="you@company.com"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(event) => setEmail(event.target.value)}
         />
 
-        <label>{t.pin}</label>
-        <div className="pin-row">
-          {digits.map((d, i) => (
-            <input
-              key={i} ref={boxes[i]} className="pin-box"
-              type="password" inputMode="numeric" maxLength={i === 0 ? 4 : 1}
-              value={d} autoComplete="off"
-              onChange={(e) => setDigit(i, e.target.value)}
-              onKeyDown={(e) => onKey(i, e)}
-              aria-label={`PIN digit ${i + 1}`}
-            />
-          ))}
+        <label htmlFor="password">{t.password}</label>
+        <div className="password-field">
+          <input
+            id="password"
+            type={showPassword ? "text" : "password"}
+            autoComplete="current-password"
+            placeholder={t.passwordPlaceholder}
+            value={password}
+            onChange={(event) => setPassword(event.target.value)}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((visible) => !visible)}
+            aria-label={showPassword ? t.hidePassword : t.showPassword}
+          >
+            {showPassword ? <IconEyeOff /> : <IconEye />}
+          </button>
         </div>
 
         {error && <div className="login-error">{error}</div>}
@@ -101,7 +106,10 @@ export default function Login({ t, lang, setLang, onSuccess }) {
           {busy ? t.loggingIn : t.loginBtn}
         </button>
 
-        <div className="login-foot">{t.loginFooter}</div>
+        <div className="login-foot">
+          <IconShield width={14} height={14} />
+          {t.loginFooter}
+        </div>
       </form>
     </div>
   );

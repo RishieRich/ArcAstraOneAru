@@ -1,94 +1,214 @@
 import { useEffect, useRef, useState } from "react";
 import { askAI, AuthError } from "../api";
-import { IconSend, IconSpark } from "../icons";
+import { IconClose, IconRefresh, IconSend, IconSpark } from "../icons";
+import BrandLogo from "./BrandLogo";
 
-export default function Copilot({ tenantId, t, onAuthError }) {
+export default function Copilot({
+  tenantId,
+  t,
+  lang,
+  open,
+  hasFinancialData,
+  onClose,
+  onAuthError,
+}) {
   const [turns, setTurns] = useState([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
   const threadRef = useRef(null);
+  const composerRef = useRef(null);
 
   useEffect(() => {
-    setTurns([]); // a different company is a different conversation
+    setTurns([]);
+    setDraft("");
   }, [tenantId]);
 
   useEffect(() => {
-    threadRef.current?.scrollTo({ top: threadRef.current.scrollHeight, behavior: "smooth" });
+    threadRef.current?.scrollTo({
+      top: threadRef.current.scrollHeight,
+      behavior: "smooth",
+    });
   }, [turns, busy]);
 
-  async function send(question) {
-    const q = question.trim();
-    if (!q || busy) return;
+  useEffect(() => {
+    if (!open) return undefined;
+    const closeOnEscape = (event) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", closeOnEscape);
+    setTimeout(() => composerRef.current?.focus(), 120);
+    return () => window.removeEventListener("keydown", closeOnEscape);
+  }, [open, onClose]);
 
-    // Only clean turns become model history — error bubbles are UI, not turns.
-    const history = turns.filter((x) => x.role !== "error");
-    setTurns((prev) => [...prev, { role: "user", content: q }]);
+  async function send(question) {
+    const cleanQuestion = question.trim();
+    if (!cleanQuestion || busy) return;
+
+    const history = turns.filter((turn) => turn.role !== "error");
+    setTurns((current) => [
+      ...current,
+      { role: "user", content: cleanQuestion },
+    ]);
     setDraft("");
     setBusy(true);
 
     try {
-      const answer = await askAI({ tenantId, question: q, history });
-      setTurns((prev) => [...prev, { role: "assistant", content: answer }]);
-    } catch (e) {
-      if (e instanceof AuthError) return onAuthError();
-      setTurns((prev) => [...prev, { role: "error", content: e.message }]);
+      const answer = await askAI({
+        tenantId,
+        question: cleanQuestion,
+        history,
+        language: lang,
+      });
+      setTurns((current) => [
+        ...current,
+        { role: "assistant", content: answer },
+      ]);
+    } catch (error) {
+      if (error instanceof AuthError) return onAuthError();
+      setTurns((current) => [
+        ...current,
+        { role: "error", content: error.message },
+      ]);
     } finally {
       setBusy(false);
     }
   }
 
+  if (!open) return null;
+
+  const suggestions = hasFinancialData
+    ? t.financialSuggestions
+    : t.suggestions;
+  const welcome = hasFinancialData
+    ? t.chatFinancialHello
+    : t.askHello;
+
   return (
-    <aside className="copilot">
-      <div className="copilot-head">
-        <div className="spark"><IconSpark /></div>
-        <div>
-          <h3>{t.askTitle}</h3>
-          <p><span className="dot-live" />{t.askStatus}</p>
-        </div>
-      </div>
-
-      <div className="copilot-thread" ref={threadRef}>
-        <div className="bubble ai">{t.askHello}</div>
-        {turns.map((turn, i) => (
-          <div
-            key={i}
-            className={`bubble ${turn.role === "user" ? "user" : turn.role === "error" ? "err" : "ai"}`}
-          >
-            {turn.content}
-          </div>
-        ))}
-        {busy && (
-          <div className="bubble ai">
-            <span className="typing"><i /><i /><i /></span>
-          </div>
-        )}
-      </div>
-
-      <div className="copilot-chips">
-        {t.suggestions.map((s) => (
-          <button className="chip" key={s} onClick={() => send(s)} disabled={busy}>
-            {s}
-          </button>
-        ))}
-      </div>
-
-      <form
-        className="composer"
-        onSubmit={(e) => {
-          e.preventDefault();
-          send(draft);
-        }}
+    <>
+      <button
+        className="chat-backdrop"
+        type="button"
+        onClick={onClose}
+        aria-label={t.closeChat}
+      />
+      <aside
+        className="copilot"
+        role="dialog"
+        aria-modal="true"
+        aria-label={t.askTitle}
       >
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder={t.placeholder}
-          disabled={busy}
-        />
-        <button type="submit" disabled={busy || !draft.trim()} aria-label={t.send}>
-          <IconSend />
-        </button>
-      </form>
-    </aside>
+        <div className="copilot-head">
+          <BrandLogo compact />
+          <div className="copilot-head-copy">
+            <span className="copilot-kicker">
+              <IconSpark width={13} height={13} />
+              {t.aiPowered}
+            </span>
+            <h3>{t.askTitle}</h3>
+            <p>
+              <span className="dot-live" />
+              {hasFinancialData ? t.chatDataReady : t.askStatus}
+            </p>
+          </div>
+          <div className="copilot-actions">
+            {turns.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setTurns([])}
+                aria-label={t.clearChat}
+                title={t.clearChat}
+              >
+                <IconRefresh width={16} height={16} />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label={t.closeChat}
+              title={t.closeChat}
+            >
+              <IconClose width={17} height={17} />
+            </button>
+          </div>
+        </div>
+
+        <div className="copilot-context">
+          <span>{hasFinancialData ? t.excelConnected : t.tallyConnected}</span>
+          <strong>{t.askFreely}</strong>
+        </div>
+
+        <div className="copilot-thread" ref={threadRef}>
+          <div className="bubble ai">{welcome}</div>
+          {turns.map((turn, index) => (
+            <div
+              key={`${turn.role}-${index}`}
+              className={`bubble ${
+                turn.role === "user"
+                  ? "user"
+                  : turn.role === "error"
+                    ? "err"
+                    : "ai"
+              }`}
+            >
+              {turn.content}
+            </div>
+          ))}
+          {busy && (
+            <div className="bubble ai">
+              <span className="typing">
+                <i />
+                <i />
+                <i />
+              </span>
+            </div>
+          )}
+        </div>
+
+        <div className="copilot-chips">
+          {suggestions.map((suggestion) => (
+            <button
+              className="chip"
+              type="button"
+              key={suggestion}
+              onClick={() => send(suggestion)}
+              disabled={busy}
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
+
+        <form
+          className="composer"
+          onSubmit={(event) => {
+            event.preventDefault();
+            send(draft);
+          }}
+        >
+          <textarea
+            ref={composerRef}
+            rows={1}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                send(draft);
+              }
+            }}
+            placeholder={t.placeholder}
+            disabled={busy}
+          />
+          <button
+            type="submit"
+            disabled={busy || !draft.trim()}
+            aria-label={t.send}
+          >
+            <IconSend />
+          </button>
+        </form>
+        <div className="copilot-foot">{t.aiAccuracyNote}</div>
+      </aside>
+    </>
   );
 }

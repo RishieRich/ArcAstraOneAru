@@ -9,17 +9,17 @@ negative, so a receivable of 5,08,989 lands in bills.pending_amount as
 -508989. The tables keep Tally's raw sign; the dashboard reports magnitude,
 which is what "outstanding" means to the reader.
 """
+from datetime import date
 from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.dashauth import require_dashboard_user
+from app.dashauth import ensure_dashboard_tenant_access, require_dashboard_user
 from app.db import get_connection
 
 router = APIRouter(
     prefix="/v1/dashboard",
     tags=["dashboard"],
-    dependencies=[Depends(require_dashboard_user)],
 )
 
 
@@ -45,20 +45,117 @@ def _empty_financials() -> dict:
     return {
         "has_data": False,
         "kinds": [],
+        "pnl_complete": False,
         "totals": {
             "sales": 0.0,
             "purchase": 0.0,
             "expense": 0.0,
             "net_flow": 0.0,
+            "operating_result": 0.0,
+            "profit": 0.0,
+            "loss": 0.0,
+            "margin_pct": 0.0,
+            "cost_ratio_pct": 0.0,
+            "average_monthly_sales": 0.0,
+            "average_monthly_purchase": 0.0,
+            "average_monthly_expense": 0.0,
             "tax": 0.0,
             "transactions": 0,
         },
         "monthly": [],
+        "highlights": {},
+        "period": {
+            "months": 0,
+            "active_months": 0,
+            "years": 0.0,
+        },
         "breakdown": {"sales": [], "purchase": [], "expense": []},
         "counterparties": {"sales": [], "purchase": [], "expense": []},
         "imports": [],
         "date_range": {"from": None, "to": None},
         "last_import_at": None,
+    }
+
+
+def _month_keys(first_date: date, last_date: date) -> list[str]:
+    """Return every calendar month in the inclusive uploaded-data span."""
+    current = date(first_date.year, first_date.month, 1)
+    finish = date(last_date.year, last_date.month, 1)
+    keys: list[str] = []
+    while current <= finish:
+        keys.append(current.strftime("%Y-%m"))
+        current = (
+            date(current.year + 1, 1, 1)
+            if current.month == 12
+            else date(current.year, current.month + 1, 1)
+        )
+    return keys
+
+
+def build_monthly_financials(
+    rows: list[tuple[str, str, object]],
+    first_date: date,
+    last_date: date,
+) -> list[dict]:
+    """Zero-fill the complete tenure, then derive monthly profit/loss facts."""
+    monthly_map = {
+        month: {
+            "month": month,
+            "sales": 0.0,
+            "purchase": 0.0,
+            "expense": 0.0,
+        }
+        for month in _month_keys(first_date, last_date)
+    }
+    for month, kind, amount in rows:
+        if month not in monthly_map or kind not in ("sales", "purchase", "expense"):
+            continue
+        monthly_map[month][kind] = _num(amount)
+
+    monthly = []
+    for point in monthly_map.values():
+        result = round(point["sales"] - point["purchase"] - point["expense"], 2)
+        point["net_flow"] = result  # backwards-compatible field
+        point["net_result"] = result
+        point["profit"] = max(result, 0.0)
+        point["loss"] = max(-result, 0.0)
+        monthly.append(point)
+    return monthly
+
+
+def _extreme(
+    monthly: list[dict],
+    key: str,
+    *,
+    largest: bool,
+    positive_only: bool = True,
+) -> dict | None:
+    candidates = [
+        point for point in monthly if not positive_only or point.get(key, 0) > 0
+    ]
+    if not candidates:
+        return None
+    point = (max if largest else min)(candidates, key=lambda item: item.get(key, 0))
+    return {"month": point["month"], "amount": round(point.get(key, 0), 2)}
+
+
+def financial_highlights(monthly: list[dict]) -> dict:
+    """Language-neutral extrema; the frontend and AI explain them."""
+    return {
+        "highest_sales": _extreme(monthly, "sales", largest=True),
+        "lowest_sales": _extreme(monthly, "sales", largest=False),
+        "highest_purchase": _extreme(monthly, "purchase", largest=True),
+        "lowest_purchase": _extreme(monthly, "purchase", largest=False),
+        "highest_expense": _extreme(monthly, "expense", largest=True),
+        "lowest_expense": _extreme(monthly, "expense", largest=False),
+        "highest_profit": _extreme(monthly, "profit", largest=True),
+        "highest_loss": _extreme(monthly, "loss", largest=True),
+        "best_result": _extreme(
+            monthly, "net_result", largest=True, positive_only=False
+        ),
+        "weakest_result": _extreme(
+            monthly, "net_result", largest=False, positive_only=False
+        ),
     }
 
 
@@ -93,6 +190,8 @@ def financial_metrics(cur, tenant_id: str) -> dict:
     sales = by_kind.get("sales", {}).get("gross", 0.0)
     purchase = by_kind.get("purchase", {}).get("gross", 0.0)
     expense = by_kind.get("expense", {}).get("gross", 0.0)
+    first_dates = [summary["from"] for summary in by_kind.values() if summary["from"]]
+    last_dates = [summary["to"] for summary in by_kind.values() if summary["to"]]
 
     cur.execute(
         """
@@ -105,19 +204,25 @@ def financial_metrics(cur, tenant_id: str) -> dict:
         """,
         (tenant_id,),
     )
-    monthly_map: dict[str, dict] = {}
-    for month, kind, amount in cur.fetchall():
-        point = monthly_map.setdefault(
-            month,
-            {"month": month, "sales": 0.0, "purchase": 0.0, "expense": 0.0},
+    raw_monthly = cur.fetchall()
+    monthly = (
+        build_monthly_financials(
+            raw_monthly,
+            min(first_dates),
+            max(last_dates),
         )
-        point[kind] = _num(amount)
-    monthly = []
-    for point in monthly_map.values():
-        point["net_flow"] = round(
-            point["sales"] - point["purchase"] - point["expense"], 2
-        )
-        monthly.append(point)
+        if first_dates and last_dates
+        else []
+    )
+    result = round(sales - purchase - expense, 2)
+    period_months = len(monthly)
+    active_months = sum(
+        1
+        for point in monthly
+        if point["sales"] or point["purchase"] or point["expense"]
+    )
+    profitable_months = round(sum(point["profit"] for point in monthly), 2)
+    loss_months = round(sum(point["loss"] for point in monthly), 2)
 
     cur.execute(
         """
@@ -185,20 +290,42 @@ def financial_metrics(cur, tenant_id: str) -> dict:
             created_at,
         ) in cur.fetchall()
     ]
-    first_dates = [summary["from"] for summary in by_kind.values() if summary["from"]]
-    last_dates = [summary["to"] for summary in by_kind.values() if summary["to"]]
+    pnl_complete = all(kind in by_kind for kind in ("sales", "purchase", "expense"))
     return {
         "has_data": True,
         "kinds": [kind for kind in ("sales", "purchase", "expense") if kind in by_kind],
+        "pnl_complete": pnl_complete,
         "totals": {
             "sales": sales,
             "purchase": purchase,
             "expense": expense,
-            "net_flow": round(sales - purchase - expense, 2),
+            "net_flow": result,
+            "operating_result": result,
+            "profit": profitable_months,
+            "loss": loss_months,
+            "margin_pct": round(result / sales * 100, 1) if sales else 0.0,
+            "cost_ratio_pct": (
+                round((purchase + expense) / sales * 100, 1) if sales else 0.0
+            ),
+            "average_monthly_sales": (
+                round(sales / period_months, 2) if period_months else 0.0
+            ),
+            "average_monthly_purchase": (
+                round(purchase / period_months, 2) if period_months else 0.0
+            ),
+            "average_monthly_expense": (
+                round(expense / period_months, 2) if period_months else 0.0
+            ),
             "tax": round(sum(summary["tax"] for summary in by_kind.values()), 2),
             "transactions": sum(summary["transactions"] for summary in by_kind.values()),
         },
         "monthly": monthly,
+        "highlights": financial_highlights(monthly),
+        "period": {
+            "months": period_months,
+            "active_months": active_months,
+            "years": round(period_months / 12, 1) if period_months else 0.0,
+        },
         "breakdown": breakdown,
         "counterparties": counterparties,
         "imports": imports,
@@ -211,7 +338,7 @@ def financial_metrics(cur, tenant_id: str) -> dict:
 
 
 @router.get("/companies")
-def companies() -> list[dict]:
+def companies(dashboard_user: str = Depends(require_dashboard_user)) -> list[dict]:
     """Every tenant, with enough context for the dashboard's company picker."""
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
@@ -226,8 +353,15 @@ def companies() -> list[dict]:
                    exists(select 1 from financial_transactions ft
                      where ft.tenant_id = t.id)
             from tenants t
+            join dashboard_users du on du.email = %s
+            where du.all_tenants
+               or exists(
+                    select 1 from dashboard_user_tenants dut
+                    where dut.user_email = %s and dut.tenant_id = t.id
+                  )
             order by t.created_at
-            """
+            """,
+            (dashboard_user, dashboard_user),
         )
         return [
             {
@@ -255,8 +389,7 @@ def companies() -> list[dict]:
         ]
 
 
-@router.get("/metrics/{tenant_id}")
-def metrics(tenant_id: str) -> dict:
+def metrics_snapshot(tenant_id: str) -> dict:
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("select name from tenants where id = %s", (tenant_id,))
         row = cur.fetchone()
@@ -508,3 +641,13 @@ def metrics(tenant_id: str) -> dict:
         "last_sync_at": last_sync_iso,
         "last_activity_at": _latest_iso(last_sync_iso, financials["last_import_at"]),
     }
+
+
+@router.get("/metrics/{tenant_id}")
+def metrics(
+    tenant_id: str,
+    dashboard_user: str = Depends(require_dashboard_user),
+) -> dict:
+    with get_connection() as conn, conn.cursor() as cur:
+        ensure_dashboard_tenant_access(cur, dashboard_user, tenant_id)
+    return metrics_snapshot(tenant_id)

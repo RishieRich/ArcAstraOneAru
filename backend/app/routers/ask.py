@@ -20,15 +20,14 @@ import urllib.request
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from app.dashauth import require_dashboard_user
+from app.dashauth import ensure_dashboard_tenant_access, require_dashboard_user
 from app.db import get_connection
-from app.routers.dashboard import metrics
+from app.routers.dashboard import metrics_snapshot
 from app.schemas_ask import AskRequest, AskResponse
 
 router = APIRouter(
     prefix="/v1/ask",
     tags=["ask"],
-    dependencies=[Depends(require_dashboard_user)],
 )
 
 # Primary provider. Gemini exposes an OpenAI-compatible surface at this path.
@@ -73,8 +72,22 @@ TRUTHFULNESS:
 - Receivables come from the latest Tally connector snapshot. Sales, purchases and \
 expenses come only from the uploaded workbook kinds listed in financials.kinds.
 - If a requested data kind was not uploaded, say it is not available.
-- financials.totals.net_flow means sales minus purchases minus expenses. Never call it \
-profit because the uploaded data is not a complete P&L."""
+- financials.pnl_complete is true only when Sales, Purchases and Expenses are all uploaded.
+- When pnl_complete is true, operating_result means Sales minus Purchases minus Expenses. \
+Call a positive value "estimated operating profit" and a negative value "estimated operating \
+loss". Always make clear it is based on uploaded workbooks, not a statutory P&L.
+- financials.totals.profit is the sum of positive monthly results; totals.loss is the sum of \
+negative monthly results. totals.operating_result is the net result across the full period.
+- financials.highlights and financials.monthly cover the complete uploaded date range, including \
+calendar months with no activity. Use those fields for highest/lowest and trend questions.
+- For "why" questions, describe the observable sales, purchase, expense and category changes. \
+Do not claim a cause that the uploaded data cannot prove."""
+
+LANGUAGE_NAMES = {
+    "en": "English",
+    "hi": "Hinglish in Roman script",
+    "gu": "Gujarati-English in Roman script",
+}
 
 
 class _ProviderError(Exception):
@@ -131,7 +144,7 @@ def _call(provider: str, url: str, key: str, model: str, messages: list[dict]) -
 
 def build_context(tenant_id: str) -> str:
     """The company's normalized books snapshot, as JSON, for the prompt."""
-    data = metrics(tenant_id)
+    data = metrics_snapshot(tenant_id)
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             """
@@ -179,6 +192,27 @@ def build_context(tenant_id: str) -> str:
                 tax,
             ) in cur.fetchall()
         ]
+        cur.execute(
+            """
+            select to_char(date_trunc('month', txn_date), 'YYYY-MM'), kind,
+                   coalesce(nullif(category, ''), 'Uncategorized'),
+                   coalesce(sum(gross_amount), 0)
+            from financial_transactions
+            where tenant_id = %s and txn_date is not null
+            group by 1, kind, 3
+            order by 1, kind, 4 desc
+            """,
+            (tenant_id,),
+        )
+        driver_groups: dict[tuple[str, str], list[dict]] = {}
+        for month, kind, category, amount in cur.fetchall():
+            rows = driver_groups.setdefault((month, kind), [])
+            if len(rows) < 5:
+                rows.append({"category": category, "amount": float(amount)})
+        monthly_drivers = [
+            {"month": month, "kind": kind, "drivers": drivers}
+            for (month, kind), drivers in driver_groups.items()
+        ]
 
     return json.dumps(
         {
@@ -189,6 +223,7 @@ def build_context(tenant_id: str) -> str:
             "outstanding_bills": data["bills"],
             "customer_ledgers": ledgers,
             "financials": data["financials"],
+            "monthly_drivers": monthly_drivers,
             "uploaded_transactions": uploaded_transactions,
         },
         indent=2,
@@ -197,7 +232,13 @@ def build_context(tenant_id: str) -> str:
 
 
 @router.post("", response_model=AskResponse)
-def ask(payload: AskRequest) -> AskResponse:
+def ask(
+    payload: AskRequest,
+    dashboard_user: str = Depends(require_dashboard_user),
+) -> AskResponse:
+    with get_connection() as conn, conn.cursor() as cur:
+        ensure_dashboard_tenant_access(cur, dashboard_user, payload.tenant_id)
+
     providers = _providers()
     if not providers:
         raise HTTPException(
@@ -210,7 +251,12 @@ def ask(payload: AskRequest) -> AskResponse:
     messages = [
         {
             "role": "system",
-            "content": f"{SYSTEM}\n\n<business_data>\n{context}\n</business_data>",
+            "content": (
+                f"{SYSTEM}\n\nThe selected dashboard language is "
+                f"{LANGUAGE_NAMES[payload.language]}. Reply in that language unless the "
+                "user clearly asks for another language."
+                f"\n\n<business_data>\n{context}\n</business_data>"
+            ),
         },
         *[{"role": m.role, "content": m.content} for m in payload.history],
         {"role": "user", "content": payload.question},
