@@ -11,6 +11,9 @@ connector/.venv/
 *.env
 !config.example.toml
 
+# Local data references (private spreadsheets, not for repo)
+git_ignore_data_ref/
+
 # Local state & logs
 exports/
 connector/dist/
