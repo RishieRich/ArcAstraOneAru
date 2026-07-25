@@ -1,4 +1,4 @@
-"""Run all .sql files in this directory, in filename order, against DATABASE_URL.
+r"""Run all .sql files in this directory, in filename order, against DATABASE_URL.
 
 Usage (from backend/):  ..\.venv\Scripts\python.exe migrations\run_migration.py
 """
