@@ -4,6 +4,34 @@ Goal: backend live on Vercel → bake that URL into the exe → hand the exe to 
 
 ---
 
+## Current production deployment path (verified 2026-07-25)
+
+The Git push integration did not create deployments for either existing Vercel
+project during the Excel-import release. Push the commit to GitHub first, then
+deploy manually with the authenticated Vercel CLI:
+
+```powershell
+# Backend: run from the repository root because the Vercel project setting is
+# Root Directory = backend.
+npx vercel@latest link --project arcastraone --yes
+npx vercel@latest --prod --yes
+
+# Frontend
+cd frontend
+npx vercel@latest --prod --yes
+```
+
+Do not run the backend production command from inside `backend/`. Vercel combines
+the current directory with the configured Root Directory and otherwise searches
+for a nonexistent `backend/backend` path.
+
+The stable production aliases remain:
+
+- Backend: `https://arcastraone.vercel.app`
+- Frontend: `https://arq-receivables.vercel.app`
+
+---
+
 ## What changed in the code (already done)
 
 | File | Why |

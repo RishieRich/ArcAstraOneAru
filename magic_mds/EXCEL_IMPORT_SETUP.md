@@ -56,8 +56,24 @@ No new environment variable is required.
 
 1. Review and commit the code when ready.
 2. Push to `main`.
-3. Let the backend and frontend Vercel projects auto-deploy.
-4. Remember that the frontend's `VITE_API_BASE_URL` remains a build-time value.
+3. Deploy the two existing Vercel projects manually. Git auto-deploy did not
+   trigger during the 2026-07-25 production release:
+
+   ```powershell
+   # Backend: run from the repository root. The project already has
+   # Root Directory = backend.
+   npx vercel@latest link --project arcastraone --yes
+   npx vercel@latest --prod --yes
+
+   # Frontend
+   cd frontend
+   npx vercel@latest --prod --yes
+   ```
+
+4. Do not run the backend deployment from inside `backend/`; Vercel would combine
+   that directory with the configured Root Directory and look for
+   `backend/backend`.
+5. Remember that the frontend's `VITE_API_BASE_URL` remains a build-time value.
 
 The backend adds `openpyxl` to both dependency lists that Vercel may read:
 

@@ -129,8 +129,23 @@ cd backend; python migrations\run_migration.py migrations\0002_dashboard_users.s
 
 ## 7. Deploy
 
-Push to `main` → both Vercel projects auto-deploy. There is **no `vercel.json`** in this repo;
-configuration lives in `backend/pyproject.toml`:
+Push to `main` first, then deploy both existing Vercel projects manually. Git auto-deploy
+did not trigger for either project during the 2026-07-25 release; both projects still showed
+their 13-day-old deployments after the push. Until the Git integrations are repaired, use:
+
+```powershell
+# Backend: run from the repository root because the Vercel project already has
+# Root Directory = backend. Running from backend/ incorrectly resolves backend/backend.
+npx vercel@latest link --project arcastraone --yes
+npx vercel@latest --prod --yes
+
+# Frontend: its linked project deploys from frontend/.
+cd frontend
+npx vercel@latest --prod --yes
+```
+
+There is **no `vercel.json`** in this repo; configuration lives in
+`backend/pyproject.toml` and the Vercel project settings:
 
 - Vercel's Python builder installs from `[project].dependencies` and **ignores
   `requirements.txt`** — keep both lists in sync or the build silently lacks a package.
