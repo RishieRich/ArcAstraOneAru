@@ -97,12 +97,40 @@ export default function Login({
 
   return (
     <div className="login-screen">
-      <ConversionContactBar t={t} />
-      <div className="login-theme">
-        <ThemeToggle theme={theme} setTheme={setTheme} t={t} />
-      </div>
+      <header className="login-topbar">
+        <div className="login-topbrand">
+          <BrandLogo compact />
+          <div>
+            <strong>ARQ Astra</strong>
+            <span>{t.tagline}</span>
+          </div>
+        </div>
 
-      <div className="auth-shell">
+        <ConversionContactBar t={t} />
+
+        <div className="login-topcontrols">
+          <div className="lang-group" aria-label={t.languagePicker}>
+            {LANGS.map((language) => (
+              <button
+                type="button"
+                key={language.id}
+                onClick={() => setLang(language.id)}
+                aria-pressed={lang === language.id}
+              >
+                {language.label}
+              </button>
+            ))}
+          </div>
+          <ThemeToggle
+            theme={theme}
+            setTheme={setTheme}
+            t={t}
+            compact
+          />
+        </div>
+      </header>
+
+      <main className="auth-shell">
         <section className="auth-story">
           <span className="auth-story-kicker">
             <IconSpark width={14} height={14} />
@@ -129,29 +157,6 @@ export default function Login({
           className={`login-card${error ? " error" : ""}`}
           onSubmit={submit}
         >
-          <div className="login-brand">
-            <BrandLogo />
-            <div>
-              <h1>ARQ Astra</h1>
-              <p>{t.tagline}</p>
-            </div>
-          </div>
-
-          <div className="login-lang">
-            <div className="lang-group">
-              {LANGS.map((language) => (
-                <button
-                  type="button"
-                  key={language.id}
-                  onClick={() => setLang(language.id)}
-                  aria-pressed={lang === language.id}
-                >
-                  {language.label}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <div className="auth-tabs" role="tablist" aria-label={t.accountAccess}>
             <button
               type="button"
@@ -268,7 +273,7 @@ export default function Login({
         <div className="mobile-product-preview">
           <ProductShowcase t={t} compact />
         </div>
-      </div>
+      </main>
     </div>
   );
 }

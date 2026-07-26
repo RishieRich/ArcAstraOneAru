@@ -314,6 +314,7 @@ export const T = {
     loginBtn: "Open dashboard",
     // public trial signup
     accountAccess: "Account access",
+    languagePicker: "Choose language",
     signInTab: "Log in",
     signUpTab: "Start free",
     freeBusinessIntelligence: "Free business intelligence trial",
@@ -903,6 +904,7 @@ export const T = {
     loginBtn: "Dashboard kholo",
     // public trial signup
     accountAccess: "Account access",
+    languagePicker: "Language chuno",
     signInTab: "Log in",
     signUpTab: "Free shuru karo",
     freeBusinessIntelligence: "Free business intelligence trial",
@@ -1488,6 +1490,7 @@ export const T = {
     loginBtn: "Dashboard kholo",
     // public trial signup
     accountAccess: "Account access",
+    languagePicker: "Language pasand karo",
     signInTab: "Log in",
     signUpTab: "Free sharu karo",
     freeBusinessIntelligence: "Free business intelligence trial",
@@ -2023,6 +2026,7 @@ T.mr = {
   beyondExcelBody:
     "Full access madhye Tally ani database connections; pudhe research ani agentic actions.",
   accountAccess: "Account access",
+  languagePicker: "Language nivda",
   signInTab: "Log in",
   signUpTab: "Sign up",
   secureWorkspace: "Secure workspace",
