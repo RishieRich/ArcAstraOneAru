@@ -73,5 +73,5 @@ device can therefore populate a genuinely fresh snapshot after cleanup.
 Migration 0005 was explicitly approved, applied to the configured Neon database,
 verified and deployed on 2026-07-26. Migration 0006 was explicitly approved,
 applied, verified and deployed on 2026-07-26.
-Migration 0007 is authored but intentionally not applied until the owner approves
-the matching release.
+Migration 0007 was explicitly approved, applied to the configured Neon database,
+verified and deployed with the Smart Excel release on 2026-07-26.

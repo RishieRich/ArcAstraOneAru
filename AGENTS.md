@@ -5,8 +5,8 @@ different agents on the same page. Codex CLI loads `AGENTS.md` automatically; Cl
 loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way — one file,
 not two drifting copies.
 
-Last verified against the repo: **2026-07-26** (working tree based on commit `5eb57d1`;
-Smart Excel migration 0007 is not yet applied or deployed).
+Last verified against the repo: **2026-07-26** (Smart Excel release commit `35c7fa8`;
+migration 0007 and both Vercel projects verified in production).
 
 ---
 
@@ -251,9 +251,6 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 - **Excel voucher removals/cancellations** — re-exports update vouchers that retain the same
   Tally GUID, but a voucher absent from a later workbook is not automatically deleted. Add an
   explicit snapshot/reconciliation workflow before treating imports as a cancellation ledger.
-- **Smart Excel migration 0007 is authored but not yet approved/applied in production.**
-  Apply it before deploying the matching backend and frontend.
-
 ## 10. Documentation index (`magic_mds/`)
 
 | File | What it is |

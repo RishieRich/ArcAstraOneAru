@@ -49,7 +49,8 @@ retain their existing GUID/business-key upsert behavior.
 
 ## Deployment order
 
-Do not deploy the matching backend until the owner approves and applies:
+Migration 0007 was owner-approved, applied and verified in production on 2026-07-26
+before the Smart Excel backend was deployed. For a fresh environment, preserve that order:
 
 ```powershell
 cd backend
