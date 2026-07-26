@@ -1,6 +1,8 @@
 import uuid
 
 from app.db import get_connection
+from app.routers.sync import bill_source_key
+from app.schemas import BillIn
 
 
 def _register(client, tenant, company_guid="guid-1"):
@@ -40,6 +42,23 @@ def test_sync_with_wrong_company_guid_is_403(client, make_tenant):
     assert resp.status_code == 403
 
 
+def test_bill_identity_is_stable_across_amount_and_case_changes():
+    original = BillIn(
+        party_guid="LEDGER-1",
+        party_name="Test Party",
+        bill_ref=" INV-1 ",
+        pending_amount=500,
+    )
+    refreshed = BillIn(
+        party_guid="ledger-1",
+        party_name="Renamed Party",
+        bill_ref="inv-1",
+        pending_amount=125,
+    )
+
+    assert bill_source_key(original) == bill_source_key(refreshed)
+
+
 def test_sync_writes_rows_and_is_idempotent(client, make_tenant):
     tenant = make_tenant()
     token = _register(client, tenant, company_guid="guid-1")
@@ -73,6 +92,71 @@ def test_sync_writes_rows_and_is_idempotent(client, make_tenant):
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute("select count(*) from bills where sync_run_id = %s", (run_id,))
         assert cur.fetchone()[0] == 1
+
+
+def test_new_sync_updates_bill_in_place_and_closes_missing_bills(client, make_tenant):
+    tenant = make_tenant()
+    token = _register(client, tenant, company_guid="guid-current-state")
+    headers = {"Authorization": f"Bearer {token}"}
+    first_bill = {
+        "party_guid": "lg-1",
+        "party_name": "Test Party",
+        "bill_ref": "INV-1",
+        "pending_amount": 500,
+        "overdue_days": 2,
+    }
+    first = client.post(
+        "/v1/sync",
+        headers=headers,
+        json={
+            "sync_run_id": str(uuid.uuid4()),
+            "company_guid": "guid-current-state",
+            "ledgers": [],
+            "bills": [first_bill],
+        },
+    )
+    assert first.status_code == 200
+
+    updated = client.post(
+        "/v1/sync",
+        headers=headers,
+        json={
+            "sync_run_id": str(uuid.uuid4()),
+            "company_guid": "guid-current-state",
+            "ledgers": [],
+            "bills": [{**first_bill, "pending_amount": 275}],
+        },
+    )
+    assert updated.status_code == 200
+
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            select count(*), max(pending_amount), count(*) filter (where closed_at is null)
+            from bills where tenant_id = %s
+            """,
+            (tenant["tenant_id"],),
+        )
+        assert cur.fetchone() == (1, 275, 1)
+
+    cleared = client.post(
+        "/v1/sync",
+        headers=headers,
+        json={
+            "sync_run_id": str(uuid.uuid4()),
+            "company_guid": "guid-current-state",
+            "ledgers": [],
+            "bills": [],
+        },
+    )
+    assert cleared.status_code == 200
+
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            "select count(*) from bills where tenant_id = %s and closed_at is null",
+            (tenant["tenant_id"],),
+        )
+        assert cur.fetchone()[0] == 0
 
 
 def test_two_tenants_cannot_see_each_others_data(client, make_tenant):

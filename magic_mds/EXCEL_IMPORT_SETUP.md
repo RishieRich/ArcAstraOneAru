@@ -17,7 +17,9 @@ names can use the selected Expense option as the tie-breaker.
 
 The original workbook is **not stored**. ARQ stores normalized voucher totals and
 item/category lines. Exact file re-uploads are idempotent, and vouchers with the
-same Tally GUID are updated instead of duplicated.
+same Tally GUID are updated instead of duplicated. GUID-less vouchers use date,
+voucher number and party rather than export row order, so a differently sorted
+re-export also updates instead of stacking.
 
 The dashboard zero-fills every calendar month between the earliest and latest
 uploaded dates. A one-year workbook therefore produces a complete one-year chart,
@@ -42,6 +44,7 @@ idempotent. The Excel data model and dashboard-access additions are:
 ```text
 migrations/0003_financial_imports.sql
 migrations/0004_dashboard_user_access.sql
+migrations/0005_bill_current_state.sql
 ```
 
 This creates:
@@ -51,6 +54,7 @@ This creates:
 - `financial_transaction_lines` — item, expense-category and tax detail.
 - `dashboard_users.all_tenants` — explicit owner-wide access.
 - `dashboard_user_tenants` — per-company grants for client logins.
+- current-state bill identity plus canonical GUID-less Excel voucher keys.
 
 No existing table is dropped or truncated. Migration 0004 additively alters
 `dashboard_users`: pre-existing accounts become explicit all-company owners and
@@ -58,7 +62,8 @@ new accounts default to no access.
 
 If you prefer the Neon SQL Editor, open
 `backend/migrations/0003_financial_imports.sql` and
-`backend/migrations/0004_dashboard_user_access.sql`, paste each complete file in
+`backend/migrations/0004_dashboard_user_access.sql`, and
+`backend/migrations/0005_bill_current_state.sql`, paste each complete file in
 order, and run them once against the production database.
 
 ## 2. Deploy
@@ -112,7 +117,9 @@ Then:
    counterparties, period table and import history.
 7. Re-upload the exact same file once. The UI should report that it was already
    imported and totals must not double.
-8. Switch back to **Receivables** and confirm the original Tally dashboard is
+8. Export the same vouchers in a different order (where practical), upload it,
+   and confirm totals still do not double.
+9. Switch back to **Receivables** and confirm the original Tally dashboard is
    unchanged.
 
 Optional metadata-only SQL checks in Neon:

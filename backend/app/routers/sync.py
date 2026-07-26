@@ -1,3 +1,4 @@
+import hashlib
 import json
 
 from fastapi import APIRouter, HTTPException
@@ -7,6 +8,33 @@ from app.db import get_connection
 from app.schemas import SyncPayload, SyncResponse
 
 router = APIRouter(prefix="/v1/sync", tags=["sync"])
+
+
+def _normalized_identity(value: str | None) -> str:
+    return (value or "").strip().casefold()
+
+
+def bill_source_key(bill) -> str:
+    """Return a stable identity for one bill across connector refreshes."""
+    party = _normalized_identity(bill.party_guid) or _normalized_identity(bill.party_name)
+    reference = _normalized_identity(bill.bill_ref)
+    if reference:
+        # Migration 0005 uses the same readable identity for existing rows.
+        return f"ref:{party}\x1f{reference}"
+
+    # A reference-less bill has no perfect Tally identity. Dates and amount are
+    # the least surprising fallback: distinct same-party bills stay distinct,
+    # while an identical refresh still upserts instead of stacking.
+    fallback = json.dumps(
+        [
+            party,
+            bill.bill_date.isoformat() if bill.bill_date else "",
+            bill.due_date.isoformat() if bill.due_date else "",
+            format(bill.pending_amount.normalize(), "f"),
+        ],
+        separators=(",", ":"),
+    )
+    return "fallback:" + hashlib.sha256(fallback.encode("utf-8")).hexdigest()
 
 
 @router.post("", response_model=SyncResponse)
@@ -22,6 +50,14 @@ def sync(payload: SyncPayload, device: DeviceContext = DeviceAuth) -> SyncRespon
                 status_code=403,
                 detail="company_guid does not match this tenant's bound Tally company",
             )
+
+        # Sync, upload and cleanup all take this tenant-scoped lock. It prevents
+        # a connector push racing with a user-requested reset and resurrecting
+        # only half a snapshot.
+        cur.execute(
+            "select pg_advisory_xact_lock(hashtextextended(cast(%s as text), 0))",
+            (device.tenant_id,),
+        )
 
         counts = {"ledgers": len(payload.ledgers), "bills": len(payload.bills)}
 
@@ -78,16 +114,32 @@ def sync(payload: SyncPayload, device: DeviceContext = DeviceAuth) -> SyncRespon
             ],
         )
 
+        bills_by_key = {bill_source_key(bill): bill for bill in payload.bills}
         cur.executemany(
             """
             insert into bills
-                (tenant_id, sync_run_id, party_guid, party_name, bill_ref, bill_date, due_date, pending_amount, overdue_days)
-            values (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                (tenant_id, sync_run_id, source_key, party_guid, party_name,
+                 bill_ref, bill_date, due_date, pending_amount, overdue_days,
+                 first_sync_run_id, last_sync_run_id, updated_at, closed_at)
+            values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, now(), null)
+            on conflict (tenant_id, source_key) do update set
+                sync_run_id = excluded.sync_run_id,
+                party_guid = excluded.party_guid,
+                party_name = excluded.party_name,
+                bill_ref = excluded.bill_ref,
+                bill_date = excluded.bill_date,
+                due_date = excluded.due_date,
+                pending_amount = excluded.pending_amount,
+                overdue_days = excluded.overdue_days,
+                last_sync_run_id = excluded.last_sync_run_id,
+                updated_at = now(),
+                closed_at = null
             """,
             [
                 (
                     device.tenant_id,
                     str(payload.sync_run_id),
+                    source_key,
                     bill.party_guid,
                     bill.party_name,
                     bill.bill_ref,
@@ -95,9 +147,26 @@ def sync(payload: SyncPayload, device: DeviceContext = DeviceAuth) -> SyncRespon
                     bill.due_date,
                     bill.pending_amount,
                     bill.overdue_days,
+                    str(payload.sync_run_id),
+                    str(payload.sync_run_id),
                 )
-                for bill in payload.bills
+                for source_key, bill in bills_by_key.items()
             ],
+        )
+
+        # A successful Tally Bills Receivable export is a complete snapshot.
+        # Anything previously open but absent now has been paid, cancelled or
+        # otherwise cleared in Tally, so retain it as history but hide it from
+        # current receivables.
+        cur.execute(
+            """
+            update bills
+            set closed_at = now(), updated_at = now()
+            where tenant_id = %s
+              and closed_at is null
+              and not (source_key = any(%s::text[]))
+            """,
+            (device.tenant_id, list(bills_by_key)),
         )
 
         cur.execute(

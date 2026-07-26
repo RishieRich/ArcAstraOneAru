@@ -61,6 +61,14 @@ export async function login(email, password) {
 export const fetchCompanies = () => request("/v1/dashboard/companies");
 export const fetchMetrics = (tenantId) => request(`/v1/dashboard/metrics/${tenantId}`);
 
+export function cleanupCompanyData({ tenantId, companyName, password }) {
+  return request(`/v1/dashboard/data/${tenantId}`, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ company_name: companyName, password }),
+  });
+}
+
 export function uploadFinancialFile({ tenantId, kind, file }) {
   const params = new URLSearchParams({ tenant_id: tenantId, declared_kind: kind });
   return request(`/v1/imports/financials?${params}`, {

@@ -62,6 +62,7 @@ Three components, **one repo** (`github.com/RishieRich/ArcAstraOneAru`), three d
 | `GET /v1/dashboard/metrics/{tenant_id}` | `Bearer <dashboard token>` | all dashboard numbers |
 | `POST /v1/imports/financials` | `Bearer <dashboard token>` | classify + import one Tally `.xlsx` workbook |
 | `POST /v1/ask` | `Bearer <dashboard token>` | AI copilot Q&A over the tenant's snapshot |
+| `DELETE /v1/dashboard/data/{tenant_id}` | `Bearer <dashboard token>` + password/name confirmation | clear synced/imported facts while preserving tenant, access and devices |
 
 Routers live in `backend/app/routers/`; wiring is in `backend/app/main.py`.
 
@@ -81,6 +82,8 @@ Routers live in `backend/app/routers/`; wiring is in `backend/app/main.py`.
   `ensure_dashboard_tenant_access` on `/metrics`, `/imports`, `/ask`, and inside the `/companies`
   query. Grant with `python -m app.admin grant-dashboard-access`.
 - **The exe never writes to Tally** — only read/export XML requests. Keep it that way.
+- **Data cleanup re-authenticates** — exact company name plus current password/PIN are
+  verified server-side; tenant, dashboard access and registered devices are preserved.
 - **No secrets in files or logs**; logs carry counts and statuses, never party names or amounts.
 
 ## 5. Environment variables
@@ -184,6 +187,14 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 7. **Apply `0003_financial_imports.sql` before deploying code that queries finance data.**
    Imports accept `.xlsx` up to 5 MB, never store the original file, reject mixed/wrong
    voucher types, deduplicate exact files by SHA-256, and upsert vouchers by Tally GUID.
+8. **Apply `0005_bill_current_state.sql` before deploying the matching backend.** It
+   collapses referenced historical bill duplicates, adds current/closed bill state, and
+   canonicalizes GUID-less Excel identities. Sync, import and cleanup serialize per tenant
+   with one Postgres advisory transaction lock. A compatibility trigger keeps the older
+   deployed sync insert working safely until the matching backend is deployed.
+9. **Advisory-lock tenant IDs must be cast to text.** Psycopg binds the connector's tenant
+   ID as PostgreSQL `uuid`, while `hashtext()` accepts only text. The writer paths use
+   `hashtextextended(cast(%s as text), 0)`; preserve the cast.
 
 ## 9. Open items
 
@@ -191,8 +202,10 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
   empty test company, or their Tally XML shape doesn't match `parse_bills_receivable`
   (`connector/src/arq_connector/tally/parsers.py`), which is live-verified against only one
   bill layout. Needs their real-company push or raw XML to resolve.
-- **Bills dedup migration** (`magic_mds/DATA_MODEL.md`) — repeated syncs stack duplicate bill
-  rows. Designed, awaiting the owner's go-ahead. Do not apply unilaterally.
+- **Migration 0005 is applied; matching application code is not deployed yet.** Neon was
+  migrated and verified on 2026-07-26. Commit/push and deploy backend then frontend before
+  expecting the Start fresh UI and full current-snapshot close behavior in production. The
+  migration's compatibility trigger prevents the older deployed sync route from failing.
 - **Excel voucher removals/cancellations** — re-exports update vouchers that retain the same
   Tally GUID, but a voucher absent from a later workbook is not automatically deleted. Add an
   explicit snapshot/reconciliation workflow before treating imports as a cancellation ledger.
@@ -205,7 +218,7 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 | `HOW_IT_ALL_WORKS.md` | plain-language system tour (⚠️ its "next steps" section predates the Vercel deploy) |
 | `USER_MANUAL.md` | end-user install / register / use of the exe |
 | `CONNECTOR_SETUP.md` | connector installation detail |
-| `DATA_MODEL.md` | schema + the pending bills-dedup proposal |
+| `DATA_MODEL.md` | current connector, workbook and reset data model |
 | `DASHBOARD_TABLE_REFERENCE.md` | what every dashboard number means |
 | `VERCEL_DEPLOY.md` | deploy procedure and preset gotchas |
 | `ERROR101_RESOLUTION.md` | the Neon cold-start incident, root cause → fix |
@@ -214,6 +227,7 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 | `readme_1107_output.md` | build log of what was actually shipped and verified |
 | `AI_ERA_REVIEW_PLAYBOOK.md` | review playbook |
 | `EXCEL_IMPORT_SETUP.md` | Neon migration, deploy and verification steps for optional workbook imports |
+| `DATA_CLEANUP_AND_DEDUP.md` | reset boundary, Tally/Excel dedup behavior and migration 0005 deployment order |
 
 ## 11. Working agreement for agents
 

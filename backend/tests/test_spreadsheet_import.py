@@ -3,9 +3,13 @@ from io import BytesIO
 from uuid import uuid4
 
 import pytest
-from openpyxl import Workbook
+from openpyxl import Workbook, load_workbook
 
-from app.spreadsheet_import import ImportValidationError, parse_tally_workbook
+from app.spreadsheet_import import (
+    ImportValidationError,
+    _source_key,
+    parse_tally_workbook,
+)
 
 
 def _tally_workbook(kind: str) -> bytes:
@@ -125,6 +129,55 @@ def test_declared_type_mismatch_is_rejected_before_database_write():
 def test_legacy_xls_is_rejected_with_export_guidance():
     with pytest.raises(ImportValidationError, match=r"\.xlsx"):
         parse_tally_workbook(b"not a workbook", "sales.xls", "sales")
+
+
+def test_fallback_voucher_identity_does_not_depend_on_export_sequence():
+    first = _source_key(
+        kind="sales",
+        guid=None,
+        sequence="1",
+        txn_date=date(2026, 4, 5),
+        voucher_number="INV-7",
+        party="Test Party",
+    )
+    reordered = _source_key(
+        kind="sales",
+        guid=None,
+        sequence="938",
+        txn_date=date(2026, 4, 5),
+        voucher_number=" inv-7 ",
+        party="test party",
+    )
+
+    assert first == reordered
+
+
+def test_repeated_voucher_guid_inside_one_workbook_is_counted_once():
+    workbook = load_workbook(BytesIO(_tally_workbook("sales")))
+    vouchers = workbook["Vouchers"]
+    vouchers.append(
+        [2, "Sales", date(2026, 4, 5), "sales-guid", "Test Party", "1"]
+    )
+
+    ledgers = workbook["Ledger Entries"]
+    original_ledger_rows = list(ledgers.iter_rows(min_row=2, values_only=True))
+    for row in original_ledger_rows:
+        ledgers.append([2, *row[1:]])
+
+    inventory = workbook["Inventory Entries"]
+    original_inventory_rows = list(inventory.iter_rows(min_row=2, values_only=True))
+    for row in original_inventory_rows:
+        inventory.append([2, *row[1:]])
+
+    output = BytesIO()
+    workbook.save(output)
+    workbook.close()
+
+    parsed = parse_tally_workbook(output.getvalue(), "sales.xlsx", "sales")
+
+    assert len(parsed.transactions) == 1
+    assert parsed.skipped_rows == 1
+    assert len(parsed.transactions[0].lines) == 2
 
 
 def test_financial_import_endpoint_requires_dashboard_login(client):

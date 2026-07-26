@@ -6,7 +6,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.db import get_connection
-from app.routers import ask, auth_dashboard, dashboard, devices, imports, sync
+from app.routers import (
+    ask,
+    auth_dashboard,
+    dashboard,
+    data_management,
+    devices,
+    imports,
+    sync,
+)
 
 logger = logging.getLogger("arq.api")
 
@@ -42,6 +50,7 @@ app.add_middleware(
 app.include_router(devices.router)
 app.include_router(sync.router)
 app.include_router(dashboard.router)
+app.include_router(data_management.router)
 app.include_router(ask.router)
 app.include_router(auth_dashboard.router)
 app.include_router(imports.router)

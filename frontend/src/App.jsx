@@ -6,7 +6,7 @@ import {
 import { LANGS, T } from "./i18n";
 import {
   IconAlarm, IconChart, IconFile, IconLogout, IconRupee, IconUsers,
-  IconMessage, IconSpark, IconUpload,
+  IconMessage, IconSpark, IconTrash, IconUpload,
 } from "./icons";
 import AgingChart from "./components/AgingChart";
 import Alerts from "./components/Alerts";
@@ -14,6 +14,7 @@ import BillsTable from "./components/BillsTable";
 import BrandLogo from "./components/BrandLogo";
 import ChaseList from "./components/ChaseList";
 import Copilot from "./components/Copilot";
+import DataCleanup from "./components/DataCleanup";
 import DataNotes from "./components/DataNotes";
 import DueTimeline from "./components/DueTimeline";
 import FinancialOverview from "./components/FinancialOverview";
@@ -87,6 +88,7 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
   const [showUpload, setShowUpload] = useState(false);
   const [view, setView] = useState("receivables");
   const [chatOpen, setChatOpen] = useState(false);
+  const [showCleanup, setShowCleanup] = useState(false);
 
   useEffect(() => {
     fetchCompanies()
@@ -133,6 +135,22 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
       setData(next);
       setCompanies(companyList);
       setView("financial");
+    } catch (refreshError) {
+      if (refreshError instanceof AuthError) return onLogout();
+      setError(refreshError.message);
+    }
+  }
+
+  async function handleCleared() {
+    try {
+      const [next, companyList] = await Promise.all([
+        fetchMetrics(tenantId),
+        fetchCompanies(),
+      ]);
+      setData(next);
+      setCompanies(companyList);
+      setShowUpload(false);
+      setView("receivables");
     } catch (refreshError) {
       if (refreshError instanceof AuthError) return onLogout();
       setError(refreshError.message);
@@ -229,6 +247,14 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
                   <span className="dot-live" />
                   {t.lastUpdated}: {formatWhen(data.last_activity_at || data.last_sync_at)}
                 </span>
+                <button
+                  className="cleanup-trigger"
+                  type="button"
+                  onClick={() => setShowCleanup(true)}
+                >
+                  <IconTrash width={14} height={14} />
+                  {t.cleanupData}
+                </button>
               </div>
 
               {showUpload && (
@@ -284,6 +310,16 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
         onClose={() => setChatOpen(false)}
         onAuthError={onLogout}
       />
+
+      {showCleanup && data && (
+        <DataCleanup
+          tenantId={tenantId}
+          companyName={data.tenant_name}
+          t={t}
+          onCleared={handleCleared}
+          onClose={() => setShowCleanup(false)}
+        />
+      )}
 
       {!chatOpen && (
         <button

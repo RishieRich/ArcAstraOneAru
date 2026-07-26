@@ -149,6 +149,7 @@ export default function FinancialOverview({ financials, t }) {
         pnlComplete={financials.pnl_complete}
         t={t}
       />
+      <BookExplorer financials={financials} t={t} />
       <PeakHighlights
         highlights={financials.highlights}
         pnlComplete={financials.pnl_complete}
@@ -366,6 +367,243 @@ function FinancialTrend({ monthly, pnlComplete, t }) {
       </div>
       <p className="chart-note">{t.chartHoverNote}</p>
     </section>
+  );
+}
+
+const MIX_COLORS = {
+  sales: ["#147b5a", "#2d9a73", "#55b28e", "#83c7aa", "#b6dfce", "#d8eee5"],
+  purchase: ["#246ebf", "#4388d3", "#67a1df", "#8bb9e8", "#b5d3f0", "#d9e8f7"],
+  expense: ["#c65f24", "#dc783a", "#e79863", "#efb48b", "#f5d0b5", "#fae7d9"],
+};
+
+function BookExplorer({ financials, t }) {
+  const [kind, setKind] = useState(financials.kinds[0] || "sales");
+  useEffect(() => {
+    if (!financials.kinds.includes(kind)) {
+      setKind(financials.kinds[0] || "sales");
+    }
+  }, [financials, kind]);
+
+  const points = financials.monthly;
+  const active = points.filter((point) => point[kind] > 0);
+  const total = financials.totals[kind] || 0;
+  const average = active.length ? total / active.length : 0;
+  const best = active.reduce(
+    (winner, point) => (!winner || point[kind] > winner[kind] ? point : winner),
+    null,
+  );
+  const first = active[0];
+  const latest = active[active.length - 1];
+  const change =
+    first && latest && first !== latest && first[kind]
+      ? ((latest[kind] - first[kind]) / first[kind]) * 100
+      : null;
+
+  return (
+    <section className={`card book-explorer ${kind}`}>
+      <div className="chart-heading">
+        <div>
+          <span className="eyebrow">{t.bookExplorerEyebrow}</span>
+          <h3><IconChart /> {t.bookExplorerTitle}</h3>
+          <p className="sub">{t.bookExplorerSub}</p>
+        </div>
+        <div className="book-tabs" aria-label={t.bookExplorerTitle}>
+          {financials.kinds.map((candidate) => (
+            <button
+              type="button"
+              key={candidate}
+              className={candidate}
+              aria-pressed={candidate === kind}
+              onClick={() => setKind(candidate)}
+            >
+              {t.kindLabels[candidate]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="book-kpis">
+        <div>
+          <span>{t.bookTotal}</span>
+          <strong>{formatMoney(total)}</strong>
+        </div>
+        <div>
+          <span>{t.activeMonthAverage}</span>
+          <strong>{formatMoney(average)}</strong>
+          <small>{t.activeMonths(active.length)}</small>
+        </div>
+        <div>
+          <span>{t.bestMonthLabel}</span>
+          <strong>{best ? formatMoney(best[kind]) : "—"}</strong>
+          <small>{best ? formatMonth(best.month) : t.notAvailable}</small>
+        </div>
+        <div>
+          <span>{t.firstToLatest}</span>
+          <strong className={change == null ? "" : change >= 0 ? "up" : "down"}>
+            {change == null ? "—" : `${change >= 0 ? "+" : "−"}${Math.abs(change).toFixed(1)}%`}
+          </strong>
+          <small>
+            {first && latest && first !== latest
+              ? `${formatMonth(first.month)} → ${formatMonth(latest.month)}`
+              : t.needsTwoActiveMonths}
+          </small>
+        </div>
+      </div>
+
+      <div className="book-visual-grid">
+        <MonthlyBookBars monthly={points} kind={kind} average={average} t={t} />
+        <BookMix rows={financials.breakdown[kind] || []} kind={kind} t={t} />
+      </div>
+    </section>
+  );
+}
+
+function MonthlyBookBars({ monthly, kind, average, t }) {
+  if (!monthly.length) {
+    return (
+      <div className="book-chart-panel">
+        <div className="book-panel-head">
+          <div>
+            <strong>{t.monthlyBookTrend(t.kindLabels[kind])}</strong>
+            <span>{t.monthlyBookTrendSub}</span>
+          </div>
+        </div>
+        <div className="empty-mini">{t.empty}</div>
+      </div>
+    );
+  }
+
+  const width = Math.max(720, monthly.length * 48);
+  const height = 300;
+  const left = 62;
+  const right = 20;
+  const top = 22;
+  const bottom = 252;
+  const plotWidth = width - left - right;
+  const maximum = Math.max(1, ...monthly.map((point) => point[kind]), average);
+  const x = (index) => left + ((index + 0.5) / monthly.length) * plotWidth;
+  const y = (value) => bottom - (value / maximum) * (bottom - top);
+  const barWidth = Math.max(8, Math.min(28, (plotWidth / monthly.length) * 0.62));
+  const labelStep = Math.max(1, Math.ceil(monthly.length / 8));
+
+  return (
+    <div className="book-chart-panel">
+      <div className="book-panel-head">
+        <div>
+          <strong>{t.monthlyBookTrend(t.kindLabels[kind])}</strong>
+          <span>{t.monthlyBookTrendSub}</span>
+        </div>
+        <span className="average-key">{t.averageLine}</span>
+      </div>
+      <div className="book-chart-scroll">
+        <svg
+          viewBox={`0 0 ${width} ${height}`}
+          style={{ minWidth: `${width}px` }}
+          role="img"
+          aria-label={t.monthlyBookTrend(t.kindLabels[kind])}
+        >
+          {[0, 0.5, 1].map((ratio) => {
+            const gridY = y(maximum * ratio);
+            return (
+              <g key={ratio}>
+                <line x1={left} x2={width - right} y1={gridY} y2={gridY} className="chart-grid" />
+                <text x={left - 10} y={gridY + 4} className="chart-axis-label">
+                  {formatMoney(maximum * ratio, { compact: true })}
+                </text>
+              </g>
+            );
+          })}
+          <line
+            x1={left}
+            x2={width - right}
+            y1={y(average)}
+            y2={y(average)}
+            className="book-average-line"
+          />
+          {monthly.map((point, index) => {
+            const value = point[kind];
+            return (
+              <g key={point.month}>
+                <rect
+                  x={x(index) - barWidth / 2}
+                  y={y(value)}
+                  width={barWidth}
+                  height={Math.max(bottom - y(value), 1)}
+                  rx="5"
+                  className={`book-bar ${kind}${value === 0 ? " empty" : ""}`}
+                >
+                  <title>{`${formatMonth(point.month)} · ${formatMoney(value)}`}</title>
+                </rect>
+                {(index % labelStep === 0 || index === monthly.length - 1) && (
+                  <text x={x(index)} y={height - 20} className="chart-month-label" textAnchor="middle">
+                    {formatMonth(point.month)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+        </svg>
+      </div>
+    </div>
+  );
+}
+
+function BookMix({ rows, kind, t }) {
+  if (!rows.length) {
+    return (
+      <div className="book-mix-panel">
+        <div className="book-panel-head">
+          <div>
+            <strong>{t.bookMixTitle}</strong>
+            <span>{t.bookMixSub}</span>
+          </div>
+        </div>
+        <div className="empty-mini">{t.noBreakdown}</div>
+      </div>
+    );
+  }
+
+  const shown = rows.slice(0, 6);
+  const total = shown.reduce((sum, row) => sum + row.amount, 0) || 1;
+  let cursor = 0;
+  const stops = shown.map((row, index) => {
+    const start = cursor;
+    cursor += (row.amount / total) * 100;
+    return `${MIX_COLORS[kind][index]} ${start.toFixed(1)}% ${cursor.toFixed(1)}%`;
+  });
+  const largestShare = (shown[0].amount / total) * 100;
+
+  return (
+    <div className="book-mix-panel">
+      <div className="book-panel-head">
+        <div>
+          <strong>{t.bookMixTitle}</strong>
+          <span>{t.bookMixSub}</span>
+        </div>
+      </div>
+      <div className="book-mix-content">
+        <div
+          className="mix-donut"
+          style={{ background: `conic-gradient(${stops.join(",")})` }}
+          role="img"
+          aria-label={t.bookMixAria(t.kindLabels[kind])}
+        >
+          <div>
+            <strong>{largestShare.toFixed(1)}%</strong>
+            <span>{t.largestDriver}</span>
+          </div>
+        </div>
+        <div className="mix-legend">
+          {shown.map((row, index) => (
+            <div key={row.name}>
+              <i style={{ background: MIX_COLORS[kind][index] }} />
+              <span title={row.name}>{row.name}</span>
+              <strong>{((row.amount / total) * 100).toFixed(1)}%</strong>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 

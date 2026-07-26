@@ -38,6 +38,10 @@ async def upload_financials(
         if cur.fetchone() is None:
             raise HTTPException(status_code=404, detail="No such company")
         ensure_dashboard_tenant_access(cur, uploaded_by, str(tenant_id))
+        cur.execute(
+            "select pg_advisory_xact_lock(hashtextextended(cast(%s as text), 0))",
+            (str(tenant_id),),
+        )
 
         cur.execute(
             """

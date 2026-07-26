@@ -15,7 +15,7 @@ The backend must be running, and the client needs a pairing code.
 cd D:\AI_Projects\ARQ\ARQ_Astra_Launch\backend
 .\start_backend.ps1
 ```
-Leave that window open. The API is now at `http://127.0.0.1:8000`.
+Leave that window open. The API is now at `http://127.0.0.1:8010`.
 
 **Create the client's tenant and pairing code** (new terminal):
 ```powershell
@@ -34,7 +34,7 @@ Other admin commands: `python -m app.admin list-tenants` and `python -m app.admi
 
 1. Make sure **TallyPrime is open with the company loaded** (its name visible at the top of Tally).
 2. Copy `arq-connector.exe` anywhere on the machine and **double-click it**. A small window opens.
-3. **Backend URL** — leave as `http://127.0.0.1:8000` for local testing; change to the real server address when the backend is deployed.
+3. **Backend URL** — use `http://127.0.0.1:8010` for local testing; use the production alias in a deployed connector build.
 4. **Tally company** — your open companies appear in the dropdown automatically. Pick the right one. (Empty? Check Tally is open with a company loaded, press **Refresh**.)
 5. **Pairing code** — paste the code from the admin and press **Register**. You'll see *"Registered ✓ — token stored in Windows Credential Manager."* This is once per machine; afterwards this section shows ✓ and stays locked.
 
@@ -87,7 +87,21 @@ The app (and the log) always says *why* in plain words:
 
 ---
 
-## 6. Rebuilding the exe (developers only)
+## 6. Start fresh from the dashboard
+
+Use **Start fresh** beside the selected company only when you intentionally want
+to remove all ARQ dashboard data and rebuild it from Tally/Excel.
+
+The confirmation asks for the exact company name, your current dashboard
+password/PIN, and an irreversible-action checkbox. It deletes receivables,
+ledgers, sync history, uploaded Excel transactions and import history from SQL.
+It does **not** delete the company, user access or registered connector device.
+
+After cleanup, press **Push Now** (or wait for auto-sync) to repopulate
+receivables, then upload any Sales, Purchase and Expense workbooks you still want.
+Deleted SQL data cannot be recovered from ARQ.
+
+## 7. Rebuilding the exe (developers only)
 
 ```powershell
 cd D:\AI_Projects\ARQ\ARQ_Astra_Launch\connector

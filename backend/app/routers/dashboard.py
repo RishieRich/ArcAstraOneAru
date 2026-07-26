@@ -1,8 +1,8 @@
 """Read-only endpoints for the metrics dashboard.
 
-Bills are stored per sync run (append-only), so "current" means the bills from
-the most recent run that pushed any — hence the latest_sync_run_id() lookup
-rather than a plain select over the whole table.
+Bills retain their first/last sync references for history. Current receivables
+are rows whose closed_at is null; a connector snapshot updates, reopens or
+soft-closes those rows atomically.
 
 Amounts are abs()'d here, not in the DB. Tally sends debit balances signed
 negative, so a receivable of 5,08,989 lands in bills.pending_amount as
@@ -30,15 +30,6 @@ def _num(value) -> float:
 def _latest_iso(*values: str | None) -> str | None:
     present = [value for value in values if value]
     return max(present) if present else None
-
-
-def latest_sync_run_id(cur, tenant_id: str) -> str | None:
-    cur.execute(
-        "select sync_run_id from bills where tenant_id = %s order by id desc limit 1",
-        (tenant_id,),
-    )
-    row = cur.fetchone()
-    return row[0] if row else None
 
 
 def _empty_financials() -> dict:
@@ -347,7 +338,8 @@ def companies(dashboard_user: str = Depends(require_dashboard_user)) -> list[dic
                    (select count(*) from devices d
                      where d.tenant_id = t.id and d.revoked_at is null),
                    (select max(started_at) from sync_runs s where s.tenant_id = t.id),
-                   (select count(*) from bills b where b.tenant_id = t.id),
+                   (select count(*) from bills b
+                     where b.tenant_id = t.id and b.closed_at is null),
                    (select max(created_at) from financial_imports fi
                      where fi.tenant_id = t.id),
                    exists(select 1 from financial_transactions ft
@@ -397,8 +389,6 @@ def metrics_snapshot(tenant_id: str) -> dict:
             raise HTTPException(status_code=404, detail="No such company")
         (tenant_name,) = row
 
-        run_id = latest_sync_run_id(cur, tenant_id)
-
         cur.execute(
             """
             select count(*), coalesce(sum(abs(closing_balance)), 0), max(updated_at)
@@ -408,7 +398,17 @@ def metrics_snapshot(tenant_id: str) -> dict:
         )
         ledger_count, ledger_balance, ledgers_updated = cur.fetchone()
         financials = financial_metrics(cur, tenant_id)
-        ledger_updated_iso = ledgers_updated.isoformat() if ledgers_updated else None
+        cur.execute(
+            """
+            select max(finished_at), max(started_at)
+            from sync_runs
+            where tenant_id = %s
+            """,
+            (tenant_id,),
+        )
+        finished, started = cur.fetchone()
+        last_sync = finished or started or ledgers_updated
+        last_sync_iso = last_sync.isoformat() if last_sync else None
 
         empty = {
             "tenant_id": tenant_id,
@@ -427,13 +427,11 @@ def metrics_snapshot(tenant_id: str) -> dict:
             "aging": [], "top_debtors": [], "bills": [], "due_timeline": [],
             "oldest_bills": [], "alerts": [], "notes": [],
             "financials": financials,
-            "last_sync_at": ledger_updated_iso,
+            "last_sync_at": last_sync_iso,
             "last_activity_at": _latest_iso(
-                ledger_updated_iso, financials["last_import_at"]
+                last_sync_iso, financials["last_import_at"]
             ),
         }
-        if run_id is None:
-            return empty
 
         cur.execute(
             """
@@ -444,12 +442,14 @@ def metrics_snapshot(tenant_id: str) -> dict:
                    count(*) filter (where coalesce(overdue_days, 0) > 0),
                    coalesce(max(coalesce(overdue_days, 0)), 0),
                    coalesce(avg(overdue_days) filter (where coalesce(overdue_days, 0) > 0), 0)
-            from bills where tenant_id = %s and sync_run_id = %s
+            from bills where tenant_id = %s and closed_at is null
             """,
-            (tenant_id, run_id),
+            (tenant_id,),
         )
         (bill_count, outstanding, overdue, party_count,
          overdue_bill_count, max_overdue, avg_overdue) = cur.fetchone()
+        if bill_count == 0:
+            return empty
 
         # Aging buckets. Ordered, so the dashboard renders them as an ordinal ramp.
         cur.execute(
@@ -462,10 +462,10 @@ def metrics_snapshot(tenant_id: str) -> dict:
                      else '90+ days'
                    end as bucket,
                    coalesce(sum(abs(pending_amount)), 0), count(*)
-            from bills where tenant_id = %s and sync_run_id = %s
+            from bills where tenant_id = %s and closed_at is null
             group by bucket
             """,
-            (tenant_id, run_id),
+            (tenant_id,),
         )
         found = {b: (_num(amt), n) for b, amt, n in cur.fetchall()}
         order = ["Not due", "1-30 days", "31-60 days", "61-90 days", "90+ days"]
@@ -480,12 +480,12 @@ def metrics_snapshot(tenant_id: str) -> dict:
                    coalesce(sum(abs(pending_amount)), 0),
                    coalesce(max(overdue_days), 0),
                    count(*)
-            from bills where tenant_id = %s and sync_run_id = %s
+            from bills where tenant_id = %s and closed_at is null
             group by party_name
             order by 2 desc
             limit 8
             """,
-            (tenant_id, run_id),
+            (tenant_id,),
         )
         total_out = _num(outstanding) or 1.0
         top_debtors = [
@@ -508,10 +508,10 @@ def metrics_snapshot(tenant_id: str) -> dict:
                    coalesce(sum(abs(pending_amount)) filter (where coalesce(overdue_days, 0) <= 0), 0),
                    count(*)
             from bills
-            where tenant_id = %s and sync_run_id = %s and due_date is not null
+            where tenant_id = %s and closed_at is null and due_date is not null
             group by 1 order by 1
             """,
-            (tenant_id, run_id),
+            (tenant_id,),
         )
         due_timeline = [
             {"month": ym, "overdue": _num(od), "on_track": _num(ok), "bills": n}
@@ -521,11 +521,14 @@ def metrics_snapshot(tenant_id: str) -> dict:
         cur.execute(
             """
             select party_name, bill_ref, due_date, abs(pending_amount), coalesce(overdue_days, 0)
-            from bills where tenant_id = %s and sync_run_id = %s and coalesce(overdue_days, 0) > 0
+            from bills
+            where tenant_id = %s
+              and closed_at is null
+              and coalesce(overdue_days, 0) > 0
             order by overdue_days desc, abs(pending_amount) desc
             limit 5
             """,
-            (tenant_id, run_id),
+            (tenant_id,),
         )
         oldest_bills = [
             {
@@ -540,10 +543,10 @@ def metrics_snapshot(tenant_id: str) -> dict:
             """
             select party_name, bill_ref, bill_date, due_date, abs(pending_amount),
                    coalesce(overdue_days, 0)
-            from bills where tenant_id = %s and sync_run_id = %s
+            from bills where tenant_id = %s and closed_at is null
             order by abs(pending_amount) desc
             """,
-            (tenant_id, run_id),
+            (tenant_id,),
         )
         bills = [
             {
@@ -556,13 +559,6 @@ def metrics_snapshot(tenant_id: str) -> dict:
             }
             for p, ref, bd, dd, amt, days in cur.fetchall()
         ]
-
-        cur.execute(
-            "select max(finished_at), max(started_at) from sync_runs where id = %s",
-            (run_id,),
-        )
-        finished, started = cur.fetchone()
-        last_sync = finished or started
 
     largest_bill = bills[0] if bills else None  # bills come back sorted by amount desc
     top_party = top_debtors[0] if top_debtors else None
@@ -607,8 +603,6 @@ def metrics_snapshot(tenant_id: str) -> dict:
             else {"id": "scope", "data": {}}
         ),
     ]
-    last_sync_iso = last_sync.isoformat() if last_sync else None
-
     return {
         "tenant_id": tenant_id,
         "tenant_name": tenant_name,

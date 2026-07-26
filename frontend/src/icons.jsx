@@ -85,3 +85,6 @@ export const IconTrendDown = (p) => (
 export const IconRefresh = (p) => (
   <svg {...base} {...p}><path d="M20 7h-5V2M4 17h5v5" /><path d="M18 4.9A9 9 0 0 0 4.6 8M5.9 19.1A9 9 0 0 0 19.4 16" /></svg>
 );
+export const IconTrash = (p) => (
+  <svg {...base} {...p}><path d="M3 6h18M8 6V4h8v2M6 6l1 15h10l1-15" /><path d="M10 10v7M14 10v7" /></svg>
+);

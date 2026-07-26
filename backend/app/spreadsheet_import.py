@@ -420,7 +420,12 @@ def _build_transactions(
                 lines=lines,
             )
         )
-    return parsed, skipped
+    # Some customized exports repeat the same voucher in more than one
+    # sequence. Keep one normalized voucher so its item/category lines cannot
+    # double the dashboard breakdown even though the transaction upsert is safe.
+    unique = {transaction.source_key: transaction for transaction in parsed}
+    skipped += len(parsed) - len(unique)
+    return list(unique.values()), skipped
 
 
 def _inventory_lines(rows: list[dict[str, object]]) -> tuple[ParsedLine, ...]:
@@ -477,9 +482,20 @@ def _source_key(
     party: str | None,
 ) -> str:
     if guid:
-        return f"guid:{guid}"[:180]
+        return f"guid:{guid.strip().casefold()}"
+    # VoucherSeq is an export-row locator and may change when the same period is
+    # exported with a different sort order. Prefer business identity so a
+    # modified re-export updates the existing voucher.
+    voucher_identity = [
+        kind,
+        txn_date.isoformat() if txn_date else "",
+        (voucher_number or "").strip().casefold(),
+        (party or "").strip().casefold(),
+    ]
+    if any(voucher_identity[1:]):
+        return "derived:" + "\x1f".join(voucher_identity)
     raw = "|".join(
-        [kind, sequence, txn_date.isoformat() if txn_date else "", voucher_number or "", party or ""]
+        [kind, "sequence", sequence]
     )
     return "derived:" + hashlib.sha256(raw.encode("utf-8")).hexdigest()
 

@@ -46,6 +46,15 @@ def make_tenant():
 
     with get_connection() as conn, conn.cursor() as cur:
         for tenant_id in created_tenant_ids:
+            cur.execute(
+                "delete from financial_transaction_lines where tenant_id = %s",
+                (tenant_id,),
+            )
+            cur.execute(
+                "delete from financial_transactions where tenant_id = %s",
+                (tenant_id,),
+            )
+            cur.execute("delete from financial_imports where tenant_id = %s", (tenant_id,))
             cur.execute("delete from bills where tenant_id = %s", (tenant_id,))
             cur.execute("delete from ledgers where tenant_id = %s", (tenant_id,))
             cur.execute("delete from sync_runs where tenant_id = %s", (tenant_id,))
