@@ -7,8 +7,8 @@ not two drifting copies.
 
 Last verified against the repo: **2026-07-27** (Smart Excel release commit `35c7fa8`;
 migration 0007 and both Vercel projects verified in production. `/v1/ask` provider
-routing re-verified live against both Gemini and Groq — see trap 13; the fix is
-**not yet deployed** to the Vercel backend project).
+routing fixed and **deployed** — verified live in production in all four languages,
+and the Gemini→Groq fallback proven from Vercel's own network. See trap 13).
 
 ---
 
@@ -257,6 +257,15 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
     An empty `content` is treated as a provider failure so it falls through instead of
     returning a blank bubble. Fallback order is exercised by
     `backend/tests/test_ask_providers.py` with no network.
+    - **The Vercel backend project had neither LLM key until 2026-07-27** — only
+      `DATABASE_URL`. The copilot had therefore never worked in production; it returned
+      503, while local dev returned 502 from real provider failures. Both keys are now
+      set (Production scope). `npx vercel@latest env ls production` is the fast check,
+      and the 503-vs-502 split tells you which failure you are looking at.
+    - Verified end-to-end in production by pinning `GEMINI_MODEL` to the exhausted
+      `gemini-3.6-flash`: the request returned 200 from Groq and the runtime log showed
+      `[ask] provider failed ... gemini: HTTP 429`. That is the cheap way to re-prove the
+      fallback after touching this code — set the env var, deploy, test, then `env rm`.
 14. **Product analytics come only from normalized `item` lines.** Do not infer a product
    from a party or ledger row. Product value, quantity coverage, weighted rate, customers
    and top-customer metrics are computed in `dashboard.product_metrics`. A null unit remains
