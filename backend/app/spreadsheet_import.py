@@ -8,6 +8,7 @@ validation error instead of a silent database write.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import zipfile
 from collections import Counter, defaultdict
@@ -73,6 +74,10 @@ class ParsedWorkbook:
     skipped_rows: int
     min_date: date | None
     max_date: date | None
+    source_format: str
+    column_mapping: dict[str, str]
+    warnings: tuple[str, ...]
+    possible_duplicate_groups: int
 
     @property
     def line_count(self) -> int:
@@ -121,28 +126,76 @@ def parse_tally_workbook(
         vouchers_sheet = _find_sheet(workbook, "vouchers")
         ledgers_sheet = _find_sheet(workbook, "ledgerentries")
         inventory_sheet = _find_sheet(workbook, "inventoryentries")
-        if ledgers_sheet is None:
-            raise ImportValidationError(
-                "No 'Ledger Entries' sheet was found. Export voucher details from Tally with "
-                "ledger entries included."
+        if ledgers_sheet is not None:
+            vouchers = _records(vouchers_sheet) if vouchers_sheet is not None else []
+            ledgers = _records(ledgers_sheet)
+            inventory = _records(inventory_sheet) if inventory_sheet is not None else []
+
+            detected_kind, confidence, reason = _classify(
+                safe_filename,
+                vouchers,
+                ledgers,
+                declared,
             )
-
-        vouchers = _records(vouchers_sheet) if vouchers_sheet is not None else []
-        ledgers = _records(ledgers_sheet)
-        inventory = _records(inventory_sheet) if inventory_sheet is not None else []
-
-        detected_kind, confidence, reason = _classify(
-            safe_filename,
-            vouchers,
-            ledgers,
-            declared,
-        )
-        transactions, skipped_rows = _build_transactions(
-            detected_kind,
-            vouchers,
-            ledgers,
-            inventory,
-        )
+            transactions, skipped_rows = _build_transactions(
+                detected_kind,
+                vouchers,
+                ledgers,
+                inventory,
+            )
+            source_format = "tally-multi-sheet"
+            column_mapping = {
+                "transactions": vouchers_sheet.title if vouchers_sheet else "Ledger Entries",
+                "ledger_lines": ledgers_sheet.title,
+                "product_lines": inventory_sheet.title if inventory_sheet else "Not supplied",
+            }
+            warnings: tuple[str, ...] = ()
+            possible_duplicate_groups = 0
+        else:
+            flat = _find_flat_register(workbook)
+            if flat is None:
+                raise ImportValidationError(
+                    "No supported transaction table was found. Include either Tally's "
+                    "'Ledger Entries' sheet or a register with Date, Particulars and Value/"
+                    "Amount columns."
+                )
+            sheet, header_row, mapping = flat
+            detected_kind, confidence, reason = _classify_flat_register(
+                sheet,
+                header_row,
+                mapping,
+                safe_filename,
+                declared,
+            )
+            (
+                transactions,
+                skipped_rows,
+                possible_duplicate_groups,
+                reconciliation_warnings,
+            ) = _build_flat_register_transactions(
+                sheet,
+                header_row,
+                mapping,
+                detected_kind,
+            )
+            source_format = "adaptive-flat-register"
+            column_mapping = mapping["display"]
+            warning_list = [
+                "A single-sheet register was detected; parent vouchers and product detail "
+                "rows were reconciled by date, value, quantity and rate."
+            ]
+            warning_list.extend(reconciliation_warnings)
+            if mapping.get("voucher_number") is None:
+                warning_list.append(
+                    "No voucher number or GUID column was found. Stable business fingerprints "
+                    "are used to match re-uploads."
+                )
+            if possible_duplicate_groups:
+                warning_list.append(
+                    f"{possible_duplicate_groups} identical-looking transaction group(s) were "
+                    "kept and flagged because the workbook has no reliable voucher identity."
+                )
+            warnings = tuple(warning_list)
     finally:
         workbook.close()
 
@@ -162,6 +215,10 @@ def parse_tally_workbook(
         skipped_rows=skipped_rows,
         min_date=min(dated) if dated else None,
         max_date=max(dated) if dated else None,
+        source_format=source_format,
+        column_mapping=column_mapping,
+        warnings=warnings,
+        possible_duplicate_groups=possible_duplicate_groups,
     )
 
 
@@ -221,6 +278,488 @@ def _records(sheet) -> list[dict[str, object]]:
             record["_ROW"] = row_number
             records.append(record)
     return records
+
+
+_FLAT_HEADER_ALIASES = {
+    "date": ("DATE", "VOUCHERDATE", "INVOICEDATE", "BILLDATE"),
+    "particulars": (
+        "PARTICULARS",
+        "ITEM",
+        "ITEMNAME",
+        "STOCKITEM",
+        "STOCKITEMNAME",
+        "PRODUCT",
+        "PRODUCTNAME",
+        "DESCRIPTION",
+    ),
+    "party": (
+        "BUYER",
+        "CUSTOMER",
+        "CUSTOMERNAME",
+        "PARTY",
+        "PARTYNAME",
+        "PARTYLEDGERNAME",
+        "SUPPLIER",
+        "SUPPLIERNAME",
+        "VENDOR",
+        "VENDORNAME",
+    ),
+    "voucher_type": ("VOUCHERTYPE", "VCHTYPE", "TYPE"),
+    "voucher_number": (
+        "VOUCHERNUMBER",
+        "VOUCHERNO",
+        "VCHNO",
+        "INVOICENUMBER",
+        "INVOICENO",
+        "BILLNUMBER",
+        "BILLNO",
+        "REFERENCE",
+        "REFNO",
+    ),
+    "quantity": (
+        "QUANTITY",
+        "QTY",
+        "BILLEDQTY",
+        "ACTUALQTY",
+        "ALTUNITS",
+        "ALTERNATEUNITS",
+    ),
+    "unit": ("UNIT", "UOM", "UNITOFMEASURE"),
+    "rate": ("RATE", "PRICE", "UNITPRICE", "SELLINGRATE", "PURCHASERATE"),
+    "net": (
+        "VALUE",
+        "NETVALUE",
+        "NETAMOUNT",
+        "TAXABLEVALUE",
+        "TAXABLEAMOUNT",
+        "AMOUNT",
+        "LINEVALUE",
+        "TOTAL",
+    ),
+    "gross": (
+        "GROSSTOTAL",
+        "GROSSVALUE",
+        "GROSSAMOUNT",
+        "INVOICEVALUE",
+        "INVOICEAMOUNT",
+        "TOTALAMOUNT",
+    ),
+}
+_TOTAL_ROW = re.compile(r"^(grand\s+)?total\b", re.I)
+
+
+def _find_flat_register(workbook):
+    """Find a single-sheet register even when its detail rows change layout."""
+    best = None
+    for sheet in workbook.worksheets:
+        for row_number, values in enumerate(
+            sheet.iter_rows(min_row=1, max_row=min(sheet.max_row or 1, 25), values_only=True),
+            start=1,
+        ):
+            if len(values) > MAX_SHEET_COLUMNS:
+                continue
+            mapping = _flat_column_mapping(values)
+            if mapping is None:
+                continue
+            score = 3 + sum(
+                bool(mapping.get(role))
+                for role in ("party", "voucher_type", "voucher_number", "rate", "gross")
+            )
+            candidate = (score, sheet, row_number, mapping)
+            if best is None or candidate[0] > best[0]:
+                best = candidate
+    if best is None:
+        return None
+    _, sheet, header_row, mapping = best
+    mapping["display"]["sheet"] = sheet.title
+    return sheet, header_row, mapping
+
+
+def _flat_column_mapping(headers: tuple[object, ...]) -> dict | None:
+    normalized = [_header_key(value) for value in headers]
+
+    def first(role: str) -> int | None:
+        for alias in _FLAT_HEADER_ALIASES[role]:
+            if alias in normalized:
+                return normalized.index(alias)
+        return None
+
+    date_index = first("date")
+    particulars_index = first("particulars")
+    net_index = first("net")
+    if date_index is None or particulars_index is None or net_index is None:
+        return None
+
+    quantity_indices = [
+        index
+        for index, key in enumerate(normalized)
+        if key in _FLAT_HEADER_ALIASES["quantity"]
+    ]
+    tax_indices = [
+        index
+        for index, value in enumerate(headers)
+        if _is_tax_ledger(_text(value))
+    ]
+    mapping = {
+        "date": date_index,
+        "particulars": particulars_index,
+        "party": first("party"),
+        "voucher_type": first("voucher_type"),
+        "voucher_number": first("voucher_number"),
+        "quantity": quantity_indices,
+        "unit": first("unit"),
+        "rate": first("rate"),
+        "net": net_index,
+        "gross": first("gross"),
+        "tax": tax_indices,
+    }
+
+    def label(index: int | None) -> str | None:
+        return _text(headers[index], 80) if index is not None else None
+
+    display = {
+        "sheet": "Detected table",
+        "date": label(mapping["date"]),
+        "product": label(mapping["particulars"]),
+        "party": label(mapping["party"]) or label(mapping["particulars"]),
+        "voucher_number": label(mapping["voucher_number"]) or "Not supplied",
+        "quantity": " / ".join(
+            label(index) or "" for index in quantity_indices
+        ) or "Not supplied",
+        "rate": label(mapping["rate"]) or "Not supplied",
+        "net_value": label(mapping["net"]),
+        "gross_value": label(mapping["gross"]) or "Not supplied",
+        "tax": " / ".join(label(index) or "" for index in tax_indices) or "Not supplied",
+    }
+    mapping["display"] = display
+    return mapping
+
+
+def _classify_flat_register(
+    sheet,
+    header_row: int,
+    mapping: dict,
+    filename: str,
+    declared_kind: str | None,
+) -> tuple[str, float, str]:
+    votes: Counter[str] = Counter()
+    voucher_index = mapping.get("voucher_type")
+    if voucher_index is not None:
+        for row_number, values in enumerate(
+            sheet.iter_rows(min_row=header_row + 1, values_only=True),
+            start=header_row + 1,
+        ):
+            if row_number > MAX_SHEET_ROWS + header_row:
+                raise ImportValidationError(
+                    f"The '{sheet.title}' sheet exceeds the {MAX_SHEET_ROWS:,}-row limit."
+                )
+            if _date_value(_cell(values, mapping["date"])) is None:
+                continue
+            label = (_text(_cell(values, voucher_index)) or "").casefold()
+            if re.search(r"\bsales?\b", label):
+                votes["sales"] += 1
+            elif re.search(r"\bpurchases?\b", label):
+                votes["purchase"] += 1
+            elif re.search(
+                r"\b(expense|expenses|payment|journal|repair|maintenance|rent)\b",
+                label,
+            ):
+                votes["expense"] += 1
+
+    voted = [kind for kind, count in votes.items() if count]
+    if "sales" in voted and "purchase" in voted:
+        raise ImportValidationError(
+            "This register mixes sales and purchase vouchers. Export and upload each type "
+            "as a separate file."
+        )
+    if voted:
+        detected = max(votes, key=votes.get)
+        confidence = 0.96
+        reason = (
+            f"Single-sheet register detected on '{sheet.title}'; dated voucher rows identify "
+            f"{detected} transactions and product detail rows reconcile to their values."
+        )
+    elif declared_kind:
+        detected = declared_kind
+        confidence = 0.78
+        reason = (
+            f"Single-sheet register detected on '{sheet.title}'; the selected upload type "
+            "resolved its custom or missing voucher labels."
+        )
+    else:
+        detected = _filename_kind(filename)
+        if detected is None:
+            raise ImportValidationError(
+                "The register columns are usable, but its transaction type is ambiguous. "
+                "Choose Sales, Purchase or Expense before uploading."
+            )
+        confidence = 0.65
+        reason = (
+            f"Single-sheet register detected on '{sheet.title}'; the filename supplied the "
+            "transaction type because voucher labels were unavailable."
+        )
+
+    if declared_kind and declared_kind != detected:
+        raise ImportValidationError(
+            f"This workbook looks like {detected}, but it was uploaded as {declared_kind}. "
+            f"Use the {detected.title()} upload option."
+        )
+    return detected, confidence, reason
+
+
+def _build_flat_register_transactions(
+    sheet,
+    header_row: int,
+    mapping: dict,
+    kind: str,
+) -> tuple[list[ParsedTransaction], int, int, tuple[str, ...]]:
+    groups: list[tuple[int, tuple[object, ...], list[tuple[int, tuple[object, ...]]]]] = []
+    footer_sections: list[tuple[int, int, int, tuple[object, ...]]] = []
+    section_start = 0
+    current: tuple[int, tuple[object, ...], list[tuple[int, tuple[object, ...]]]] | None = None
+
+    for row_number, values in enumerate(
+        sheet.iter_rows(min_row=header_row + 1, values_only=True),
+        start=header_row + 1,
+    ):
+        if row_number > MAX_SHEET_ROWS + header_row:
+            raise ImportValidationError(
+                f"The '{sheet.title}' sheet exceeds the {MAX_SHEET_ROWS:,}-row limit."
+            )
+        if len(values) > MAX_SHEET_COLUMNS:
+            raise ImportValidationError(
+                f"The '{sheet.title}' sheet has too many columns to process safely."
+            )
+
+        txn_date = _date_value(_cell(values, mapping["date"]))
+        particulars = _text(_cell(values, mapping["particulars"]))
+        if txn_date is not None:
+            if current is not None:
+                groups.append(current)
+            current = (row_number, values, [])
+            continue
+        if current is None or not particulars:
+            continue
+        if _TOTAL_ROW.search(particulars):
+            groups.append(current)
+            current = None
+            footer_sections.append((section_start, len(groups), row_number, values))
+            section_start = len(groups)
+            continue
+        if _header_key(particulars) in _FLAT_HEADER_ALIASES["particulars"]:
+            continue
+        current[2].append((row_number, values))
+
+    if current is not None:
+        groups.append(current)
+
+    parsed: list[ParsedTransaction] = []
+    skipped = 0
+    fingerprints: Counter[str] = Counter()
+    for source_row, parent, detail_rows in groups:
+        txn_date = _date_value(_cell(parent, mapping["date"]))
+        party = _text(_cell(parent, mapping.get("party")))
+        if not party:
+            party = _text(_cell(parent, mapping["particulars"]))
+
+        item_lines = tuple(
+            line
+            for _, detail in detail_rows
+            if (line := _flat_item_line(detail, mapping)) is not None
+        )
+        parent_net = abs(_amount(_cell(parent, mapping["net"])))
+        item_net = sum((line.amount for line in item_lines), Decimal("0"))
+        net = item_net or parent_net
+        tax_lines = tuple(
+            ParsedLine(
+                line_type="tax",
+                name=_text(sheet.cell(header_row, index + 1).value) or "Tax",
+                amount=abs(_amount(_cell(parent, index))),
+            )
+            for index in mapping["tax"]
+            if _amount(_cell(parent, index))
+        )
+        tax = sum((line.amount for line in tax_lines), Decimal("0"))
+        gross = abs(_amount(_cell(parent, mapping.get("gross"))))
+        if not gross:
+            gross = max(parent_net, net + tax)
+        if not net and gross:
+            net = max(gross - tax, Decimal("0"))
+        if gross <= 0:
+            skipped += 1
+            continue
+
+        voucher_number = _text(_cell(parent, mapping.get("voucher_number")))
+        raw_voucher_type = _text(_cell(parent, mapping.get("voucher_type")))
+        voucher_type = (
+            raw_voucher_type
+            if raw_voucher_type and re.search(rf"\b{re.escape(kind.rstrip('s'))}s?\b", raw_voucher_type, re.I)
+            else kind.title()
+        )
+        lines = item_lines + tax_lines
+        category = max(item_lines, key=lambda line: line.amount).name if item_lines else None
+
+        fingerprint = _flat_business_fingerprint(
+            kind=kind,
+            txn_date=txn_date,
+            party=party,
+            gross=gross,
+            net=net,
+            tax=tax,
+            lines=item_lines,
+        )
+        fingerprints[fingerprint] += 1
+        if voucher_number:
+            source_key = _source_key(
+                kind=kind,
+                guid=None,
+                sequence=str(source_row),
+                txn_date=txn_date,
+                voucher_number=voucher_number,
+                party=party,
+            )
+        else:
+            source_key = f"flat:{fingerprint}:{fingerprints[fingerprint]}"
+
+        parsed.append(
+            ParsedTransaction(
+                source_key=source_key,
+                source_row=source_row,
+                kind=kind,
+                txn_date=txn_date,
+                voucher_number=voucher_number,
+                voucher_type=voucher_type,
+                party_name=party,
+                category=category,
+                gross_amount=_money(gross),
+                net_amount=_money(net),
+                tax_amount=_money(tax),
+                lines=lines,
+            )
+        )
+
+    # A real voucher number is authoritative. If a customized register repeats
+    # it, keep only the last normalized copy so its lines cannot double-count.
+    unique = {transaction.source_key: transaction for transaction in parsed}
+    skipped += len(parsed) - len(unique)
+    duplicate_groups = (
+        sum(1 for count in fingerprints.values() if count > 1)
+        if mapping.get("voucher_number") is None
+        else 0
+    )
+    reconciliation_warnings = []
+    for start, finish, footer_row, footer in footer_sections:
+        stated_total = abs(_amount(_cell(footer, mapping["net"])))
+        visible_total = sum(
+            (
+                abs(_amount(_cell(parent, mapping["net"])))
+                for _, parent, _ in groups[start:finish]
+            ),
+            Decimal("0"),
+        )
+        tolerance = max(Decimal("1"), stated_total * Decimal("0.005"))
+        if stated_total and abs(stated_total - visible_total) > tolerance:
+            reconciliation_warnings.append(
+                f"The total at row {footer_row} does not reconcile to visible voucher rows "
+                f"(stated {_money(stated_total)}, visible {_money(visible_total)}). "
+                "Only visible transactions were imported."
+            )
+    return (
+        list(unique.values()),
+        skipped,
+        duplicate_groups,
+        tuple(reconciliation_warnings),
+    )
+
+
+def _flat_item_line(values: tuple[object, ...], mapping: dict) -> ParsedLine | None:
+    name = _text(_cell(values, mapping["particulars"]))
+    if not name or _TOTAL_ROW.search(name):
+        return None
+    amount = abs(_amount(_cell(values, mapping["net"])))
+    rate = _positive_decimal(_cell(values, mapping.get("rate")))
+    quantity, quantity_unit = _best_flat_quantity(
+        values,
+        mapping["quantity"],
+        rate,
+        amount,
+    )
+    unit = _text(_cell(values, mapping.get("unit")), 30) or quantity_unit
+    if not amount and quantity and rate:
+        amount = quantity * rate
+    if not amount:
+        return None
+    return ParsedLine(
+        line_type="item",
+        name=name,
+        amount=_money(amount),
+        quantity=quantity,
+        unit=unit,
+        rate=rate,
+    )
+
+
+def _best_flat_quantity(
+    values: tuple[object, ...],
+    indices: list[int],
+    rate: Decimal | None,
+    amount: Decimal,
+) -> tuple[Decimal | None, str | None]:
+    candidates = []
+    for index in indices:
+        quantity, unit = _quantity(_cell(values, index))
+        if quantity is None:
+            continue
+        error = Decimal("1")
+        if rate and amount:
+            error = abs((quantity * rate) - amount) / max(amount, Decimal("0.01"))
+        candidates.append((error, quantity, unit))
+    if not candidates:
+        return None, None
+    _, quantity, unit = min(candidates, key=lambda item: item[0])
+    return quantity, unit
+
+
+def _flat_business_fingerprint(
+    *,
+    kind: str,
+    txn_date: date | None,
+    party: str | None,
+    gross: Decimal,
+    net: Decimal,
+    tax: Decimal,
+    lines: tuple[ParsedLine, ...],
+) -> str:
+    canonical_lines = sorted(
+        [
+            {
+                "name": line.name.casefold(),
+                "amount": str(_money(line.amount)),
+                "quantity": str(line.quantity.normalize()) if line.quantity else "",
+                "unit": (line.unit or "").casefold(),
+                "rate": str(line.rate.normalize()) if line.rate else "",
+            }
+            for line in lines
+        ],
+        key=lambda line: json.dumps(line, sort_keys=True),
+    )
+    canonical = {
+        "kind": kind,
+        "date": txn_date.isoformat() if txn_date else "",
+        "party": (party or "").casefold(),
+        "gross": str(_money(gross)),
+        "net": str(_money(net)),
+        "tax": str(_money(tax)),
+        "lines": canonical_lines,
+    }
+    payload = json.dumps(canonical, sort_keys=True, separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def _cell(values: tuple[object, ...], index: int | None) -> object:
+    if index is None or index < 0 or index >= len(values):
+        return None
+    return values[index]
 
 
 def _classify(
@@ -640,7 +1179,18 @@ def _date_value(value: object) -> date | None:
         except (OverflowError, ValueError):
             return None
     text = str(value or "").strip()
-    for pattern in ("%Y%m%d", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%Y", "%d.%m.%Y"):
+    for pattern in (
+        "%Y%m%d",
+        "%Y-%m-%d",
+        "%d-%m-%Y",
+        "%d-%m-%y",
+        "%d-%b-%Y",
+        "%d-%b-%y",
+        "%d/%m/%Y",
+        "%d/%m/%y",
+        "%d.%m.%Y",
+        "%d.%m.%y",
+    ):
         try:
             return datetime.strptime(text, pattern).date()
         except ValueError:

@@ -60,7 +60,7 @@ Three components, **one repo** (`github.com/RishieRich/ArcAstraOneAru`), three d
 | `POST /v1/auth/login` | email + password (legacy 4-digit PIN still accepted) | returns stateless HMAC dashboard token |
 | `GET /v1/dashboard/companies` | `Bearer <dashboard token>` | tenant list |
 | `GET /v1/dashboard/metrics/{tenant_id}` | `Bearer <dashboard token>` | all dashboard numbers |
-| `POST /v1/imports/financials` | `Bearer <dashboard token>` | classify + import one Tally `.xlsx` workbook |
+| `POST /v1/imports/financials` | `Bearer <dashboard token>` | detect + import a standard or flat-register `.xlsx` workbook |
 | `POST /v1/ask` | `Bearer <dashboard token>` | AI copilot Q&A over the tenant's snapshot |
 | `DELETE /v1/dashboard/data/{tenant_id}` | `Bearer <dashboard token>` + password/name confirmation | clear synced/imported facts while preserving tenant, access and devices |
 
@@ -188,6 +188,10 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 7. **Apply `0003_financial_imports.sql` before deploying code that queries finance data.**
    Imports accept `.xlsx` up to 5 MB, never store the original file, reject mixed/wrong
    voucher types, deduplicate exact files by SHA-256, and upsert vouchers by Tally GUID.
+   The importer also detects single-sheet registers with parent voucher/product-detail rows.
+   It reconciles quantity * rate to value per row, supports concatenated layouts that shift
+   columns mid-sheet, reports non-reconciling footer totals, and flags identical-looking rows
+   without silently dropping them when the export has no voucher number/GUID.
 8. **Apply `0005_bill_current_state.sql` before deploying the matching backend.** It
    collapses referenced historical bill duplicates, adds current/closed bill state, and
    canonicalizes GUID-less Excel identities. Sync, import and cleanup serialize per tenant
@@ -202,6 +206,11 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
    multi-resolution icon, runs connector-only tests, validates the x64 PE/icon/signature,
    and creates a checksum-bearing versioned ZIP. Unsigned developer builds can be blocked
    by Windows Smart App Control and must not be sent to clients.
+11. **Product analytics come only from normalized `item` lines.** Do not infer a product
+   from a party or ledger row. Product value, quantity coverage, weighted rate, customers
+   and top-customer metrics are computed in `dashboard.product_metrics`. A null unit remains
+   unknown. Ask ARQ's one-page report is rendered from authorized dashboard metrics in the
+   browser and printed/saved as A4 landscape; the AI narrative never supplies chart numbers.
 
 ## 9. Open items
 

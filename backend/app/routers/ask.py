@@ -80,6 +80,9 @@ loss". Always make clear it is based on uploaded workbooks, not a statutory P&L.
 negative monthly results. totals.operating_result is the net result across the full period.
 - financials.highlights and financials.monthly cover the complete uploaded date range, including \
 calendar months with no activity. Use those fields for highest/lowest and trend questions.
+- financials.products contains normalized product-level sales/purchase value, quantity coverage, \
+weighted average rate, transaction/customer counts and each product's top customer. Use it for \
+product, item, quantity, rate, mix and SKU questions; do not infer units when unit is null.
 - For "why" questions, describe the observable sales, purchase, expense and category changes. \
 Do not claim a cause that the uploaded data cannot prove."""
 

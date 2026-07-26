@@ -78,6 +78,21 @@ export default function FinancialUpload({ tenantId, t, onImported, onClose }) {
                   {result.date_range.from} — {result.date_range.to || result.date_range.from}
                 </small>
               )}
+              <small>
+                {result.source_format === "adaptive-flat-register"
+                  ? t.adaptiveSchemaDetected
+                  : t.standardSchemaDetected}
+              </small>
+              {result.possible_duplicate_groups > 0 && (
+                <small className="upload-warning">
+                  {t.possibleDuplicateGroups(result.possible_duplicate_groups)}
+                </small>
+              )}
+              {result.warnings?.some((warning) =>
+                warning.includes("does not reconcile"),
+              ) && (
+                <small className="upload-warning">{t.totalMismatchWarning}</small>
+              )}
             </span>
           </div>
         )}

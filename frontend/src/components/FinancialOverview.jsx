@@ -11,6 +11,7 @@ import {
   IconWallet,
 } from "../icons";
 import StatTile from "./StatTile";
+import ProductAnalytics from "./ProductAnalytics";
 
 const KINDS = ["sales", "purchase", "expense"];
 const SERIES = {
@@ -150,6 +151,9 @@ export default function FinancialOverview({ financials, t }) {
         t={t}
       />
       <BookExplorer financials={financials} t={t} />
+      {financials.products?.has_data && (
+        <ProductAnalytics products={financials.products} t={t} />
+      )}
       <PeakHighlights
         highlights={financials.highlights}
         pnlComplete={financials.pnl_complete}

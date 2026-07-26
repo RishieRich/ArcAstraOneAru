@@ -7,13 +7,23 @@ unchanged.
 ## What the feature accepts
 
 - `.xlsx` files up to 5 MB.
-- Tally-style exports containing a `Ledger Entries` sheet.
-- `Vouchers` and `Inventory Entries` are used when present.
+- Standard Tally exports containing a `Ledger Entries` sheet; `Vouchers` and
+  `Inventory Entries` are used when present.
+- Single-sheet sales, purchase or expense registers with Date, Particulars and
+  Value/Amount columns. Common aliases such as Buyer/Customer, Quantity/Qty/Alt.
+  Units, Rate/Price, Gross Total and GST columns are detected automatically.
+- Concatenated register sections may shift quantity between columns. Detection is
+  performed per detail row by reconciling `quantity * rate` with line value.
 - Upload sales, purchases and expenses as separate workbooks.
 
 ARQ checks sheet signatures and Tally voucher types before writing. A workbook
 uploaded through the wrong option is rejected. Custom journal/payment voucher
 names can use the selected Expense option as the tie-breaker.
+
+For flat registers, dated rows become vouchers and the following undated rows
+become product lines until the next dated row. Footer totals are checked against
+visible voucher rows. A mismatch is shown to the user and only visible rows are
+imported; ARQ never invents missing transactions to force a total to reconcile.
 
 The original workbook is **not stored**. ARQ stores normalized voucher totals and
 item/category lines. Exact file re-uploads are idempotent, and vouchers with the
@@ -21,10 +31,26 @@ same Tally GUID are updated instead of duplicated. GUID-less vouchers use date,
 voucher number and party rather than export row order, so a differently sorted
 re-export also updates instead of stacking.
 
+Some flat registers do not include a voucher number or GUID. ARQ then uses a
+stable fingerprint of date, party, amounts and normalized product lines.
+Identical-looking transactions are retained with distinct occurrence keys and
+flagged for review because two identical invoices cannot safely be distinguished
+from an accidental duplicate without a source identity.
+
 The dashboard zero-fills every calendar month between the earliest and latest
 uploaded dates. A one-year workbook therefore produces a complete one-year chart,
 including inactive months. Estimated operating profit/loss is shown only after all
 three book types are present; partial uploads are labelled as partial results.
+
+Normalized item lines drive the Product performance section: product value,
+quantity coverage, weighted average rate, transaction/customer counts, value
+share and top customer. Unknown units remain blank instead of being guessed.
+
+Every completed Ask ARQ answer offers **Create one-page report**. Questions that
+explicitly mention report, one-page or PDF open it automatically. The report uses
+deterministic dashboard metrics for KPIs and both charts, uses the AI answer only
+as the narrative summary, and prints/saves as one A4 landscape page. No report
+file is stored on the backend.
 
 ## 1. Apply the Neon migration first
 
@@ -114,13 +140,16 @@ Then:
 5. After import, open **Sales & spending**.
 6. Confirm the total, full date range, complete-tenure chart, Sales/Purchase/Expense
    lines, monthly profit/loss bars, performance highs/lows, category/item mix,
-   counterparties, period table and import history.
+   counterparties, Product performance, period table and import history.
 7. Re-upload the exact same file once. The UI should report that it was already
    imported and totals must not double.
 8. Export the same vouchers in a different order (where practical), upload it,
    and confirm totals still do not double.
 9. Switch back to **Receivables** and confirm the original Tally dashboard is
    unchanged.
+10. Ask ARQ a product or management question, create the one-page report and use
+    Print / Save PDF. Confirm the report stays to one A4 landscape page and its
+    KPI/chart values match the dashboard.
 
 Optional metadata-only SQL checks in Neon:
 
@@ -143,6 +172,8 @@ These checks avoid displaying party names or amounts.
 - Dashboard users are scoped. New users cannot list, view, upload to, or ask AI
   about a company until `grant-dashboard-access` adds that tenant.
 - A file/type mismatch is rejected before any insert.
+- Adaptive-register uploads return the detected format, column mapping, duplicate
+  review count and reconciliation warnings in the API response.
 - Sales, purchase and expense totals are gross voucher values. Tax is also shown
   separately where Tally exposes tax ledger lines.
 - With all three book types, **estimated operating result** is

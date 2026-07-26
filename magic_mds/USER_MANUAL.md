@@ -87,7 +87,35 @@ The app (and the log) always says *why* in plain words:
 
 ---
 
-## 6. Start fresh from the dashboard
+## 6. Upload Excel and view products
+
+Use **Upload Excel** and choose Sales, Purchases or Expenses. ARQ accepts both
+standard multi-sheet Tally exports and many single-sheet registers. It detects
+common column names, links dated voucher rows to the product rows beneath them,
+and can reconcile layouts where quantity shifts between columns.
+
+After import, open **Sales & spending → Product performance**. You can search by
+product or customer and see product value, quantity, average realised rate,
+transaction/customer counts, value share and the strongest customer.
+
+If a workbook has no voucher number/GUID, identical-looking transactions are
+flagged for review rather than silently deleted. If a footer total does not
+match its visible voucher rows, ARQ imports only the visible rows and shows a
+warning. It never fabricates entries to match a stated total.
+
+## 7. Ask ARQ and create a one-page report
+
+Ask ARQ a normal management question, such as product performance, sales trends,
+cost drivers or overdue collections. Every completed answer has **Create
+one-page report**. Asking explicitly for a report, one-page or PDF opens it
+automatically.
+
+The report contains four KPIs, an executive summary and two focused graphs.
+Choose **Print / Save PDF** to save one A4 landscape page. KPI and graph values
+come directly from the selected company's authorized dashboard data; the AI
+answer supplies only the written summary.
+
+## 8. Start fresh from the dashboard
 
 Use **Start fresh** beside the selected company only when you intentionally want
 to remove all ARQ dashboard data and rebuild it from Tally/Excel.
@@ -101,7 +129,7 @@ After cleanup, press **Push Now** (or wait for auto-sync) to repopulate
 receivables, then upload any Sales, Purchase and Expense workbooks you still want.
 Deleted SQL data cannot be recovered from ARQ.
 
-## 7. Rebuilding the exe (developers only)
+## 9. Rebuilding the exe (developers only)
 
 ```powershell
 cd D:\AI_Projects\ARQ\ARQ_Astra_Launch\connector

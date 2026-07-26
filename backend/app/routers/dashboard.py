@@ -62,10 +62,207 @@ def _empty_financials() -> dict:
         },
         "breakdown": {"sales": [], "purchase": [], "expense": []},
         "counterparties": {"sales": [], "purchase": [], "expense": []},
+        "products": _empty_products(),
         "imports": [],
         "date_range": {"from": None, "to": None},
         "last_import_at": None,
     }
+
+
+def _empty_products() -> dict:
+    return {
+        "has_data": False,
+        "total_products": 0,
+        "by_kind": {
+            "sales": {
+                "product_count": 0,
+                "value": 0.0,
+                "quantity": 0.0,
+                "quantity_coverage_pct": 0.0,
+                "details": [],
+            },
+            "purchase": {
+                "product_count": 0,
+                "value": 0.0,
+                "quantity": 0.0,
+                "quantity_coverage_pct": 0.0,
+                "details": [],
+            },
+        },
+    }
+
+
+def product_metrics(cur, tenant_id: str) -> dict:
+    """Product-level facts from normalized item lines, never ledger guesses."""
+    products = _empty_products()
+    cur.execute(
+        """
+        select ft.kind,
+               count(distinct lower(btrim(fl.name))),
+               coalesce(sum(fl.amount), 0),
+               coalesce(sum(fl.quantity), 0),
+               count(*) filter (where fl.quantity is not null),
+               count(*)
+        from financial_transaction_lines fl
+        join financial_transactions ft on ft.id = fl.transaction_id
+        where ft.tenant_id = %s
+          and fl.line_type = 'item'
+          and ft.kind in ('sales', 'purchase')
+        group by ft.kind
+        """,
+        (tenant_id,),
+    )
+    summaries = cur.fetchall()
+    if not summaries:
+        return products
+
+    for kind, count, value, quantity, quantity_rows, total_rows in summaries:
+        products["by_kind"][kind].update(
+            {
+                "product_count": count,
+                "value": _num(value),
+                "quantity": _num(quantity),
+                "quantity_coverage_pct": (
+                    round(quantity_rows / total_rows * 100, 1) if total_rows else 0.0
+                ),
+            }
+        )
+
+    cur.execute(
+        """
+        with grouped as (
+          select ft.kind,
+                 lower(btrim(fl.name)) as product_key,
+                 min(fl.name) as display_name,
+                 coalesce(sum(fl.amount), 0) as amount,
+                 coalesce(sum(fl.quantity), 0) as quantity,
+                 case
+                   when count(distinct nullif(btrim(coalesce(fl.unit, '')), '')) = 1
+                     then min(nullif(btrim(fl.unit), ''))
+                   else null
+                 end as unit,
+                 count(distinct ft.id) as transactions,
+                 count(distinct nullif(ft.party_name, '')) as customers
+          from financial_transaction_lines fl
+          join financial_transactions ft on ft.id = fl.transaction_id
+          where ft.tenant_id = %s
+            and fl.line_type = 'item'
+            and ft.kind in ('sales', 'purchase')
+          group by ft.kind, lower(btrim(fl.name))
+        ),
+        ranked as (
+          select grouped.*,
+                 row_number() over (
+                   partition by kind order by amount desc, display_name
+                 ) as product_rank
+          from grouped
+        )
+        select kind, product_key, display_name, amount, quantity, unit,
+               transactions, customers
+        from ranked
+        where product_rank <= 60
+        order by kind, product_rank
+        """,
+        (tenant_id,),
+    )
+    detail_lookup: dict[tuple[str, str], dict] = {}
+    for (
+        kind,
+        product_key,
+        name,
+        amount,
+        quantity,
+        unit,
+        transactions,
+        customers,
+    ) in cur.fetchall():
+        numeric_amount = _num(amount)
+        numeric_quantity = _num(quantity)
+        row = {
+            "name": name,
+            "amount": numeric_amount,
+            "quantity": numeric_quantity,
+            "unit": unit,
+            "average_rate": (
+                round(numeric_amount / numeric_quantity, 4)
+                if numeric_quantity
+                else None
+            ),
+            "transactions": transactions,
+            "customers": customers,
+            "share_pct": (
+                round(
+                    numeric_amount / products["by_kind"][kind]["value"] * 100,
+                    1,
+                )
+                if products["by_kind"][kind]["value"]
+                else 0.0
+            ),
+            "top_customer": None,
+            "top_customer_amount": 0.0,
+        }
+        products["by_kind"][kind]["details"].append(row)
+        detail_lookup[(kind, product_key)] = row
+
+    cur.execute(
+        """
+        with product_totals as (
+          select ft.kind, lower(btrim(fl.name)) as product_key,
+                 coalesce(sum(fl.amount), 0) as amount
+          from financial_transaction_lines fl
+          join financial_transactions ft on ft.id = fl.transaction_id
+          where ft.tenant_id = %s
+            and fl.line_type = 'item'
+            and ft.kind in ('sales', 'purchase')
+          group by ft.kind, lower(btrim(fl.name))
+        ),
+        top_products as (
+          select kind, product_key
+          from (
+            select product_totals.*,
+                   row_number() over (
+                     partition by kind order by amount desc, product_key
+                   ) as product_rank
+            from product_totals
+          ) ranked_products
+          where product_rank <= 60
+        ),
+        party_totals as (
+          select ft.kind, lower(btrim(fl.name)) as product_key, ft.party_name,
+                 coalesce(sum(fl.amount), 0) as amount
+          from financial_transaction_lines fl
+          join financial_transactions ft on ft.id = fl.transaction_id
+          join top_products tp
+            on tp.kind = ft.kind and tp.product_key = lower(btrim(fl.name))
+          where ft.tenant_id = %s
+            and fl.line_type = 'item'
+            and nullif(ft.party_name, '') is not null
+          group by ft.kind, lower(btrim(fl.name)), ft.party_name
+        ),
+        ranked_parties as (
+          select party_totals.*,
+                 row_number() over (
+                   partition by kind, product_key order by amount desc, party_name
+                 ) as party_rank
+          from party_totals
+        )
+        select kind, product_key, party_name, amount
+        from ranked_parties
+        where party_rank = 1
+        """,
+        (tenant_id, tenant_id),
+    )
+    for kind, product_key, party, amount in cur.fetchall():
+        detail = detail_lookup.get((kind, product_key))
+        if detail is not None:
+            detail["top_customer"] = party
+            detail["top_customer_amount"] = _num(amount)
+
+    products["has_data"] = True
+    products["total_products"] = sum(
+        products["by_kind"][kind]["product_count"] for kind in ("sales", "purchase")
+    )
+    return products
 
 
 def _month_keys(first_date: date, last_date: date) -> list[str]:
@@ -282,6 +479,7 @@ def financial_metrics(cur, tenant_id: str) -> dict:
         ) in cur.fetchall()
     ]
     pnl_complete = all(kind in by_kind for kind in ("sales", "purchase", "expense"))
+    products = product_metrics(cur, tenant_id)
     return {
         "has_data": True,
         "kinds": [kind for kind in ("sales", "purchase", "expense") if kind in by_kind],
@@ -319,6 +517,7 @@ def financial_metrics(cur, tenant_id: str) -> dict:
         },
         "breakdown": breakdown,
         "counterparties": counterparties,
+        "products": products,
         "imports": imports,
         "date_range": {
             "from": min(first_dates).isoformat() if first_dates else None,

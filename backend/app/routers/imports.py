@@ -81,7 +81,7 @@ async def upload_financials(
             )
             existing = cur.fetchone()
             conn.commit()
-            return _existing_response(existing, filename)
+            return _existing_response(existing, filename, parsed)
 
         import_id, created_at = inserted
         transaction_rows = [
@@ -185,6 +185,10 @@ def _parsed_response(
         "transactions": len(parsed.transactions),
         "lines": parsed.line_count,
         "skipped_rows": parsed.skipped_rows,
+        "source_format": parsed.source_format,
+        "column_mapping": parsed.column_mapping,
+        "warnings": list(parsed.warnings),
+        "possible_duplicate_groups": parsed.possible_duplicate_groups,
         "date_range": {
             "from": parsed.min_date.isoformat() if parsed.min_date else None,
             "to": parsed.max_date.isoformat() if parsed.max_date else None,
@@ -193,7 +197,7 @@ def _parsed_response(
     }
 
 
-def _existing_response(row, filename: str) -> dict:
+def _existing_response(row, filename: str, parsed: ParsedWorkbook) -> dict:
     (
         import_id,
         detected_kind,
@@ -215,6 +219,10 @@ def _existing_response(row, filename: str) -> dict:
         "transactions": transaction_count,
         "lines": line_count,
         "skipped_rows": skipped_rows,
+        "source_format": parsed.source_format,
+        "column_mapping": parsed.column_mapping,
+        "warnings": list(parsed.warnings),
+        "possible_duplicate_groups": parsed.possible_duplicate_groups,
         "date_range": {
             "from": min_date.isoformat() if min_date else None,
             "to": max_date.isoformat() if max_date else None,

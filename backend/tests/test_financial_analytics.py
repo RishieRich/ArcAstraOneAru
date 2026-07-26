@@ -1,7 +1,11 @@
 from datetime import date
 from decimal import Decimal
 
-from app.routers.dashboard import build_monthly_financials, financial_highlights
+from app.routers.dashboard import (
+    build_monthly_financials,
+    financial_highlights,
+    product_metrics,
+)
 
 
 def test_monthly_financials_cover_the_complete_period_and_calculate_result():
@@ -53,3 +57,69 @@ def test_financial_highlights_ignore_empty_months_for_low_activity_metrics():
     assert highlights["highest_profit"] == {"month": "2025-04", "amount": 700}
     assert highlights["highest_loss"] == {"month": "2025-05", "amount": 400}
     assert highlights["weakest_result"] == {"month": "2025-05", "amount": -400}
+
+
+def test_product_metrics_keep_value_quantity_rate_and_top_customer_together():
+    class Cursor:
+        def __init__(self):
+            self.results = iter(
+                [
+                    [("sales", 2, Decimal("1500"), Decimal("30"), 3, 3)],
+                    [
+                        (
+                            "sales",
+                            "widget a",
+                            "Widget A",
+                            Decimal("1200"),
+                            Decimal("20"),
+                            "Nos",
+                            2,
+                            2,
+                        ),
+                        (
+                            "sales",
+                            "widget b",
+                            "Widget B",
+                            Decimal("300"),
+                            Decimal("10"),
+                            "Nos",
+                            1,
+                            1,
+                        ),
+                    ],
+                    [
+                        (
+                            "sales",
+                            "widget a",
+                            "Acme Customer",
+                            Decimal("900"),
+                        )
+                    ],
+                ]
+            )
+
+        def execute(self, _query, _params):
+            return None
+
+        def fetchall(self):
+            return next(self.results)
+
+    products = product_metrics(Cursor(), "tenant-id")
+
+    assert products["has_data"] is True
+    assert products["total_products"] == 2
+    sales = products["by_kind"]["sales"]
+    assert sales["value"] == 1500
+    assert sales["quantity_coverage_pct"] == 100
+    assert sales["details"][0] == {
+        "name": "Widget A",
+        "amount": 1200,
+        "quantity": 20,
+        "unit": "Nos",
+        "average_rate": 60,
+        "transactions": 2,
+        "customers": 2,
+        "share_pct": 80,
+        "top_customer": "Acme Customer",
+        "top_customer_amount": 900,
+    }

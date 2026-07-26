@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { askAI, AuthError } from "../api";
-import { IconClose, IconRefresh, IconSend, IconSpark } from "../icons";
+import { IconClose, IconFile, IconRefresh, IconSend, IconSpark } from "../icons";
 import BrandLogo from "./BrandLogo";
+import OnePageReport from "./OnePageReport";
 
 export default function Copilot({
   tenantId,
@@ -9,18 +10,21 @@ export default function Copilot({
   lang,
   open,
   hasFinancialData,
+  data,
   onClose,
   onAuthError,
 }) {
   const [turns, setTurns] = useState([]);
   const [draft, setDraft] = useState("");
   const [busy, setBusy] = useState(false);
+  const [report, setReport] = useState(null);
   const threadRef = useRef(null);
   const composerRef = useRef(null);
 
   useEffect(() => {
     setTurns([]);
     setDraft("");
+    setReport(null);
   }, [tenantId]);
 
   useEffect(() => {
@@ -44,7 +48,9 @@ export default function Copilot({
     const cleanQuestion = question.trim();
     if (!cleanQuestion || busy) return;
 
-    const history = turns.filter((turn) => turn.role !== "error");
+    const history = turns
+      .filter((turn) => turn.role !== "error")
+      .map(({ role, content }) => ({ role, content }));
     setTurns((current) => [
       ...current,
       { role: "user", content: cleanQuestion },
@@ -61,8 +67,11 @@ export default function Copilot({
       });
       setTurns((current) => [
         ...current,
-        { role: "assistant", content: answer },
+        { role: "assistant", content: answer, question: cleanQuestion },
       ]);
+      if (/\b(report|one[\s-]?page|pdf)\b/i.test(cleanQuestion) && data) {
+        setReport({ question: cleanQuestion, answer });
+      }
     } catch (error) {
       if (error instanceof AuthError) return onAuthError();
       setTurns((current) => [
@@ -150,7 +159,19 @@ export default function Copilot({
                     : "ai"
               }`}
             >
-              {turn.content}
+              <span>{turn.content}</span>
+              {turn.role === "assistant" && turn.question && data && (
+                <button
+                  className="bubble-report-action"
+                  type="button"
+                  onClick={() =>
+                    setReport({ question: turn.question, answer: turn.content })
+                  }
+                >
+                  <IconFile width={14} height={14} />
+                  {t.createOnePageReport}
+                </button>
+              )}
             </div>
           ))}
           {busy && (
@@ -209,6 +230,15 @@ export default function Copilot({
         </form>
         <div className="copilot-foot">{t.aiAccuracyNote}</div>
       </aside>
+      {report && data && (
+        <OnePageReport
+          data={data}
+          question={report.question}
+          answer={report.answer}
+          t={t}
+          onClose={() => setReport(null)}
+        />
+      )}
     </>
   );
 }

@@ -105,6 +105,83 @@ def _tally_workbook(kind: str) -> bytes:
     return output.getvalue()
 
 
+def _adaptive_sales_register(*, duplicate_business_row: bool = False) -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Sales Register"
+    sheet.append(
+        [
+            "Date",
+            "Particulars",
+            "Buyer",
+            "Voucher Type",
+            "Quantity",
+            "Alt. Units",
+            "Rate",
+            "Value",
+            "Gross Total",
+            "Interstate Sales",
+            "IGST",
+        ]
+    )
+    sheet.append(
+        [
+            date(2026, 4, 3),
+            "Acme Customer",
+            "Acme Customer",
+            "Sales",
+            10,
+            None,
+            None,
+            100,
+            118,
+            100,
+            18,
+        ]
+    )
+    sheet.append([None, "Widget A", "", "", 10, None, 10, 100])
+    if duplicate_business_row:
+        sheet.append(
+            [
+                date(2026, 4, 3),
+                "Acme Customer",
+                "Acme Customer",
+                "Sales",
+                10,
+                None,
+                None,
+                100,
+                118,
+                100,
+                18,
+            ]
+        )
+        sheet.append([None, "Widget A", "", "", 10, None, 10, 100])
+    sheet.append([None, "Grand Total", "", "", None, None, None, 100, 118])
+
+    # A second concatenated section shifts quantity into Alt. Units and puts a
+    # custom party label where Voucher Type appeared in the first section.
+    sheet.append(
+        [
+            date(2026, 5, 4),
+            "Beta Customer",
+            "Beta Customer",
+            "Beta Customer",
+            "Ahmedabad",
+            5,
+            None,
+            50,
+        ]
+    )
+    sheet.append([None, "Widget B", "", "", "", 5, 10, 50])
+    sheet.append([None, "Grand Total", "", "", None, None, None, 75])
+
+    output = BytesIO()
+    workbook.save(output)
+    workbook.close()
+    return output.getvalue()
+
+
 @pytest.mark.parametrize("kind", ["sales", "purchase", "expense"])
 def test_tally_workbook_is_classified_and_normalized(kind):
     result = parse_tally_workbook(_tally_workbook(kind), f"{kind}.xlsx", kind)
@@ -187,3 +264,67 @@ def test_financial_import_endpoint_requires_dashboard_login(client):
         content=b"not sent without auth",
     )
     assert response.status_code == 401
+
+
+def test_adaptive_register_handles_concatenated_row_layouts_and_products():
+    parsed = parse_tally_workbook(
+        _adaptive_sales_register(),
+        "Sale 26-27.xlsx",
+        "sales",
+    )
+
+    assert parsed.source_format == "adaptive-flat-register"
+    assert parsed.detected_kind == "sales"
+    assert len(parsed.transactions) == 2
+    assert parsed.column_mapping["quantity"] == "Quantity / Alt. Units"
+    assert parsed.transactions[0].gross_amount == 118
+    assert parsed.transactions[0].tax_amount == 18
+    assert parsed.transactions[0].lines[0].name == "Widget A"
+    assert parsed.transactions[0].lines[0].quantity == 10
+    assert parsed.transactions[1].gross_amount == 50
+    assert parsed.transactions[1].lines[0].name == "Widget B"
+    assert parsed.transactions[1].lines[0].quantity == 5
+    assert any("does not reconcile" in warning for warning in parsed.warnings)
+
+
+def test_identical_flat_rows_without_voucher_number_are_flagged_not_dropped():
+    parsed = parse_tally_workbook(
+        _adaptive_sales_register(duplicate_business_row=True),
+        "sales-register.xlsx",
+        "sales",
+    )
+
+    matching = [
+        transaction
+        for transaction in parsed.transactions
+        if transaction.party_name == "Acme Customer"
+    ]
+    assert len(matching) == 2
+    assert len({transaction.source_key for transaction in matching}) == 2
+    assert parsed.possible_duplicate_groups == 1
+    assert any("kept and flagged" in warning for warning in parsed.warnings)
+
+
+def test_adaptive_register_declared_type_mismatch_is_rejected():
+    with pytest.raises(ImportValidationError, match="looks like sales"):
+        parse_tally_workbook(
+            _adaptive_sales_register(),
+            "sales-register.xlsx",
+            "purchase",
+        )
+
+
+def test_adaptive_register_accepts_tally_style_text_dates():
+    workbook = load_workbook(BytesIO(_adaptive_sales_register()))
+    workbook["Sales Register"]["A2"] = "3-Apr-26"
+    output = BytesIO()
+    workbook.save(output)
+    workbook.close()
+
+    parsed = parse_tally_workbook(
+        output.getvalue(),
+        "sales-register.xlsx",
+        "sales",
+    )
+
+    assert parsed.min_date == date(2026, 4, 3)

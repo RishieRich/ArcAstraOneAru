@@ -307,6 +307,7 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
         lang={lang}
         open={chatOpen}
         hasFinancialData={Boolean(data?.has_financial_data)}
+        data={data}
         onClose={() => setChatOpen(false)}
         onAuthError={onLogout}
       />
