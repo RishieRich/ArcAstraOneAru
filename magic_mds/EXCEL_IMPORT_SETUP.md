@@ -16,6 +16,21 @@ unchanged.
   performed per detail row by reconciling `quantity * rate` with line value.
 - Upload sales, purchases and expenses as separate workbooks.
 
+The public trial upload panel also offers **Smart detect** and **Profit & Loss**:
+
+- Smart detect uses workbook structure, voucher labels, sheet/file names and deterministic
+  accounting rules. If semantics remain ambiguous, it asks the user to select Sales,
+  Purchase or Expense instead of guessing.
+- A clearly titled Profit & Loss / P&L / Income Statement can contain one- or two-sided
+  ledger layouts. The importer maps recognizable income, purchase/COGS and expense rows
+  into the existing three normalized kinds. Printed totals and Gross/Net Profit/Loss rows
+  are excluded so child ledgers are not counted twice.
+- P&L summary imports do not invent voucher, customer or product detail. Opening and closing
+  stock rows are skipped because their treatment cannot be inferred safely from an arbitrary
+  layout. These limitations are returned as upload warnings.
+- Migration `0006_public_trials.sql` expands only `financial_imports.detected_kind` to allow
+  the `profit_loss` envelope. Normalized transaction rows remain Sales/Purchase/Expense.
+
 ARQ checks sheet signatures and Tally voucher types before writing. A workbook
 uploaded through the wrong option is rejected. Custom journal/payment voucher
 names can use the selected Expense option as the tie-breaker.

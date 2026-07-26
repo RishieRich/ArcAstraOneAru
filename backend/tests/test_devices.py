@@ -1,3 +1,6 @@
+from uuid import uuid4
+
+
 def test_register_with_invalid_pairing_code_returns_404(client):
     resp = client.post(
         "/v1/devices/register",
@@ -8,11 +11,12 @@ def test_register_with_invalid_pairing_code_returns_404(client):
 
 def test_register_success_returns_token_once(client, make_tenant):
     tenant = make_tenant()
+    company_guid = f"pytest-guid-{uuid4()}"
     resp = client.post(
         "/v1/devices/register",
         json={
             "pairing_code": tenant["pairing_code"],
-            "company_guid": "guid-1",
+            "company_guid": company_guid,
             "machine_label": "test-machine",
         },
     )
@@ -23,7 +27,10 @@ def test_register_success_returns_token_once(client, make_tenant):
 
 def test_pairing_code_is_single_use(client, make_tenant):
     tenant = make_tenant()
-    body = {"pairing_code": tenant["pairing_code"], "company_guid": "guid-1"}
+    body = {
+        "pairing_code": tenant["pairing_code"],
+        "company_guid": f"pytest-guid-{uuid4()}",
+    }
     first = client.post("/v1/devices/register", json=body)
     second = client.post("/v1/devices/register", json=body)
     assert first.status_code == 200
@@ -32,9 +39,10 @@ def test_pairing_code_is_single_use(client, make_tenant):
 
 def test_second_device_with_mismatched_company_guid_is_rejected(client, make_tenant):
     tenant = make_tenant()
+    original_guid = f"pytest-guid-{uuid4()}"
     client.post(
         "/v1/devices/register",
-        json={"pairing_code": tenant["pairing_code"], "company_guid": "guid-A"},
+        json={"pairing_code": tenant["pairing_code"], "company_guid": original_guid},
     )
     # simulate a second pairing code for the SAME tenant with a different GUID
     from app.db import get_connection
@@ -52,6 +60,9 @@ def test_second_device_with_mismatched_company_guid_is_rejected(client, make_ten
 
     resp = client.post(
         "/v1/devices/register",
-        json={"pairing_code": raw_code, "company_guid": "guid-B-different"},
+        json={
+            "pairing_code": raw_code,
+            "company_guid": f"{original_guid}-different",
+        },
     )
     assert resp.status_code == 403

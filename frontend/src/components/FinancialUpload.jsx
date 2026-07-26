@@ -2,7 +2,7 @@ import { useState } from "react";
 import { uploadFinancialFile } from "../api";
 import { IconCheck, IconUpload } from "../icons";
 
-const KINDS = ["sales", "purchase", "expense"];
+const KINDS = ["auto", "sales", "purchase", "expense", "profit_loss"];
 
 export default function FinancialUpload({ tenantId, t, onImported, onClose }) {
   const [uploading, setUploading] = useState("");
@@ -42,7 +42,7 @@ export default function FinancialUpload({ tenantId, t, onImported, onClose }) {
 
       <div className="upload-kinds">
         {KINDS.map((kind) => (
-          <label className={`upload-kind ${kind}`} key={kind}>
+          <label className={`upload-kind ${kind}${kind === "auto" ? " featured" : ""}`} key={kind}>
             <span className="upload-kind-name">{t.kindLabels[kind]}</span>
             <span className="upload-kind-help">{t.uploadKindHelp[kind]}</span>
             <span className="upload-action">
@@ -79,9 +79,11 @@ export default function FinancialUpload({ tenantId, t, onImported, onClose }) {
                 </small>
               )}
               <small>
-                {result.source_format === "adaptive-flat-register"
-                  ? t.adaptiveSchemaDetected
-                  : t.standardSchemaDetected}
+                {result.source_format === "adaptive-profit-loss"
+                  ? t.profitLossSchemaDetected
+                  : result.source_format === "adaptive-flat-register"
+                    ? t.adaptiveSchemaDetected
+                    : t.standardSchemaDetected}
               </small>
               {result.possible_duplicate_groups > 0 && (
                 <small className="upload-warning">

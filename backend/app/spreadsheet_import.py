@@ -28,10 +28,37 @@ MAX_ZIP_MEMBERS = 600
 MAX_SHEET_ROWS = 100_000
 MAX_SHEET_COLUMNS = 400
 ALLOWED_KINDS = {"sales", "purchase", "expense"}
+ALLOWED_IMPORT_KINDS = ALLOWED_KINDS | {"profit_loss"}
 
 _NUMBER = re.compile(r"-?\d+(?:\.\d+)?")
 _TAX_LEDGER = re.compile(r"(^|[^A-Z])(I?GST|CGST|SGST|UTGST|CESS|TAX)([^A-Z]|$)", re.I)
 _ROUNDING_LEDGER = re.compile(r"round(?:ing)?[\s._-]*off", re.I)
+_PROFIT_LOSS_TITLE = re.compile(
+    r"\b(profit\s*(?:&|and)\s*loss|p\s*&\s*l|income\s+statement)\b",
+    re.I,
+)
+_PROFIT_LOSS_SKIP = re.compile(
+    r"^(particulars?|amount|closing\s+stock|opening\s+stock|"
+    r"(grand\s+)?total|gross\s+(profit|loss)|net\s+(profit|loss)|"
+    r"profit\s*(?:&|and)\s*loss(\s+a/?c)?)\b",
+    re.I,
+)
+_PROFIT_LOSS_SALES = re.compile(
+    r"\b(sales?|revenue|turnover|service\s+income|operating\s+income|"
+    r"direct\s+income|indirect\s+income|other\s+income)\b",
+    re.I,
+)
+_PROFIT_LOSS_PURCHASE = re.compile(
+    r"\b(purchases?|cost\s+of\s+goods|cogs|material\s+consum|raw\s+material|"
+    r"cost\s+of\s+sales)\b",
+    re.I,
+)
+_PROFIT_LOSS_EXPENSE = re.compile(
+    r"\b(expenses?|overheads?|salary|salaries|wages?|rent|freight|"
+    r"depreciation|interest|commission|advertis|repairs?|electricity|"
+    r"telephone|travell?ing|insurance|bank\s+charges?|professional\s+fees?)\b",
+    re.I,
+)
 
 
 class ImportValidationError(ValueError):
@@ -152,50 +179,81 @@ def parse_tally_workbook(
             warnings: tuple[str, ...] = ()
             possible_duplicate_groups = 0
         else:
-            flat = _find_flat_register(workbook)
-            if flat is None:
-                raise ImportValidationError(
-                    "No supported transaction table was found. Include either Tally's "
-                    "'Ledger Entries' sheet or a register with Date, Particulars and Value/"
-                    "Amount columns."
-                )
-            sheet, header_row, mapping = flat
-            detected_kind, confidence, reason = _classify_flat_register(
-                sheet,
-                header_row,
-                mapping,
-                safe_filename,
-                declared,
+            profit_loss_sheet = _find_profit_loss_sheet(
+                workbook,
+                force=declared == "profit_loss" or _filename_is_profit_loss(safe_filename),
             )
-            (
-                transactions,
-                skipped_rows,
-                possible_duplicate_groups,
-                reconciliation_warnings,
-            ) = _build_flat_register_transactions(
-                sheet,
-                header_row,
-                mapping,
-                detected_kind,
-            )
-            source_format = "adaptive-flat-register"
-            column_mapping = mapping["display"]
-            warning_list = [
-                "A single-sheet register was detected; parent vouchers and product detail "
-                "rows were reconciled by date, value, quantity and rate."
-            ]
-            warning_list.extend(reconciliation_warnings)
-            if mapping.get("voucher_number") is None:
-                warning_list.append(
-                    "No voucher number or GUID column was found. Stable business fingerprints "
-                    "are used to match re-uploads."
+            if profit_loss_sheet is not None:
+                transactions, skipped_rows, period_columns = (
+                    _build_profit_loss_transactions(profit_loss_sheet)
                 )
-            if possible_duplicate_groups:
-                warning_list.append(
-                    f"{possible_duplicate_groups} identical-looking transaction group(s) were "
-                    "kept and flagged because the workbook has no reliable voucher identity."
+                detected_kind = "profit_loss"
+                confidence = 0.9
+                reason = (
+                    f"Profit & Loss summary detected on '{profit_loss_sheet.title}' and "
+                    "normalized into sales, purchase and expense ledger categories."
                 )
-            warnings = tuple(warning_list)
+                source_format = "adaptive-profit-loss"
+                column_mapping = {
+                    "sheet": profit_loss_sheet.title,
+                    "labels": "Particular / ledger text",
+                    "amounts": "Nearest numeric value to each ledger",
+                    "period_columns": str(period_columns),
+                }
+                warnings = (
+                    "Profit & Loss summary rows were imported as ledger categories; "
+                    "voucher, customer and product-level detail is not available from this file.",
+                    "Printed totals and Gross/Net Profit or Loss rows were skipped to avoid "
+                    "double-counting the underlying ledgers.",
+                    "Opening and closing stock rows were skipped because their accounting "
+                    "treatment cannot be inferred safely from an arbitrary workbook layout.",
+                )
+                possible_duplicate_groups = 0
+            else:
+                flat = _find_flat_register(workbook)
+                if flat is None:
+                    raise ImportValidationError(
+                        "No supported transaction table was found. Include either Tally's "
+                        "'Ledger Entries' sheet, a register with Date, Particulars and Value/"
+                        "Amount columns, or a clearly titled Profit & Loss statement."
+                    )
+                sheet, header_row, mapping = flat
+                detected_kind, confidence, reason = _classify_flat_register(
+                    sheet,
+                    header_row,
+                    mapping,
+                    safe_filename,
+                    declared,
+                )
+                (
+                    transactions,
+                    skipped_rows,
+                    possible_duplicate_groups,
+                    reconciliation_warnings,
+                ) = _build_flat_register_transactions(
+                    sheet,
+                    header_row,
+                    mapping,
+                    detected_kind,
+                )
+                source_format = "adaptive-flat-register"
+                column_mapping = mapping["display"]
+                warning_list = [
+                    "A single-sheet register was detected; parent vouchers and product detail "
+                    "rows were reconciled by date, value, quantity and rate."
+                ]
+                warning_list.extend(reconciliation_warnings)
+                if mapping.get("voucher_number") is None:
+                    warning_list.append(
+                        "No voucher number or GUID column was found. Stable business fingerprints "
+                        "are used to match re-uploads."
+                    )
+                if possible_duplicate_groups:
+                    warning_list.append(
+                        f"{possible_duplicate_groups} identical-looking transaction group(s) were "
+                        "kept and flagged because the workbook has no reliable voucher identity."
+                    )
+                warnings = tuple(warning_list)
     finally:
         workbook.close()
 
@@ -278,6 +336,226 @@ def _records(sheet) -> list[dict[str, object]]:
             record["_ROW"] = row_number
             records.append(record)
     return records
+
+
+def _find_profit_loss_sheet(workbook, *, force: bool = False):
+    """Find a visibly labelled P&L without treating an arbitrary total as one."""
+    fallback = None
+    for sheet in workbook.worksheets:
+        visible_text: list[str] = []
+        has_material_value = False
+        for values in sheet.iter_rows(
+            min_row=1,
+            max_row=min(sheet.max_row or 1, 18),
+            max_col=min(sheet.max_column or 1, 16),
+            values_only=True,
+        ):
+            for value in values:
+                text = _text(value)
+                if text:
+                    visible_text.append(text)
+                if _looks_like_amount(value) and abs(_amount(value)) > 0:
+                    has_material_value = True
+        joined = " ".join([sheet.title, *visible_text])
+        if _PROFIT_LOSS_TITLE.search(joined) and has_material_value:
+            return sheet
+        if fallback is None and has_material_value and visible_text:
+            fallback = sheet
+    return fallback if force else None
+
+
+def _build_profit_loss_transactions(sheet) -> tuple[list[ParsedTransaction], int, int]:
+    """Normalize common one- and two-sided P&L layouts into category rows.
+
+    Arbitrary statements are deliberately handled conservatively: only a label
+    with a nearby numeric value and a recognizable/section-derived book kind is
+    accepted. Printed totals are excluded because importing both them and their
+    child ledgers would double the result.
+    """
+    period_by_column = _profit_loss_periods(sheet)
+    section_by_column: dict[int, str] = {}
+    occurrences: Counter[str] = Counter()
+    parsed: list[ParsedTransaction] = []
+    skipped = 0
+
+    for row_number, values in enumerate(sheet.iter_rows(values_only=True), start=1):
+        if row_number > MAX_SHEET_ROWS:
+            raise ImportValidationError(
+                f"The '{sheet.title}' sheet exceeds the {MAX_SHEET_ROWS:,}-row limit."
+            )
+        if len(values) > MAX_SHEET_COLUMNS:
+            raise ImportValidationError(
+                f"The '{sheet.title}' sheet has too many columns to process safely."
+            )
+
+        label_columns = [
+            index
+            for index, value in enumerate(values)
+            if _text(value) and not _looks_like_amount(value)
+        ]
+        for label_position, label_column in enumerate(label_columns):
+            label = _text(values[label_column])
+            if not label:
+                continue
+            next_label = (
+                label_columns[label_position + 1]
+                if label_position + 1 < len(label_columns)
+                else len(values)
+            )
+            amount_column = next(
+                (
+                    index
+                    for index in range(label_column + 1, next_label)
+                    if _looks_like_amount(values[index])
+                    and abs(_amount(values[index])) > 0
+                ),
+                None,
+            )
+
+            section = _profit_loss_kind(label)
+            if amount_column is None:
+                if section:
+                    section_by_column[label_column] = section
+                continue
+            if _PROFIT_LOSS_SKIP.search(label):
+                skipped += 1
+                continue
+
+            inherited = _nearest_section(section_by_column, label_column)
+            kind = section or inherited
+            if kind not in ALLOWED_KINDS:
+                skipped += 1
+                continue
+
+            amount = _money(abs(_amount(values[amount_column])))
+            txn_date = period_by_column.get(amount_column)
+            stable_label = _header_key(label)
+            occurrence_key = f"{kind}\x1f{txn_date or ''}\x1f{stable_label}"
+            occurrences[occurrence_key] += 1
+            source_seed = (
+                f"{occurrence_key}\x1f{occurrences[occurrence_key]}"
+            ).encode("utf-8")
+            source_key = f"pnl:{hashlib.sha256(source_seed).hexdigest()[:32]}"
+            parsed.append(
+                ParsedTransaction(
+                    source_key=source_key,
+                    source_row=row_number,
+                    kind=kind,
+                    txn_date=txn_date,
+                    voucher_number=None,
+                    voucher_type="Profit & Loss summary",
+                    party_name=None,
+                    category=label,
+                    gross_amount=amount,
+                    net_amount=amount,
+                    tax_amount=Decimal("0"),
+                    lines=(
+                        ParsedLine(
+                            line_type="category",
+                            name=label,
+                            amount=amount,
+                        ),
+                    ),
+                )
+            )
+
+    if not parsed:
+        raise ImportValidationError(
+            "The Profit & Loss sheet was recognized, but no supported ledger amounts "
+            "could be mapped. Include ledger names beside numeric values, then try again."
+        )
+    if len({transaction.kind for transaction in parsed}) < 2:
+        raise ImportValidationError(
+            "The Profit & Loss sheet needs recognizable income and cost/expense sections. "
+            "ARQ found only one side and stopped rather than showing a misleading result."
+        )
+    return parsed, skipped, len(set(period_by_column.values()))
+
+
+def _profit_loss_kind(label: str) -> str | None:
+    if _PROFIT_LOSS_PURCHASE.search(label):
+        return "purchase"
+    if _PROFIT_LOSS_SALES.search(label):
+        return "sales"
+    if _PROFIT_LOSS_EXPENSE.search(label):
+        return "expense"
+    return None
+
+
+def _nearest_section(sections: dict[int, str], column: int) -> str | None:
+    if column in sections:
+        return sections[column]
+    candidates = [
+        (abs(section_column - column), kind)
+        for section_column, kind in sections.items()
+    ]
+    return min(candidates)[1] if candidates else None
+
+
+def _profit_loss_periods(sheet) -> dict[int, date]:
+    periods: dict[int, date] = {}
+    for values in sheet.iter_rows(
+        min_row=1,
+        max_row=min(sheet.max_row or 1, 15),
+        max_col=min(sheet.max_column or 1, MAX_SHEET_COLUMNS),
+        values_only=True,
+    ):
+        for column, value in enumerate(values):
+            period = _period_date(value)
+            if period:
+                periods[column] = period
+    return periods
+
+
+def _period_date(value: object) -> date | None:
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    # Numeric P&L amounts can also be valid Excel date serials. Only typed date
+    # cells or explicit date text are treated as period headers.
+    if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool):
+        return None
+    text = str(value or "").strip()
+    if not text:
+        return None
+    direct = _date_value(text)
+    if direct:
+        return direct
+    matches = re.findall(
+        r"\d{1,2}[-/. ](?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
+        r"[a-z]*[-/. ]\d{2,4}",
+        text,
+        flags=re.I,
+    )
+    for candidate in reversed(matches):
+        normalized = re.sub(r"[/. ]", "-", candidate)
+        parsed = _date_value(normalized)
+        if parsed:
+            return parsed
+    for pattern in ("%b %Y", "%B %Y", "%b-%Y", "%B-%Y", "%b %y", "%B %y"):
+        try:
+            parsed = datetime.strptime(text, pattern)
+            return date(parsed.year, parsed.month, 1)
+        except ValueError:
+            continue
+    return None
+
+
+def _looks_like_amount(value: object) -> bool:
+    if isinstance(value, (int, float, Decimal)) and not isinstance(value, bool):
+        return True
+    text = str(value or "").strip()
+    if not text:
+        return False
+    normalized = (
+        text.replace(",", "")
+        .replace("₹", "")
+        .replace("Rs.", "")
+        .replace("Rs", "")
+        .strip()
+    )
+    return bool(re.fullmatch(r"\(?-?\d+(?:\.\d+)?\)?", normalized))
 
 
 _FLAT_HEADER_ALIASES = {
@@ -1072,16 +1350,24 @@ def _normalize_kind(value: str | None) -> str | None:
         return None
     normalized = value.strip().casefold()
     aliases = {
+        "auto": None,
+        "smart": None,
         "sale": "sales",
         "sales": "sales",
         "purchase": "purchase",
         "purchases": "purchase",
         "expense": "expense",
         "expenses": "expense",
+        "profit_loss": "profit_loss",
+        "profit loss": "profit_loss",
+        "p&l": "profit_loss",
+        "pnl": "profit_loss",
     }
-    kind = aliases.get(normalized)
-    if not kind:
-        raise ImportValidationError("Upload type must be sales, purchase or expense.")
+    if normalized not in aliases:
+        raise ImportValidationError(
+            "Upload type must be auto, sales, purchase, expense or profit & loss."
+        )
+    kind = aliases[normalized]
     return kind
 
 
@@ -1094,6 +1380,16 @@ def _filename_kind(filename: str) -> str | None:
     if re.search(r"\b(expense|expenses|expences)\b", stem):
         return "expense"
     return None
+
+
+def _filename_is_profit_loss(filename: str) -> bool:
+    stem = PurePath(filename).stem.casefold()
+    return bool(
+        re.search(r"\bprofit[\s_-]*(?:and|&)?[\s_-]*loss\b", stem)
+        or re.search(r"\bp[\s_-]*&[\s_-]*l\b", stem)
+        or re.search(r"\bpnl\b", stem)
+        or re.search(r"\bincome[\s_-]*statement\b", stem)
+    )
 
 
 def _sequence(value: object) -> str:

@@ -8,6 +8,7 @@ Usage (from backend/, with venv active):
   python -m app.admin create-dashboard-user --email a@b.com --password "..." [--name "A B"]
   python -m app.admin grant-dashboard-access --email a@b.com --tenant-id <uuid>
   python -m app.admin list-dashboard-users
+  python -m app.admin list-trial-waitlist
   python -m app.admin delete-dashboard-user --email a@b.com
 """
 import argparse
@@ -108,21 +109,53 @@ def list_dashboard_users() -> None:
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
             """
-            select du.email, du.display_name, du.all_tenants, count(dut.tenant_id),
-                   du.created_at, du.last_login_at
+            select du.email, du.display_name, du.account_type, du.all_tenants,
+                   count(dut.tenant_id), du.created_at, du.last_login_at
             from dashboard_users du
             left join dashboard_user_tenants dut on dut.user_email = du.email
-            group by du.email, du.display_name, du.all_tenants, du.created_at,
-                     du.last_login_at
+            group by du.email, du.display_name, du.account_type, du.all_tenants,
+                     du.created_at, du.last_login_at
             order by du.created_at
             """
         )
-        for email, name, all_tenants, grants, created_at, last_login in cur.fetchall():
+        for (
+            email,
+            name,
+            account_type,
+            all_tenants,
+            grants,
+            created_at,
+            last_login,
+        ) in cur.fetchall():
             scope = "all" if all_tenants else f"{grants} grant(s)"
             print(
-                f"{email}  {name or '-':24s}  scope={scope:12s}  "
+                f"{email}  {name or '-':24s}  type={account_type:10s}  "
+                f"scope={scope:12s}  "
                 f"created={created_at}  last_login={last_login}"
             )
+
+
+def list_trial_waitlist() -> None:
+    with get_connection() as conn, conn.cursor() as cur:
+        cur.execute(
+            """
+            select full_name, company_name, email, status, created_at, updated_at
+            from trial_waitlist
+            order by created_at
+            """
+        )
+        rows = cur.fetchall()
+    if not rows:
+        print("trial waitlist is empty")
+        return
+    for position, (name, company, email, status, created_at, updated_at) in enumerate(
+        rows,
+        start=1,
+    ):
+        print(
+            f"{position:3d}  {email:34s}  {name:24s}  {company:28s}  "
+            f"status={status:9s}  joined={created_at}  updated={updated_at}"
+        )
 
 
 def delete_dashboard_user(email: str) -> None:
@@ -161,6 +194,7 @@ def main() -> None:
     p.add_argument("--tenant-id", required=True)
 
     sub.add_parser("list-dashboard-users")
+    sub.add_parser("list-trial-waitlist")
 
     p = sub.add_parser("delete-dashboard-user")
     p.add_argument("--email", required=True)
@@ -181,6 +215,8 @@ def main() -> None:
         grant_dashboard_access(args.email, args.tenant_id)
     elif args.command == "list-dashboard-users":
         list_dashboard_users()
+    elif args.command == "list-trial-waitlist":
+        list_trial_waitlist()
     elif args.command == "delete-dashboard-user":
         delete_dashboard_user(args.email)
 

@@ -58,6 +58,29 @@ export async function login(email, password) {
   return session;
 }
 
+export async function fetchSignupStatus() {
+  const res = await fetch(`${BASE}/v1/auth/signup/status`);
+  if (!res.ok) throw new Error(await detail(res));
+  return res.json();
+}
+
+export async function signup({ fullName, companyName, email, password }) {
+  const res = await fetch(`${BASE}/v1/auth/signup`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      full_name: fullName,
+      company_name: companyName,
+      email,
+      password,
+    }),
+  });
+  if (!res.ok) throw new Error(await detail(res));
+  const result = await res.json();
+  if (result.status === "active") saveSession(result);
+  return result;
+}
+
 export const fetchCompanies = () => request("/v1/dashboard/companies");
 export const fetchMetrics = (tenantId) => request(`/v1/dashboard/metrics/${tenantId}`);
 

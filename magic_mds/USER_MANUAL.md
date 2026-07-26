@@ -6,6 +6,32 @@ What it does: reads receivables data from the TallyPrime running on the same mac
 
 ---
 
+## Start a free trial
+
+From the dashboard login page, select **Start free** and enter your name, company name,
+email and a password of at least eight characters containing a letter and number.
+
+- The first 10 self-service signups receive a private company workspace immediately and are
+  logged in. Existing managed customer accounts are separate from this limit.
+- After the 10 places are used, the same mandatory details add the person to the waitlist.
+  The page confirms their position and shows `contact@arqoneailabs.space` and
+  `+91 9727067044` for priority onboarding.
+- Passwords are never stored as readable text. Active-account passwords are salted and
+  hashed; a waitlisted password is not stored.
+
+The empty trial workspace gives a four-step guide:
+
+1. Upload a Sales, Purchase, Expense or Profit & Loss `.xlsx` using Smart detect or a
+   specific book type.
+2. Review key metrics, trends, product/customer/supplier detail and import warnings.
+3. Ask ARQ AI questions in English, Hinglish or Gujarati-Roman.
+4. Generate a one-page report from any answer and use Print / Save PDF.
+
+The trial also explains that ARQ can connect with Tally or another business database and
+provides the team contact details for onboarding and upcoming features.
+
+---
+
 ## 1. Admin prep (you, once per client)
 
 The backend must be running, and the client needs a pairing code.

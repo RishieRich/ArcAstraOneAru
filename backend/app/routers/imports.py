@@ -128,13 +128,21 @@ async def upload_financials(
         source_keys = [transaction.source_key for transaction in parsed.transactions]
         cur.execute(
             """
-            select source_key, id
+            select kind, source_key, id
             from financial_transactions
-            where tenant_id = %s and kind = %s and source_key = any(%s)
+            where tenant_id = %s and source_key = any(%s)
             """,
-            (str(tenant_id), parsed.detected_kind, source_keys),
+            (str(tenant_id), source_keys),
         )
-        transaction_ids = dict(cur.fetchall())
+        requested_transactions = {
+            (transaction.kind, transaction.source_key)
+            for transaction in parsed.transactions
+        }
+        transaction_ids = {
+            (kind, source_key): transaction_id
+            for kind, source_key, transaction_id in cur.fetchall()
+            if (kind, source_key) in requested_transactions
+        }
         ids_to_refresh = list(transaction_ids.values())
         cur.execute(
             "delete from financial_transaction_lines where transaction_id = any(%s)",
@@ -144,7 +152,7 @@ async def upload_financials(
         line_rows = [
             (
                 str(tenant_id),
-                transaction_ids[transaction.source_key],
+                transaction_ids[(transaction.kind, transaction.source_key)],
                 line.line_type,
                 line.name,
                 line.amount,

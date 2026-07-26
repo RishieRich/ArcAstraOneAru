@@ -409,8 +409,12 @@ def financial_metrics(cur, tenant_id: str) -> dict:
         for point in monthly
         if point["sales"] or point["purchase"] or point["expense"]
     )
-    profitable_months = round(sum(point["profit"] for point in monthly), 2)
-    loss_months = round(sum(point["loss"] for point in monthly), 2)
+    profitable_months = round(
+        sum(point["profit"] for point in monthly), 2
+    ) if monthly else max(result, 0.0)
+    loss_months = round(
+        sum(point["loss"] for point in monthly), 2
+    ) if monthly else max(-result, 0.0)
 
     cur.execute(
         """

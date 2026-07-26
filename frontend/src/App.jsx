@@ -21,6 +21,7 @@ import FinancialOverview from "./components/FinancialOverview";
 import FinancialUpload from "./components/FinancialUpload";
 import StatTile from "./components/StatTile";
 import ThemeToggle from "./components/ThemeToggle";
+import TrialGuide, { TrialBanner } from "./components/TrialGuide";
 import TopDebtors from "./components/TopDebtors";
 import Login from "./pages/Login";
 
@@ -158,6 +159,7 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
   }
 
   const totals = data?.totals;
+  const isTrial = session.account_type === "free_trial";
 
   return (
     <div className="app">
@@ -169,6 +171,8 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
         </div>
 
         <div className="spacer" />
+
+        {isTrial && <span className="trial-header-badge">{t.freeTrial}</span>}
 
         <div className="lang-group">
           {LANGS.map((l) => (
@@ -266,6 +270,14 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
                 />
               )}
 
+              {isTrial && (
+                <TrialBanner
+                  t={t}
+                  hasData={data.has_data}
+                  onUpload={() => setShowUpload(true)}
+                />
+              )}
+
               {data.has_financial_data && (
                 <nav className="view-tabs" aria-label={t.dashboardViews}>
                   <button
@@ -288,10 +300,18 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
               {view === "financial" && data.has_financial_data ? (
                 <FinancialOverview financials={data.financials} t={t} />
               ) : !data.has_receivables_data ? (
-                <div className="card state">
-                  <h3>{t.noData}</h3>
-                  <p>{t.noDataBody}</p>
-                </div>
+                isTrial && !data.has_financial_data ? (
+                  <TrialGuide
+                    t={t}
+                    onUpload={() => setShowUpload(true)}
+                    onAsk={() => setChatOpen(true)}
+                  />
+                ) : (
+                  <div className="card state">
+                    <h3>{t.noData}</h3>
+                    <p>{t.noDataBody}</p>
+                  </div>
+                )
               ) : (
                 <ReceivablesView data={data} totals={totals} t={t} />
               )}

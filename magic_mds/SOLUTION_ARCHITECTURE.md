@@ -3,11 +3,15 @@
 **Document type:** Solution Architecture Definition (ARB-ready)
 **System:** ARQ Astra — Tally → Cloud Receivables & Business Intelligence for Indian SMBs
 **Repository:** `github.com/RishieRich/ArcAstraOneAru` (mono-repo, three deploy targets)
-**Version:** 1.0
+**Version:** 1.1
 **Date:** 2026-07-26
 **Status:** Live in production (single-tenant-per-client, early customers)
 **Author / Owner:** Rishikesh Rajendra Pote
 **Verified against commit:** `cebbcbc`
+
+> Public trial signup, the 10-user capacity gate, waitlist persistence and adaptive
+> Profit & Loss imports are implemented in the current working tree but remain pending
+> migration `0006_public_trials.sql` and production deployment.
 
 ---
 
@@ -113,6 +117,8 @@ zero-to-low operating cost (all free tiers).
   counterparty breakdowns
 - AI copilot Q&A over the tenant's own snapshot, trilingual, with provider failover
 - Dashboard auth (email + password/PIN) with optional per-company access scoping
+- Guided public free-trial workspace, first-10 capacity gate and overflow waitlist
+- Adaptive Profit & Loss summary normalization alongside Sales/Purchase/Expense uploads
 
 **Explicitly out of scope (today)**
 - Writing anything back into Tally
@@ -143,6 +149,8 @@ zero-to-low operating cost (all free tiers).
 | FR-10 | Accept, classify and import a Tally `.xlsx` workbook | `POST /v1/imports/financials` |
 | FR-11 | Answer natural-language questions over the tenant's data, trilingually | `POST /v1/ask` |
 | FR-12 | Render the whole dashboard in EN / Hinglish / Gujarati-Roman | `frontend/src/i18n.js` |
+| FR-13 | Create at most 10 isolated self-service trial accounts and waitlist overflow leads | `GET /v1/auth/signup/status`, `POST /v1/auth/signup` |
+| FR-14 | Guide trial users from adaptive Excel upload through metrics, AI Q&A and one-page reports | `TrialGuide.jsx`, `FinancialUpload.jsx`, `Copilot.jsx` |
 
 ### 3.2 Non-functional requirements
 
@@ -1147,12 +1155,14 @@ owner's explicit go-ahead.**
 | 3 | `POST /v1/devices/register` | connector | pairing code in body | Exchange a one-time code for a device token | 404 invalid · 400 used/expired · 403 GUID mismatch |
 | 4 | `POST /v1/sync` | connector | `Bearer <device token>` | Ingest one snapshot | 401 invalid/revoked · 403 GUID mismatch · 409 run id owned by another tenant · **200 replay** on duplicate id |
 | 5 | `POST /v1/auth/login` | SPA | email + password (legacy 4-digit PIN accepted) | Issue a 7-day HMAC session token | 400 missing credential · 401 wrong (uniform message + 0.8 s delay) |
-| 6 | `GET /v1/dashboard/companies` | SPA | `Bearer <session>` | Companies this user may see, with sync/import status | 401 |
-| 7 | `GET /v1/dashboard/metrics/{tenant_id}` | SPA | `Bearer <session>` | **Every** dashboard number in one document | 401 · 403 no access · 404 no such company |
-| 8 | `POST /v1/imports/financials` | SPA | `Bearer <session>` | Classify + ingest one Tally `.xlsx` | 422 validation/classification · 404 no such company · 403 no access · **200 `duplicate:true`** on re-upload |
-| 9 | `POST /v1/ask` | SPA | `Bearer <session>` | Trilingual Q&A over the tenant snapshot | 403 no access · 503 AI unconfigured · 502 all providers failed |
+| 6 | `GET /v1/auth/signup/status` | public SPA | none | Return ten-place trial capacity and contact details | 500 database unavailable |
+| 7 | `POST /v1/auth/signup` | public SPA | none | Atomically create an isolated free trial or upsert a waitlist lead | 409 existing account · 422 invalid required fields |
+| 8 | `GET /v1/dashboard/companies` | SPA | `Bearer <session>` | Companies this user may see, with sync/import status | 401 |
+| 9 | `GET /v1/dashboard/metrics/{tenant_id}` | SPA | `Bearer <session>` | **Every** dashboard number in one document | 401 · 403 no access · 404 no such company |
+| 10 | `POST /v1/imports/financials` | SPA | `Bearer <session>` | Classify + ingest one `.xlsx`, including conservative P&L summaries | 422 validation/classification · 404 no such company · 403 no access · **200 `duplicate:true`** on re-upload |
+| 11 | `POST /v1/ask` | SPA | `Bearer <session>` | Trilingual Q&A over the tenant snapshot | 403 no access · 503 AI unconfigured · 502 all providers failed |
 
-**Endpoint 8 note.** The workbook is sent as a **raw request body** with `tenant_id` and
+**Endpoint 10 note.** The workbook is sent as a **raw request body** with `tenant_id` and
 `declared_kind` as query parameters and the filename URL-encoded in an `X-File-Name` header —
 not multipart. Simpler to stream, and it avoids a multipart parser dependency in the lambda.
 

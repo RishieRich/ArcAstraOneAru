@@ -22,9 +22,9 @@ export const T = {
     maxOverdue: (days) => `max ${days} days`,
     // optional Excel imports
     uploadExcel: "Upload Excel",
-    uploadTitle: "Add sales, purchases or expenses",
+    uploadTitle: "Let ARQ understand your Excel",
     uploadSub:
-      "Choose what you expect, then ARQ checks the Tally workbook structure before importing it.",
+      "Use Smart detect for most files, or choose a book type when you already know it.",
     close: "Close",
     chooseFile: "Choose .xlsx",
     uploading: "Checking & importing…",
@@ -34,16 +34,25 @@ export const T = {
     alreadyImported: (n) => `Already imported · ${n} transactions`,
     uploadSuccess: (kind, n) => `${kind} detected · ${n} transactions imported`,
     adaptiveSchemaDetected: "Adaptive register layout detected and reconciled",
+    profitLossSchemaDetected: "Profit & Loss layout detected and safely mapped",
     standardSchemaDetected: "Standard Tally voucher layout detected",
     possibleDuplicateGroups: (n) =>
       `${n} identical-looking transaction group(s) kept for review`,
     totalMismatchWarning:
       "A stated total did not match the visible rows; only visible transactions were imported.",
-    kindLabels: { sales: "Sales", purchase: "Purchases", expense: "Expenses" },
+    kindLabels: {
+      auto: "Smart detect",
+      sales: "Sales",
+      purchase: "Purchases",
+      expense: "Expenses",
+      profit_loss: "Profit & Loss",
+    },
     uploadKindHelp: {
+      auto: "Recommended for different or unfamiliar schemas",
       sales: "Invoices and sales vouchers",
       purchase: "Supplier and purchase vouchers",
       expense: "Journal, payment and expense vouchers",
+      profit_loss: "Income and cost ledger summary",
     },
     dashboardViews: "Dashboard view",
     receivablesView: "Receivables",
@@ -205,6 +214,90 @@ export const T = {
     hidePassword: "Hide password",
     pin: "4-digit PIN",
     loginBtn: "Open dashboard",
+    // public trial signup
+    accountAccess: "Account access",
+    signInTab: "Log in",
+    signUpTab: "Start free",
+    freeBusinessIntelligence: "Free business intelligence trial",
+    signupHero: "Turn your Excel books into decisions.",
+    signupHeroSub:
+      "Upload a familiar workbook. ARQ detects the structure, builds clear metrics and graphs, answers questions and creates a polished one-page report.",
+    signupBenefits: [
+      "Smart Sales, Purchase, Expense and P&L Excel detection",
+      "Colourful trends, product detail and key business metrics",
+      "Ask ARQ AI questions grounded in your uploaded books",
+      "Generate a focused one-page report and save it as PDF",
+    ],
+    beyondExcel: "Excel today. Connected operations tomorrow.",
+    beyondExcelBody:
+      "ARQ can also connect with Tally and other business databases. More decision features are on the way.",
+    limitedFreeTrial: "Limited self-service trial",
+    trialCapacityChecking: "Checking free trial availability...",
+    trialSpotsLeft: (n) => `${n} of the first 10 free trial spot${n === 1 ? "" : "s"} left`,
+    trialWaitlistOpen: "The first 10 spots are full - waitlist is open",
+    signupTitle: "Create your free workspace",
+    signupSub:
+      "Your company gets a private data workspace. All fields are required.",
+    fullName: "Your name",
+    fullNamePlaceholder: "e.g. Asha Shah",
+    companyName: "Company name",
+    companyNamePlaceholder: "e.g. Asha Engineering",
+    createPasswordPlaceholder: "At least 8 characters",
+    passwordRule: "Use at least 8 characters with one letter and one number.",
+    creatingWorkspace: "Creating secure workspace...",
+    startFreeTrial: "Start my free trial",
+    joinWaitlist: "Join the waitlist",
+    signupSecurity:
+      "Passwords are salted and hashed. Original Excel files are not retained.",
+    waitlistEyebrow: "Details received",
+    waitlistTitle: "You are on the ARQ waitlist",
+    waitlistBody: (position) =>
+      `The first 10 trial workspaces are full. Your current waitlist position is ${position || "confirmed"}. Reach our team for priority onboarding.`,
+    backToLogin: "Back to login",
+    contactEmail: "contact@arqoneailabs.space",
+    contactPhone: "+91 9727067044",
+    // free trial workspace
+    freeTrial: "Free trial",
+    trialWorkspaceReady: "Your private trial workspace is ready",
+    trialWelcomeTitle: "Start with the Excel file you already use.",
+    trialWelcomeBody:
+      "Upload a Sales, Purchase, Expense or Profit & Loss .xlsx. Smart detect maps unfamiliar columns, validates totals and shows exactly what it understood.",
+    uploadMyWorkbook: "Upload my first workbook",
+    seeAskArq: "Explore Ask ARQ AI",
+    trialSteps: [
+      {
+        title: "Upload any supported book",
+        body: "Choose Smart detect for a different schema, or select the book type yourself.",
+      },
+      {
+        title: "Review metrics and graphs",
+        body: "See totals, monthly trends, products, customers, suppliers, costs and data warnings.",
+      },
+      {
+        title: "Ask your own questions",
+        body: "Ask in English, Hinglish or Gujarati-Roman and get answers grounded only in your books.",
+      },
+      {
+        title: "Create a one-page report",
+        body: "Turn any management question into a focused report with verified charts and save it as PDF.",
+      },
+    ],
+    trialTrustPoints: [
+      "Private company workspace",
+      "Duplicate-aware imports",
+      "Original workbook not stored",
+    ],
+    connectMoreEyebrow: "Go beyond uploads",
+    connectMoreTitle: "Connect Tally or another database with our team.",
+    connectMoreBody:
+      "Automated refreshes, deeper operational intelligence and more key features are coming. Contact ARQ One AI Labs for onboarding and the roadmap.",
+    trialDataReady: "Your uploaded data is ready",
+    trialDataReadyBody:
+      "Explore the graphs, ask ARQ AI for clarification, or create a one-page report from any answer.",
+    trialBannerBody:
+      "Upload your first workbook to unlock metrics, graphs, AI answers and reports.",
+    addAnotherWorkbook: "Add workbook",
+    talkToTeam: "Talk to our team",
     loggingIn: "Checking…",
     loginFooter: "Protected access · ARQ does not save your password in browser storage",
     // tiles
@@ -350,9 +443,9 @@ export const T = {
     lastUpdated: "Last updated",
     maxOverdue: (days) => `max ${days} din`,
     uploadExcel: "Excel upload",
-    uploadTitle: "Sales, purchases ya expenses add karo",
+    uploadTitle: "ARQ ko aapka Excel samajhne do",
     uploadSub:
-      "Expected type chuno; import se pehle ARQ Tally workbook ka structure check karega.",
+      "Zyada files ke liye Smart detect use karo, ya book type pata ho toh khud chuno.",
     close: "Band karo",
     chooseFile: ".xlsx chuno",
     uploading: "Check aur import ho raha hai…",
@@ -362,16 +455,25 @@ export const T = {
     alreadyImported: (n) => `Pehle se imported · ${n} transactions`,
     uploadSuccess: (kind, n) => `${kind} detect hua · ${n} transactions imported`,
     adaptiveSchemaDetected: "Adaptive register layout detect aur reconcile hua",
+    profitLossSchemaDetected: "Profit & Loss layout safely detect aur map hua",
     standardSchemaDetected: "Standard Tally voucher layout detect hua",
     possibleDuplicateGroups: (n) =>
       `${n} same dikhne wale transaction group(s) review ke liye rakhe gaye`,
     totalMismatchWarning:
       "Workbook ka stated total visible rows se match nahi hua; sirf visible transactions import hue.",
-    kindLabels: { sales: "Sales", purchase: "Purchases", expense: "Expenses" },
+    kindLabels: {
+      auto: "Smart detect",
+      sales: "Sales",
+      purchase: "Purchases",
+      expense: "Expenses",
+      profit_loss: "Profit & Loss",
+    },
     uploadKindHelp: {
+      auto: "Alag ya unfamiliar schema ke liye recommended",
       sales: "Invoices aur sales vouchers",
       purchase: "Supplier aur purchase vouchers",
       expense: "Journal, payment aur expense vouchers",
+      profit_loss: "Income aur cost ledger summary",
     },
     dashboardViews: "Dashboard view",
     receivablesView: "Receivables",
@@ -532,6 +634,90 @@ export const T = {
     hidePassword: "Password chhupao",
     pin: "4-digit PIN",
     loginBtn: "Dashboard kholo",
+    // public trial signup
+    accountAccess: "Account access",
+    signInTab: "Log in",
+    signUpTab: "Free shuru karo",
+    freeBusinessIntelligence: "Free business intelligence trial",
+    signupHero: "Apni Excel books ko decisions mein badlo.",
+    signupHeroSub:
+      "Apni familiar workbook upload karo. ARQ structure detect karke clear metrics, graphs, answers aur polished one-page report banata hai.",
+    signupBenefits: [
+      "Sales, Purchase, Expense aur P&L Excel ka smart detection",
+      "Colourful trends, product detail aur key business metrics",
+      "Uploaded books par grounded Ask ARQ AI answers",
+      "Focused one-page report banao aur PDF save karo",
+    ],
+    beyondExcel: "Aaj Excel. Kal connected operations.",
+    beyondExcelBody:
+      "ARQ Tally aur doosre business databases se bhi connect ho sakta hai. Aur decision features aa rahe hain.",
+    limitedFreeTrial: "Limited self-service trial",
+    trialCapacityChecking: "Free trial availability check ho rahi hai...",
+    trialSpotsLeft: (n) => `Pehle 10 mein se ${n} free trial spot${n === 1 ? "" : "s"} baki`,
+    trialWaitlistOpen: "Pehle 10 spots full hain - waitlist open hai",
+    signupTitle: "Apna free workspace banao",
+    signupSub:
+      "Aapki company ko private data workspace milega. Sab fields required hain.",
+    fullName: "Aapka naam",
+    fullNamePlaceholder: "jaise Asha Shah",
+    companyName: "Company naam",
+    companyNamePlaceholder: "jaise Asha Engineering",
+    createPasswordPlaceholder: "Kam se kam 8 characters",
+    passwordRule: "8+ characters mein kam se kam ek letter aur ek number rakho.",
+    creatingWorkspace: "Secure workspace ban raha hai...",
+    startFreeTrial: "Mera free trial shuru karo",
+    joinWaitlist: "Waitlist join karo",
+    signupSecurity:
+      "Passwords salted aur hashed hain. Original Excel files retain nahi hoti.",
+    waitlistEyebrow: "Details mil gayi",
+    waitlistTitle: "Aap ARQ waitlist par ho",
+    waitlistBody: (position) =>
+      `Pehle 10 trial workspaces full hain. Aapki current waitlist position ${position || "confirmed"} hai. Priority onboarding ke liye team se baat karo.`,
+    backToLogin: "Login par wapas",
+    contactEmail: "contact@arqoneailabs.space",
+    contactPhone: "+91 9727067044",
+    // free trial workspace
+    freeTrial: "Free trial",
+    trialWorkspaceReady: "Aapka private trial workspace ready hai",
+    trialWelcomeTitle: "Jo Excel file aap abhi use karte ho, ussi se shuru karo.",
+    trialWelcomeBody:
+      "Sales, Purchase, Expense ya Profit & Loss .xlsx upload karo. Smart detect unfamiliar columns map karta hai, totals validate karta hai aur kya samjha woh clearly dikhata hai.",
+    uploadMyWorkbook: "Meri pehli workbook upload karo",
+    seeAskArq: "Ask ARQ AI explore karo",
+    trialSteps: [
+      {
+        title: "Koi supported book upload karo",
+        body: "Different schema ke liye Smart detect chuno, ya book type khud select karo.",
+      },
+      {
+        title: "Metrics aur graphs dekho",
+        body: "Totals, monthly trends, products, customers, suppliers, costs aur data warnings dekho.",
+      },
+      {
+        title: "Apne questions pucho",
+        body: "English, Hinglish ya Gujarati-Roman mein pucho; answer sirf aapki books par grounded hoga.",
+      },
+      {
+        title: "One-page report banao",
+        body: "Management question ko verified charts wale focused report mein badlo aur PDF save karo.",
+      },
+    ],
+    trialTrustPoints: [
+      "Private company workspace",
+      "Duplicate-aware imports",
+      "Original workbook store nahi hoti",
+    ],
+    connectMoreEyebrow: "Uploads se aage jao",
+    connectMoreTitle: "Hamari team ke saath Tally ya doosra database connect karo.",
+    connectMoreBody:
+      "Automated refreshes, deeper intelligence aur aur key features aa rahe hain. Onboarding aur roadmap ke liye ARQ One AI Labs se contact karo.",
+    trialDataReady: "Aapka uploaded data ready hai",
+    trialDataReadyBody:
+      "Graphs explore karo, Ask ARQ AI se clarification lo, ya kisi answer se one-page report banao.",
+    trialBannerBody:
+      "Metrics, graphs, AI answers aur reports unlock karne ke liye pehli workbook upload karo.",
+    addAnotherWorkbook: "Workbook add karo",
+    talkToTeam: "Team se baat karo",
     loggingIn: "Check kar rahe hain…",
     loginFooter: "Protected access · ARQ password ko browser storage mein save nahi karta",
     outstanding: "Total baaki",
@@ -673,9 +859,9 @@ export const T = {
     lastUpdated: "Last updated",
     maxOverdue: (days) => `max ${days} divas`,
     uploadExcel: "Excel upload",
-    uploadTitle: "Sales, purchases ke expenses add karo",
+    uploadTitle: "ARQ ne tamaru Excel samajva do",
     uploadSub:
-      "Expected type pasand karo; import pehla ARQ Tally workbook nu structure check karse.",
+      "Ghani files mate Smart detect vapro, athva book type khabar hoy to pote pasand karo.",
     close: "Band karo",
     chooseFile: ".xlsx pasand karo",
     uploading: "Check ane import thai rahyu che…",
@@ -685,16 +871,25 @@ export const T = {
     alreadyImported: (n) => `Pehla thi imported · ${n} transactions`,
     uploadSuccess: (kind, n) => `${kind} detect thayu · ${n} transactions imported`,
     adaptiveSchemaDetected: "Adaptive register layout detect ane reconcile thayu",
+    profitLossSchemaDetected: "Profit & Loss layout safely detect ane map thayu",
     standardSchemaDetected: "Standard Tally voucher layout detect thayu",
     possibleDuplicateGroups: (n) =>
       `${n} same dekhata transaction group(s) review mate rakhya`,
     totalMismatchWarning:
       "Workbook nu stated total visible rows sathe match nathi; fakt visible transactions import thaya.",
-    kindLabels: { sales: "Sales", purchase: "Purchases", expense: "Expenses" },
+    kindLabels: {
+      auto: "Smart detect",
+      sales: "Sales",
+      purchase: "Purchases",
+      expense: "Expenses",
+      profit_loss: "Profit & Loss",
+    },
     uploadKindHelp: {
+      auto: "Alag ke unfamiliar schema mate recommended",
       sales: "Invoices ane sales vouchers",
       purchase: "Supplier ane purchase vouchers",
       expense: "Journal, payment ane expense vouchers",
+      profit_loss: "Income ane cost ledger summary",
     },
     dashboardViews: "Dashboard view",
     receivablesView: "Receivables",
@@ -855,6 +1050,90 @@ export const T = {
     hidePassword: "Password chupavo",
     pin: "4-digit PIN",
     loginBtn: "Dashboard kholo",
+    // public trial signup
+    accountAccess: "Account access",
+    signInTab: "Log in",
+    signUpTab: "Free sharu karo",
+    freeBusinessIntelligence: "Free business intelligence trial",
+    signupHero: "Tamari Excel books ne decisions ma badlo.",
+    signupHeroSub:
+      "Tamari familiar workbook upload karo. ARQ structure detect kari clear metrics, graphs, answers ane polished one-page report banave che.",
+    signupBenefits: [
+      "Sales, Purchase, Expense ane P&L Excel nu smart detection",
+      "Colourful trends, product detail ane key business metrics",
+      "Uploaded books par grounded Ask ARQ AI answers",
+      "Focused one-page report banao ane PDF save karo",
+    ],
+    beyondExcel: "Aaje Excel. Kaale connected operations.",
+    beyondExcelBody:
+      "ARQ Tally ane bija business databases sathe pan connect thai shake che. Vadhu decision features avi rahya che.",
+    limitedFreeTrial: "Limited self-service trial",
+    trialCapacityChecking: "Free trial availability check thai rahi che...",
+    trialSpotsLeft: (n) => `Pehla 10 mathi ${n} free trial spot${n === 1 ? "" : "s"} baki`,
+    trialWaitlistOpen: "Pehla 10 spots full che - waitlist open che",
+    signupTitle: "Tamaru free workspace banao",
+    signupSub:
+      "Tamari company ne private data workspace malse. Badha fields jaruri che.",
+    fullName: "Tamaru naam",
+    fullNamePlaceholder: "jem ke Asha Shah",
+    companyName: "Company nu naam",
+    companyNamePlaceholder: "jem ke Asha Engineering",
+    createPasswordPlaceholder: "Ochhama ochha 8 characters",
+    passwordRule: "8+ characters ma ek letter ane ek number jarur rakho.",
+    creatingWorkspace: "Secure workspace bani rahyu che...",
+    startFreeTrial: "Maru free trial sharu karo",
+    joinWaitlist: "Waitlist join karo",
+    signupSecurity:
+      "Passwords salted ane hashed che. Original Excel files retain thati nathi.",
+    waitlistEyebrow: "Details mali gayi",
+    waitlistTitle: "Tame ARQ waitlist par cho",
+    waitlistBody: (position) =>
+      `Pehla 10 trial workspaces full che. Tamari current waitlist position ${position || "confirmed"} che. Priority onboarding mate team no sampark karo.`,
+    backToLogin: "Login par pachha",
+    contactEmail: "contact@arqoneailabs.space",
+    contactPhone: "+91 9727067044",
+    // free trial workspace
+    freeTrial: "Free trial",
+    trialWorkspaceReady: "Tamaru private trial workspace ready che",
+    trialWelcomeTitle: "Tame atyare je Excel file vapro cho tenathi sharu karo.",
+    trialWelcomeBody:
+      "Sales, Purchase, Expense ke Profit & Loss .xlsx upload karo. Smart detect unfamiliar columns map kare che, totals validate kare che ane shu samjayu te clearly batave che.",
+    uploadMyWorkbook: "Mari pehli workbook upload karo",
+    seeAskArq: "Ask ARQ AI explore karo",
+    trialSteps: [
+      {
+        title: "Koi supported book upload karo",
+        body: "Different schema mate Smart detect pasand karo, athva book type pote select karo.",
+      },
+      {
+        title: "Metrics ane graphs juo",
+        body: "Totals, monthly trends, products, customers, suppliers, costs ane data warnings juo.",
+      },
+      {
+        title: "Tamara questions pucho",
+        body: "English, Hinglish ke Gujarati-Roman ma pucho; jawab fakt tamari books par grounded hase.",
+      },
+      {
+        title: "One-page report banao",
+        body: "Management question ne verified charts vala focused report ma badlo ane PDF save karo.",
+      },
+    ],
+    trialTrustPoints: [
+      "Private company workspace",
+      "Duplicate-aware imports",
+      "Original workbook store thati nathi",
+    ],
+    connectMoreEyebrow: "Uploads thi aagal vadho",
+    connectMoreTitle: "Amari team sathe Tally ke biju database connect karo.",
+    connectMoreBody:
+      "Automated refreshes, deeper intelligence ane vadhu key features avi rahya che. Onboarding ane roadmap mate ARQ One AI Labs no sampark karo.",
+    trialDataReady: "Tamaru uploaded data ready che",
+    trialDataReadyBody:
+      "Graphs explore karo, Ask ARQ AI pase clarification lo, athva koi pan answer thi one-page report banao.",
+    trialBannerBody:
+      "Metrics, graphs, AI answers ane reports unlock karva pehli workbook upload karo.",
+    addAnotherWorkbook: "Workbook add karo",
+    talkToTeam: "Team sathe vaat karo",
     loggingIn: "Check kari rahya chhe…",
     loginFooter: "Protected access · ARQ password ne browser storage ma save nathi kartu",
     outstanding: "Kul baki",

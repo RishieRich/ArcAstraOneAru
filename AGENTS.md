@@ -58,6 +58,8 @@ Three components, **one repo** (`github.com/RishieRich/ArcAstraOneAru`), three d
 | `POST /v1/devices/register` | pairing code in body | exchange one-time code for a device token |
 | `POST /v1/sync` | `Authorization: Bearer <device token>` | receive one snapshot (ledgers + bills) |
 | `POST /v1/auth/login` | email + password (legacy 4-digit PIN still accepted) | returns stateless HMAC dashboard token |
+| `GET /v1/auth/signup/status` | none | public trial capacity and ARQ contact details |
+| `POST /v1/auth/signup` | none | create one of 10 isolated free trials, else upsert a waitlist lead |
 | `GET /v1/dashboard/companies` | `Bearer <dashboard token>` | tenant list |
 | `GET /v1/dashboard/metrics/{tenant_id}` | `Bearer <dashboard token>` | all dashboard numbers |
 | `POST /v1/imports/financials` | `Bearer <dashboard token>` | detect + import a standard or flat-register `.xlsx` workbook |
@@ -81,6 +83,12 @@ Routers live in `backend/app/routers/`; wiring is in `backend/app/main.py`.
   to all-company access; new accounts default to no access until granted a tenant. Enforced by
   `ensure_dashboard_tenant_access` on `/metrics`, `/imports`, `/ask`, and inside the `/companies`
   query. Grant with `python -m app.admin grant-dashboard-access`.
+- **Public trial signup** â€” migration 0006 marks managed vs free-trial accounts. The capacity
+  is exactly 10 `free_trial` users; a Postgres advisory transaction lock prevents concurrent
+  signups from exceeding it. Each accepted signup creates its own tenant plus one explicit
+  grant. Existing managed users do not consume trial slots. Overflow entries store name,
+  company and normalized email in `trial_waitlist`; their submitted password is deliberately
+  discarded. List leads with `python -m app.admin list-trial-waitlist`.
 - **The exe never writes to Tally** — only read/export XML requests. Keep it that way.
 - **Data cleanup re-authenticates** — exact company name plus current password/PIN are
   verified server-side; tenant, dashboard access and registered devices are preserved.
@@ -132,6 +140,7 @@ python -m app.admin revoke-device --device-id <id>
 python -m app.admin create-dashboard-user --email x@y.com --password "strong-password"
 python -m app.admin grant-dashboard-access --email x@y.com --tenant-id <id>
 python -m app.admin list-dashboard-users
+python -m app.admin list-trial-waitlist
 python -m app.admin delete-dashboard-user --email x@y.com
 
 # DB migrations
@@ -197,16 +206,19 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
    canonicalizes GUID-less Excel identities. Sync, import and cleanup serialize per tenant
    with one Postgres advisory transaction lock. A compatibility trigger keeps the older
    deployed sync insert working safely until the matching backend is deployed.
-9. **Advisory-lock tenant IDs must be cast to text.** Psycopg binds the connector's tenant
+9. **Apply `0006_public_trials.sql` before deploying public-signup code.** It adds
+   `dashboard_users.account_type`, `trial_waitlist`, and the `profit_loss` import-envelope
+   constraint. The migration is idempotent, but production application remains owner-gated.
+10. **Advisory-lock tenant IDs must be cast to text.** Psycopg binds the connector's tenant
    ID as PostgreSQL `uuid`, while `hashtext()` accepts only text. The writer paths use
    `hashtextextended(cast(%s as text), 0)`; preserve the cast.
-10. **Client connector releases support Windows 10/11 x64 and must be Authenticode-signed.**
+11. **Client connector releases support Windows 10/11 x64 and must be Authenticode-signed.**
    `connector/build.ps1 -Release` refuses to package a release without a current-user
    code-signing certificate/private key and SignTool. It embeds version metadata and a
    multi-resolution icon, runs connector-only tests, validates the x64 PE/icon/signature,
    and creates a checksum-bearing versioned ZIP. Unsigned developer builds can be blocked
    by Windows Smart App Control and must not be sent to clients.
-11. **Product analytics come only from normalized `item` lines.** Do not infer a product
+12. **Product analytics come only from normalized `item` lines.** Do not infer a product
    from a party or ledger row. Product value, quantity coverage, weighted rate, customers
    and top-customer metrics are computed in `dashboard.product_metrics`. A null unit remains
    unknown. Ask ARQ's one-page report is rendered from authorized dashboard metrics in the
@@ -218,10 +230,9 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
   empty test company, or their Tally XML shape doesn't match `parse_bills_receivable`
   (`connector/src/arq_connector/tally/parsers.py`), which is live-verified against only one
   bill layout. Needs their real-company push or raw XML to resolve.
-- **Migration 0005 is applied; matching application code is not deployed yet.** Neon was
-  migrated and verified on 2026-07-26. Commit/push and deploy backend then frontend before
-  expecting the Start fresh UI and full current-snapshot close behavior in production. The
-  migration's compatibility trigger prevents the older deployed sync route from failing.
+- **Migration 0006 is not applied and its matching application is not deployed.** Apply it
+  only with owner approval, then deploy backend before frontend. Until then production keeps
+  the existing managed-login experience and public signup remains unavailable.
 - **Excel voucher removals/cancellations** — re-exports update vouchers that retain the same
   Tally GUID, but a voucher absent from a later workbook is not automatically deleted. Add an
   explicit snapshot/reconciliation workflow before treating imports as a cancellation ledger.
@@ -244,6 +255,7 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 | `AI_ERA_REVIEW_PLAYBOOK.md` | review playbook |
 | `EXCEL_IMPORT_SETUP.md` | Neon migration, deploy and verification steps for optional workbook imports |
 | `DATA_CLEANUP_AND_DEDUP.md` | reset boundary, Tally/Excel dedup behavior and migration 0005 deployment order |
+| `PUBLIC_TRIAL_SIGNUP.md` | first-10 signup capacity, isolated tenant creation, waitlist and migration 0006 |
 
 ## 11. Working agreement for agents
 

@@ -10,7 +10,10 @@ deployment details for cleanup and deduplication are in
 - `devices` — connector registrations; only token hashes are stored.
 - `pairing_codes` — one-time, expiring registration codes.
 - `dashboard_users` / `dashboard_user_tenants` — dashboard identity and
-  per-company access.
+  per-company access. Migration 0006 adds `account_type`; only `free_trial`
+  accounts count toward the ten-place public capacity.
+- `trial_waitlist` — name, company, normalized email, status and timestamps for
+  overflow public signups. Waitlisted passwords are not stored.
 
 These rows are intentionally preserved by the dashboard's Start fresh action.
 
@@ -42,6 +45,9 @@ Workbook files are never stored. Exact files are idempotent, re-exported Tally
 GUIDs upsert, and GUID-less vouchers use a stable semantic fallback. Workbook
 absence is not yet a cancellation instruction.
 
+Migration 0006 allows `profit_loss` on the import audit envelope. Its normalized
+child transactions remain constrained to Sales, Purchase and Expense.
+
 ## Reset boundary
 
 Start fresh deletes connector facts and workbook facts, including audit history,
@@ -55,7 +61,8 @@ device can therefore populate a genuinely fresh snapshot after cleanup.
 - 0003: financial imports
 - 0004: per-company dashboard access
 - 0005: current-state bills + legacy Excel key canonicalization
+- 0006: public trial account type, waitlist and Profit & Loss import envelope
 
 Migration 0005 was explicitly approved, applied to the configured Neon database,
-and verified on 2026-07-26. The matching backend and frontend code still needs to
-be committed and deployed.
+verified and deployed on 2026-07-26. Migration 0006 is implemented but is not
+applied or deployed; applying it remains owner-gated.

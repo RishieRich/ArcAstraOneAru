@@ -1,9 +1,15 @@
-import { useState } from "react";
-import { login } from "../api";
+import { useEffect, useState } from "react";
+import { fetchSignupStatus, login, signup } from "../api";
 import BrandLogo from "../components/BrandLogo";
 import ThemeToggle from "../components/ThemeToggle";
 import { LANGS } from "../i18n";
-import { IconEye, IconEyeOff, IconShield } from "../icons";
+import {
+  IconCheck,
+  IconEye,
+  IconEyeOff,
+  IconShield,
+  IconSpark,
+} from "../icons";
 
 export default function Login({
   t,
@@ -13,28 +19,80 @@ export default function Login({
   setTheme,
   onSuccess,
 }) {
+  const [mode, setMode] = useState("login");
+  const [fullName, setFullName] = useState("");
+  const [companyName, setCompanyName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [signupStatus, setSignupStatus] = useState(null);
+  const [waitlisted, setWaitlisted] = useState(null);
 
-  const ready = /\S+@\S+\.\S+/.test(email) && password.length >= 4 && !busy;
+  useEffect(() => {
+    fetchSignupStatus().then(setSignupStatus).catch(() => {});
+  }, []);
+
+  const validEmail = /\S+@\S+\.\S+/.test(email);
+  const ready =
+    !busy &&
+    validEmail &&
+    (mode === "login"
+      ? password.length >= 4
+      : fullName.trim().length >= 2 &&
+        companyName.trim().length >= 2 &&
+        password.length >= 8 &&
+        /[A-Za-z]/.test(password) &&
+        /\d/.test(password));
+
+  function switchMode(nextMode) {
+    setMode(nextMode);
+    setError("");
+    setPassword("");
+    setWaitlisted(null);
+  }
 
   async function submit(event) {
-    event?.preventDefault();
+    event.preventDefault();
     if (!ready) return;
     setBusy(true);
     setError("");
     try {
-      onSuccess(await login(email.trim().toLowerCase(), password));
-    } catch (loginError) {
-      setError(loginError.message);
+      if (mode === "login") {
+        onSuccess(await login(email.trim().toLowerCase(), password));
+        return;
+      }
+      const result = await signup({
+        fullName: fullName.trim(),
+        companyName: companyName.trim(),
+        email: email.trim().toLowerCase(),
+        password,
+      });
+      if (result.status === "active") {
+        onSuccess(result);
+      } else {
+        setWaitlisted(result);
+        setPassword("");
+        setSignupStatus((current) => ({
+          ...(current || {}),
+          accepting_trials: false,
+          remaining: 0,
+        }));
+      }
+    } catch (requestError) {
+      setError(requestError.message);
       setPassword("");
     } finally {
       setBusy(false);
     }
   }
+
+  const statusCopy = !signupStatus
+    ? t.trialCapacityChecking
+    : signupStatus.accepting_trials
+      ? t.trialSpotsLeft(signupStatus.remaining)
+      : t.trialWaitlistOpen;
 
   return (
     <div className="login-screen">
@@ -42,75 +100,206 @@ export default function Login({
         <ThemeToggle theme={theme} setTheme={setTheme} t={t} />
       </div>
 
-      <form className={`login-card${error ? " error" : ""}`} onSubmit={submit}>
-        <div className="login-brand">
-          <BrandLogo />
-          <div>
-            <h1>ARQ Astra</h1>
-            <p>{t.tagline}</p>
-          </div>
-        </div>
-
-        <div className="login-lang">
-          <div className="lang-group">
-            {LANGS.map((language) => (
-              <button
-                type="button"
-                key={language.id}
-                onClick={() => setLang(language.id)}
-                aria-pressed={lang === language.id}
-              >
-                {language.label}
-              </button>
+      <div className="auth-shell">
+        <section className="auth-story">
+          <span className="auth-story-kicker">
+            <IconSpark width={14} height={14} />
+            {t.freeBusinessIntelligence}
+          </span>
+          <h2>{t.signupHero}</h2>
+          <p>{t.signupHeroSub}</p>
+          <div className="auth-benefits">
+            {t.signupBenefits.map((benefit) => (
+              <div key={benefit}>
+                <IconCheck width={16} height={16} />
+                <span>{benefit}</span>
+              </div>
             ))}
           </div>
-        </div>
+          <div className="auth-connect-note">
+            <strong>{t.beyondExcel}</strong>
+            <span>{t.beyondExcelBody}</span>
+          </div>
+        </section>
 
-        <span className="login-eyebrow">{t.secureWorkspace}</span>
-        <h2>{t.loginTitle}</h2>
-        <p className="sub">{t.loginSub}</p>
+        <form
+          className={`login-card${error ? " error" : ""}`}
+          onSubmit={submit}
+        >
+          <div className="login-brand">
+            <BrandLogo />
+            <div>
+              <h1>ARQ Astra</h1>
+              <p>{t.tagline}</p>
+            </div>
+          </div>
 
-        <label htmlFor="email">{t.email}</label>
-        <input
-          id="email"
-          type="email"
-          autoComplete="email"
-          autoFocus
-          placeholder="you@company.com"
-          value={email}
-          onChange={(event) => setEmail(event.target.value)}
-        />
+          <div className="login-lang">
+            <div className="lang-group">
+              {LANGS.map((language) => (
+                <button
+                  type="button"
+                  key={language.id}
+                  onClick={() => setLang(language.id)}
+                  aria-pressed={lang === language.id}
+                >
+                  {language.label}
+                </button>
+              ))}
+            </div>
+          </div>
 
-        <label htmlFor="password">{t.password}</label>
-        <div className="password-field">
-          <input
-            id="password"
-            type={showPassword ? "text" : "password"}
-            autoComplete="current-password"
-            placeholder={t.passwordPlaceholder}
-            value={password}
-            onChange={(event) => setPassword(event.target.value)}
-          />
-          <button
-            type="button"
-            onClick={() => setShowPassword((visible) => !visible)}
-            aria-label={showPassword ? t.hidePassword : t.showPassword}
-          >
-            {showPassword ? <IconEyeOff /> : <IconEye />}
-          </button>
-        </div>
+          <div className="auth-tabs" role="tablist" aria-label={t.accountAccess}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "login"}
+              onClick={() => switchMode("login")}
+            >
+              {t.signInTab}
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mode === "signup"}
+              onClick={() => switchMode("signup")}
+            >
+              {t.signUpTab}
+            </button>
+          </div>
 
-        {error && <div className="login-error">{error}</div>}
+          {mode === "signup" && (
+            <span
+              className={`trial-capacity ${
+                signupStatus?.accepting_trials ? "open" : "waiting"
+              }`}
+            >
+              <i />
+              {statusCopy}
+            </span>
+          )}
 
-        <button className="login-btn" type="submit" disabled={!ready}>
-          {busy ? t.loggingIn : t.loginBtn}
-        </button>
+          {waitlisted ? (
+            <div className="waitlist-success" aria-live="polite">
+              <span className="waitlist-check"><IconCheck /></span>
+              <span className="login-eyebrow">{t.waitlistEyebrow}</span>
+              <h2>{t.waitlistTitle}</h2>
+              <p>{t.waitlistBody(waitlisted.waitlist_position)}</p>
+              <div className="waitlist-contact">
+                <a href={`mailto:${waitlisted.contact_email}`}>
+                  {waitlisted.contact_email}
+                </a>
+                <a href={`tel:${waitlisted.contact_phone.replace(/\s/g, "")}`}>
+                  {waitlisted.contact_phone}
+                </a>
+              </div>
+              <button
+                className="secondary-auth-btn"
+                type="button"
+                onClick={() => switchMode("login")}
+              >
+                {t.backToLogin}
+              </button>
+            </div>
+          ) : (
+            <>
+              <span className="login-eyebrow">
+                {mode === "login" ? t.secureWorkspace : t.limitedFreeTrial}
+              </span>
+              <h2>{mode === "login" ? t.loginTitle : t.signupTitle}</h2>
+              <p className="sub">
+                {mode === "login" ? t.loginSub : t.signupSub}
+              </p>
 
-        <div className="login-foot">
-          <IconShield width={14} height={14} />
-          {t.loginFooter}
-        </div>
-      </form>
+              {mode === "signup" && (
+                <>
+                  <label htmlFor="full-name">{t.fullName}</label>
+                  <input
+                    className="auth-input"
+                    id="full-name"
+                    type="text"
+                    autoComplete="name"
+                    autoFocus
+                    placeholder={t.fullNamePlaceholder}
+                    value={fullName}
+                    onChange={(event) => setFullName(event.target.value)}
+                  />
+
+                  <label htmlFor="company-name">{t.companyName}</label>
+                  <input
+                    className="auth-input"
+                    id="company-name"
+                    type="text"
+                    autoComplete="organization"
+                    placeholder={t.companyNamePlaceholder}
+                    value={companyName}
+                    onChange={(event) => setCompanyName(event.target.value)}
+                  />
+                </>
+              )}
+
+              <label htmlFor="email">{t.email}</label>
+              <input
+                className="auth-input"
+                id="email"
+                type="email"
+                autoComplete="email"
+                autoFocus={mode === "login"}
+                placeholder="you@company.com"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+              />
+
+              <label htmlFor="password">{t.password}</label>
+              <div className="password-field">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete={
+                    mode === "login" ? "current-password" : "new-password"
+                  }
+                  placeholder={
+                    mode === "login"
+                      ? t.passwordPlaceholder
+                      : t.createPasswordPlaceholder
+                  }
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((visible) => !visible)}
+                  aria-label={showPassword ? t.hidePassword : t.showPassword}
+                >
+                  {showPassword ? <IconEyeOff /> : <IconEye />}
+                </button>
+              </div>
+              {mode === "signup" && (
+                <small className="password-hint">{t.passwordRule}</small>
+              )}
+
+              {error && <div className="login-error">{error}</div>}
+
+              <button className="login-btn" type="submit" disabled={!ready}>
+                {busy
+                  ? mode === "login"
+                    ? t.loggingIn
+                    : t.creatingWorkspace
+                  : mode === "login"
+                    ? t.loginBtn
+                    : signupStatus?.accepting_trials === false
+                      ? t.joinWaitlist
+                      : t.startFreeTrial}
+              </button>
+
+              <div className="login-foot">
+                <IconShield width={14} height={14} />
+                {mode === "login" ? t.loginFooter : t.signupSecurity}
+              </div>
+            </>
+          )}
+        </form>
+      </div>
     </div>
   );
 }

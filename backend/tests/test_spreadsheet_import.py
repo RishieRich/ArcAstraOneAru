@@ -182,6 +182,23 @@ def _adaptive_sales_register(*, duplicate_business_row: bool = False) -> bytes:
     return output.getvalue()
 
 
+def _profit_loss_statement() -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Profit & Loss"
+    sheet.append(["Profit & Loss A/c", None, None, None])
+    sheet.append([None, "31-Mar-2027", None, "31-Mar-2027"])
+    sheet.append(["Expenses", "Amount", "Income", "Amount"])
+    sheet.append(["Purchase Accounts", 500, "Sales Accounts", 1000])
+    sheet.append(["Rent", 100, "Other Income", 50])
+    sheet.append(["Gross Profit", 450, "Grand Total", 1050])
+
+    output = BytesIO()
+    workbook.save(output)
+    workbook.close()
+    return output.getvalue()
+
+
 @pytest.mark.parametrize("kind", ["sales", "purchase", "expense"])
 def test_tally_workbook_is_classified_and_normalized(kind):
     result = parse_tally_workbook(_tally_workbook(kind), f"{kind}.xlsx", kind)
@@ -328,3 +345,50 @@ def test_adaptive_register_accepts_tally_style_text_dates():
     )
 
     assert parsed.min_date == date(2026, 4, 3)
+
+
+def test_profit_loss_summary_is_split_into_book_kinds_without_totals():
+    parsed = parse_tally_workbook(
+        _profit_loss_statement(),
+        "Profit and Loss 26-27.xlsx",
+        "auto",
+    )
+
+    assert parsed.detected_kind == "profit_loss"
+    assert parsed.source_format == "adaptive-profit-loss"
+    assert parsed.min_date == date(2027, 3, 31)
+    assert {transaction.kind for transaction in parsed.transactions} == {
+        "sales",
+        "purchase",
+        "expense",
+    }
+    assert sum(
+        transaction.gross_amount
+        for transaction in parsed.transactions
+        if transaction.kind == "sales"
+    ) == 1050
+    assert sum(
+        transaction.gross_amount
+        for transaction in parsed.transactions
+        if transaction.kind == "purchase"
+    ) == 500
+    assert sum(
+        transaction.gross_amount
+        for transaction in parsed.transactions
+        if transaction.kind == "expense"
+    ) == 100
+    assert all("Gross Profit" != transaction.category for transaction in parsed.transactions)
+
+
+def test_profit_loss_with_only_one_recognizable_side_is_rejected():
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Profit & Loss"
+    sheet.append(["Profit & Loss", "Amount"])
+    sheet.append(["Sales Accounts", 1000])
+    output = BytesIO()
+    workbook.save(output)
+    workbook.close()
+
+    with pytest.raises(ImportValidationError, match="only one side"):
+        parse_tally_workbook(output.getvalue(), "pnl.xlsx", "profit_loss")
