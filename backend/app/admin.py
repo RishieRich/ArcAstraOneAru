@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.dashauth import hash_password
 from app.db import get_connection
+from app.routers.auth_dashboard import FREE_TRIAL_CAPACITY
 from app.security import hash_token
 
 
@@ -138,6 +139,12 @@ def list_dashboard_users() -> None:
 def list_trial_waitlist() -> None:
     with get_connection() as conn, conn.cursor() as cur:
         cur.execute(
+            "select count(*) from dashboard_users where account_type = 'free_trial'"
+        )
+        (active_trials,) = cur.fetchone()
+        cur.execute("select count(*) from trial_waitlist where status = 'waiting'")
+        (waiting_leads,) = cur.fetchone()
+        cur.execute(
             """
             select full_name, company_name, email, status, created_at, updated_at
             from trial_waitlist
@@ -145,6 +152,10 @@ def list_trial_waitlist() -> None:
             """
         )
         rows = cur.fetchall()
+    print(
+        f"private trial stats: active={active_trials}/{FREE_TRIAL_CAPACITY} "
+        f"waiting={waiting_leads}"
+    )
     if not rows:
         print("trial waitlist is empty")
         return

@@ -33,9 +33,6 @@ class LoginResponse(BaseModel):
 
 
 class SignupStatusResponse(BaseModel):
-    capacity: int
-    active_trials: int
-    remaining: int
     accepting_trials: bool
     contact_email: str
     contact_phone: str
@@ -79,8 +76,6 @@ class SignupResponse(BaseModel):
     account_type: Literal["free_trial"] | None = None
     token: str | None = None
     expires_at: int | None = None
-    waitlist_position: int | None = None
-    capacity: int
     contact_email: str
     contact_phone: str
 
@@ -143,9 +138,6 @@ def signup_status() -> SignupStatusResponse:
         (active_trials,) = cur.fetchone()
     remaining = max(FREE_TRIAL_CAPACITY - active_trials, 0)
     return SignupStatusResponse(
-        capacity=FREE_TRIAL_CAPACITY,
-        active_trials=active_trials,
-        remaining=remaining,
         accepting_trials=remaining > 0,
         contact_email=CONTACT_EMAIL,
         contact_phone=CONTACT_PHONE,
@@ -186,28 +178,15 @@ def signup(payload: SignupRequest) -> SignupResponse:
                     full_name = excluded.full_name,
                     company_name = excluded.company_name,
                     updated_at = now()
-                returning created_at
                 """,
                 (payload.full_name, payload.company_name, payload.email),
             )
-            (created_at,) = cur.fetchone()
-            cur.execute(
-                """
-                select count(*)
-                from trial_waitlist
-                where status = 'waiting' and created_at <= %s
-                """,
-                (created_at,),
-            )
-            (position,) = cur.fetchone()
             conn.commit()
             return SignupResponse(
                 status="waitlisted",
                 email=payload.email,
                 display_name=payload.full_name,
                 company_name=payload.company_name,
-                waitlist_position=position,
-                capacity=FREE_TRIAL_CAPACITY,
                 contact_email=CONTACT_EMAIL,
                 contact_phone=CONTACT_PHONE,
             )
@@ -244,7 +223,6 @@ def signup(payload: SignupRequest) -> SignupResponse:
         account_type="free_trial",
         token=token,
         expires_at=expires_at,
-        capacity=FREE_TRIAL_CAPACITY,
         contact_email=CONTACT_EMAIL,
         contact_phone=CONTACT_PHONE,
     )

@@ -58,12 +58,6 @@ export async function login(email, password) {
   return session;
 }
 
-export async function fetchSignupStatus() {
-  const res = await fetch(`${BASE}/v1/auth/signup/status`);
-  if (!res.ok) throw new Error(await detail(res));
-  return res.json();
-}
-
 export async function signup({ fullName, companyName, email, password }) {
   const res = await fetch(`${BASE}/v1/auth/signup`, {
     method: "POST",

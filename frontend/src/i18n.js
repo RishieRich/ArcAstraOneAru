@@ -232,9 +232,6 @@ export const T = {
     beyondExcelBody:
       "ARQ can also connect with Tally and other business databases. More decision features are on the way.",
     limitedFreeTrial: "Limited self-service trial",
-    trialCapacityChecking: "Checking free trial availability...",
-    trialSpotsLeft: (n) => `${n} of the first 10 free trial spot${n === 1 ? "" : "s"} left`,
-    trialWaitlistOpen: "The first 10 spots are full - waitlist is open",
     signupTitle: "Create your free workspace",
     signupSub:
       "Your company gets a private data workspace. All fields are required.",
@@ -251,11 +248,84 @@ export const T = {
       "Passwords are salted and hashed. Original Excel files are not retained.",
     waitlistEyebrow: "Details received",
     waitlistTitle: "You are on the ARQ waitlist",
-    waitlistBody: (position) =>
-      `The first 10 trial workspaces are full. Your current waitlist position is ${position || "confirmed"}. Reach our team for priority onboarding.`,
+    waitlistBody:
+      "Your details are safely recorded. Explore the sample experience while our team reviews priority onboarding.",
     backToLogin: "Back to login",
     contactEmail: "contact@arqoneailabs.space",
     contactPhone: "+91 9727067044",
+    // waitlist sample intelligence experience
+    demoIntelligencePreview: "Business intelligence preview",
+    demoDataBadge: "Illustrative sample data",
+    waitlistPreviewHello: (name) => `${name}, your details are with us.`,
+    waitlistPreviewBody:
+      "While our team reviews onboarding, explore the kind of clarity ARQ can create from your business data. Everything below is sample data, not your company figures.",
+    callOurTeam: "Call for priority access",
+    emailOurTeam: "Email our team",
+    demoReportReady: "One-page report ready",
+    demoExecutiveReport: "Executive business snapshot",
+    demoReportBody:
+      "Verified KPIs, trends, product drivers and an AI-grounded management summary.",
+    demoPrintPdf: "Print or save as a polished PDF",
+    demoDashboardTitle: "See what your numbers could reveal",
+    sampleForCompany: (company) => `${company} · sample intelligence preview`,
+    demoDataNotice:
+      "Demo values only. Uploads are required before ARQ calculates your real metrics.",
+    demoSales: "Sales",
+    demoSalesFoot: "8-month sample period",
+    demoProfit: "Estimated profit",
+    demoProfitFoot: "Sales minus uploaded costs",
+    demoMargin: "Operating margin",
+    demoMarginFoot: "Healthy sample performance",
+    demoOutstanding: "Receivables",
+    demoOutstandingFoot: "Money to collect",
+    demoTrendEyebrow: "Momentum",
+    demoSalesTrend: "Monthly sales trend",
+    demoMonths: ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov"],
+    demoTrendInsight:
+      "Sample sales rose strongly across the period, with the latest month leading.",
+    demoCostEyebrow: "Cost intelligence",
+    demoCostMix: "Where money is going",
+    demoLargestCost: "materials",
+    demoExpenseLabels: ["Materials", "Payroll", "Logistics", "Other"],
+    demoProductEyebrow: "Product intelligence",
+    demoTopProducts: "Top products by value",
+    demoProducts: [
+      "Precision Pump A1",
+      "Industrial Valve X4",
+      "Motor Assembly M2",
+      "Service Kit Pro",
+    ],
+    demoAiEyebrow: "Ask ARQ AI · sample answer",
+    demoAiQuestion: "What changed in the latest month?",
+    demoAiAnswer:
+      "Sample sales reached Rs 7.2L, led by Precision Pump A1. Growth accelerated while material cost stayed near its recent share, improving the estimated monthly result.",
+    demoAskFollowup: "Ask a follow-up",
+    demoGenerateReport: "Generate report",
+    waitlistMoreEyebrow: "This is only the beginning",
+    waitlistMoreTitle: "Unlock a living intelligence layer for your business.",
+    waitlistMoreBody:
+      "Connect uploads, Tally or another database and let ARQ turn changing numbers into answers, alerts and decision-ready reports.",
+    waitlistUnlocks: [
+      {
+        title: "Smart Excel understanding",
+        body: "Different Sales, Purchase, Expense and P&L schemas mapped with visible warnings.",
+      },
+      {
+        title: "Grounded business AI",
+        body: "Ask questions in natural language and receive answers tied to your own books.",
+      },
+      {
+        title: "Tally and database connections",
+        body: "Move from manual uploads toward automated, continuously refreshed intelligence.",
+      },
+      {
+        title: "More decision features",
+        body: "Custom reports, proactive insights and deeper operational analytics are coming.",
+      },
+    ],
+    waitlistContactTitle: "Want to move faster?",
+    waitlistContactBody:
+      "Reach ARQ One AI Labs for onboarding, integrations and upcoming features.",
     // free trial workspace
     freeTrial: "Free trial",
     trialWorkspaceReady: "Your private trial workspace is ready",
@@ -652,9 +722,6 @@ export const T = {
     beyondExcelBody:
       "ARQ Tally aur doosre business databases se bhi connect ho sakta hai. Aur decision features aa rahe hain.",
     limitedFreeTrial: "Limited self-service trial",
-    trialCapacityChecking: "Free trial availability check ho rahi hai...",
-    trialSpotsLeft: (n) => `Pehle 10 mein se ${n} free trial spot${n === 1 ? "" : "s"} baki`,
-    trialWaitlistOpen: "Pehle 10 spots full hain - waitlist open hai",
     signupTitle: "Apna free workspace banao",
     signupSub:
       "Aapki company ko private data workspace milega. Sab fields required hain.",
@@ -671,11 +738,84 @@ export const T = {
       "Passwords salted aur hashed hain. Original Excel files retain nahi hoti.",
     waitlistEyebrow: "Details mil gayi",
     waitlistTitle: "Aap ARQ waitlist par ho",
-    waitlistBody: (position) =>
-      `Pehle 10 trial workspaces full hain. Aapki current waitlist position ${position || "confirmed"} hai. Priority onboarding ke liye team se baat karo.`,
+    waitlistBody:
+      "Aapki details safely record ho gayi hain. Team priority onboarding review kare tab tak sample experience dekho.",
     backToLogin: "Login par wapas",
     contactEmail: "contact@arqoneailabs.space",
     contactPhone: "+91 9727067044",
+    // waitlist sample intelligence experience
+    demoIntelligencePreview: "Business intelligence preview",
+    demoDataBadge: "Sirf illustrative sample data",
+    waitlistPreviewHello: (name) => `${name}, aapki details hamare paas hain.`,
+    waitlistPreviewBody:
+      "Team onboarding review kare tab dekho ki ARQ aapke business data se kitni clarity bana sakta hai. Neeche sab sample data hai, aapki company ke figures nahi.",
+    callOurTeam: "Priority access ke liye call",
+    emailOurTeam: "Hamari team ko email",
+    demoReportReady: "One-page report ready",
+    demoExecutiveReport: "Executive business snapshot",
+    demoReportBody:
+      "Verified KPIs, trends, product drivers aur AI-grounded management summary.",
+    demoPrintPdf: "Polished PDF print ya save karo",
+    demoDashboardTitle: "Dekho aapke numbers kya bata sakte hain",
+    sampleForCompany: (company) => `${company} · sample intelligence preview`,
+    demoDataNotice:
+      "Sirf demo values. ARQ aapke real metrics upload ke baad calculate karega.",
+    demoSales: "Sales",
+    demoSalesFoot: "8-month sample period",
+    demoProfit: "Estimated profit",
+    demoProfitFoot: "Sales minus uploaded costs",
+    demoMargin: "Operating margin",
+    demoMarginFoot: "Healthy sample performance",
+    demoOutstanding: "Receivables",
+    demoOutstandingFoot: "Collect karne wala paisa",
+    demoTrendEyebrow: "Momentum",
+    demoSalesTrend: "Monthly sales trend",
+    demoMonths: ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov"],
+    demoTrendInsight:
+      "Sample sales period bhar strongly badhi aur latest month sabse aage raha.",
+    demoCostEyebrow: "Cost intelligence",
+    demoCostMix: "Paisa kahan ja raha hai",
+    demoLargestCost: "materials",
+    demoExpenseLabels: ["Materials", "Payroll", "Logistics", "Other"],
+    demoProductEyebrow: "Product intelligence",
+    demoTopProducts: "Value ke hisaab se top products",
+    demoProducts: [
+      "Precision Pump A1",
+      "Industrial Valve X4",
+      "Motor Assembly M2",
+      "Service Kit Pro",
+    ],
+    demoAiEyebrow: "Ask ARQ AI · sample answer",
+    demoAiQuestion: "Latest month mein kya badla?",
+    demoAiAnswer:
+      "Sample sales Rs 7.2L tak pahunchi, Precision Pump A1 lead kar raha tha. Material cost recent share ke paas rahi aur estimated monthly result improve hua.",
+    demoAskFollowup: "Follow-up pucho",
+    demoGenerateReport: "Report banao",
+    waitlistMoreEyebrow: "Yeh sirf shuruaat hai",
+    waitlistMoreTitle: "Apne business ke liye living intelligence layer unlock karo.",
+    waitlistMoreBody:
+      "Uploads, Tally ya doosra database connect karo aur ARQ changing numbers ko answers, alerts aur decision-ready reports mein badlega.",
+    waitlistUnlocks: [
+      {
+        title: "Smart Excel understanding",
+        body: "Different Sales, Purchase, Expense aur P&L schemas visible warnings ke saath map hote hain.",
+      },
+      {
+        title: "Grounded business AI",
+        body: "Natural language mein pucho aur apni books se tied answers pao.",
+      },
+      {
+        title: "Tally aur database connections",
+        body: "Manual uploads se automated, continuously refreshed intelligence ki taraf badho.",
+      },
+      {
+        title: "Aur decision features",
+        body: "Custom reports, proactive insights aur deeper operational analytics aa rahe hain.",
+      },
+    ],
+    waitlistContactTitle: "Jaldi aage badhna hai?",
+    waitlistContactBody:
+      "Onboarding, integrations aur upcoming features ke liye ARQ One AI Labs se contact karo.",
     // free trial workspace
     freeTrial: "Free trial",
     trialWorkspaceReady: "Aapka private trial workspace ready hai",
@@ -1068,9 +1208,6 @@ export const T = {
     beyondExcelBody:
       "ARQ Tally ane bija business databases sathe pan connect thai shake che. Vadhu decision features avi rahya che.",
     limitedFreeTrial: "Limited self-service trial",
-    trialCapacityChecking: "Free trial availability check thai rahi che...",
-    trialSpotsLeft: (n) => `Pehla 10 mathi ${n} free trial spot${n === 1 ? "" : "s"} baki`,
-    trialWaitlistOpen: "Pehla 10 spots full che - waitlist open che",
     signupTitle: "Tamaru free workspace banao",
     signupSub:
       "Tamari company ne private data workspace malse. Badha fields jaruri che.",
@@ -1087,11 +1224,84 @@ export const T = {
       "Passwords salted ane hashed che. Original Excel files retain thati nathi.",
     waitlistEyebrow: "Details mali gayi",
     waitlistTitle: "Tame ARQ waitlist par cho",
-    waitlistBody: (position) =>
-      `Pehla 10 trial workspaces full che. Tamari current waitlist position ${position || "confirmed"} che. Priority onboarding mate team no sampark karo.`,
+    waitlistBody:
+      "Tamari details safely record thai gayi che. Team priority onboarding review kare tya sudhi sample experience juo.",
     backToLogin: "Login par pachha",
     contactEmail: "contact@arqoneailabs.space",
     contactPhone: "+91 9727067044",
+    // waitlist sample intelligence experience
+    demoIntelligencePreview: "Business intelligence preview",
+    demoDataBadge: "Fakt illustrative sample data",
+    waitlistPreviewHello: (name) => `${name}, tamari details amari pase che.`,
+    waitlistPreviewBody:
+      "Team onboarding review kare tya sudhi juo ke ARQ tamara business data mathi ketli clarity banavi shake che. Niche badhu sample data che, tamari company na figures nathi.",
+    callOurTeam: "Priority access mate call",
+    emailOurTeam: "Amari team ne email",
+    demoReportReady: "One-page report ready",
+    demoExecutiveReport: "Executive business snapshot",
+    demoReportBody:
+      "Verified KPIs, trends, product drivers ane AI-grounded management summary.",
+    demoPrintPdf: "Polished PDF print ke save karo",
+    demoDashboardTitle: "Juo tamara numbers shu batavi shake che",
+    sampleForCompany: (company) => `${company} · sample intelligence preview`,
+    demoDataNotice:
+      "Fakt demo values. ARQ tamara real metrics upload pachhi calculate karse.",
+    demoSales: "Sales",
+    demoSalesFoot: "8-month sample period",
+    demoProfit: "Estimated profit",
+    demoProfitFoot: "Sales minus uploaded costs",
+    demoMargin: "Operating margin",
+    demoMarginFoot: "Healthy sample performance",
+    demoOutstanding: "Receivables",
+    demoOutstandingFoot: "Collect karvana paisa",
+    demoTrendEyebrow: "Momentum",
+    demoSalesTrend: "Monthly sales trend",
+    demoMonths: ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov"],
+    demoTrendInsight:
+      "Sample sales period darmiyan strongly vadhi ane latest month sauthi aagal rahyo.",
+    demoCostEyebrow: "Cost intelligence",
+    demoCostMix: "Paisa kya jai rahya che",
+    demoLargestCost: "materials",
+    demoExpenseLabels: ["Materials", "Payroll", "Logistics", "Other"],
+    demoProductEyebrow: "Product intelligence",
+    demoTopProducts: "Value pramane top products",
+    demoProducts: [
+      "Precision Pump A1",
+      "Industrial Valve X4",
+      "Motor Assembly M2",
+      "Service Kit Pro",
+    ],
+    demoAiEyebrow: "Ask ARQ AI · sample answer",
+    demoAiQuestion: "Latest month ma shu badlayu?",
+    demoAiAnswer:
+      "Sample sales Rs 7.2L sudhi pahochi ane Precision Pump A1 lead kartu hatu. Material cost recent share pase rahi etle estimated monthly result improve thayu.",
+    demoAskFollowup: "Follow-up pucho",
+    demoGenerateReport: "Report banao",
+    waitlistMoreEyebrow: "Aa fakt sharuaat che",
+    waitlistMoreTitle: "Tamara business mate living intelligence layer unlock karo.",
+    waitlistMoreBody:
+      "Uploads, Tally ke biju database connect karo ane ARQ changing numbers ne answers, alerts ane decision-ready reports ma badalse.",
+    waitlistUnlocks: [
+      {
+        title: "Smart Excel understanding",
+        body: "Different Sales, Purchase, Expense ane P&L schemas visible warnings sathe map thay che.",
+      },
+      {
+        title: "Grounded business AI",
+        body: "Natural language ma pucho ane tamari books sathe tied answers melavo.",
+      },
+      {
+        title: "Tally ane database connections",
+        body: "Manual uploads thi automated, continuously refreshed intelligence taraf vadho.",
+      },
+      {
+        title: "Vadhu decision features",
+        body: "Custom reports, proactive insights ane deeper operational analytics avi rahya che.",
+      },
+    ],
+    waitlistContactTitle: "Jaldi aagal vadhvu che?",
+    waitlistContactBody:
+      "Onboarding, integrations ane upcoming features mate ARQ One AI Labs no sampark karo.",
     // free trial workspace
     freeTrial: "Free trial",
     trialWorkspaceReady: "Tamaru private trial workspace ready che",

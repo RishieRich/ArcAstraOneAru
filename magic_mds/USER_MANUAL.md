@@ -11,10 +11,13 @@ What it does: reads receivables data from the TallyPrime running on the same mac
 From the dashboard login page, select **Start free** and enter your name, company name,
 email and a password of at least eight characters containing a letter and number.
 
-- The first 10 self-service signups receive a private company workspace immediately and are
-  logged in. Existing managed customer accounts are separate from this limit.
-- After the 10 places are used, the same mandatory details add the person to the waitlist.
-  The page confirms their position and shows `contact@arqoneailabs.space` and
+- Accepted self-service signups receive a private company workspace immediately and are
+  logged in.
+- When immediate access is unavailable, the same mandatory details add the person to the
+  waitlist. Public pages do not reveal capacity or queue position.
+- Waitlisted visitors see a clearly labelled sample intelligence dashboard with illustrative
+  KPIs, sales trend, cost mix, product rankings, an Ask ARQ AI answer, a one-page report
+  preview and upcoming integration features. It shows `contact@arqoneailabs.space` and
   `+91 9727067044` for priority onboarding.
 - Passwords are never stored as readable text. Active-account passwords are salted and
   hashed; a waitlisted password is not stored.

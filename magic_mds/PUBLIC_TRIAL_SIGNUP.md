@@ -20,7 +20,17 @@ This preserves the same isolation checks used by imports, metrics, Ask ARQ and d
 
 When the active count is already 10, name, company and normalized email are upserted into
 `trial_waitlist`. The supplied password is deliberately not stored. A repeated waitlist
-submission updates the lead details while preserving the original position.
+submission updates the lead details.
+
+Capacity is private operational information. Public signup/status responses expose only
+`accepting_trials` plus contact details; they do not expose the capacity, active count,
+remaining places or queue position. `list-trial-waitlist` prints the private active/capacity
+and waiting totals for the administrator.
+
+After a waitlisted response, the frontend replaces the signup card with a sample intelligence
+experience. All values are explicitly marked illustrative and never presented as the lead's
+own company data. It previews KPIs, sales trend, cost mix, product performance, Ask ARQ,
+one-page reporting, upcoming Tally/database connectivity and direct contact actions.
 
 ## Operations
 

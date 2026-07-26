@@ -58,7 +58,7 @@ Three components, **one repo** (`github.com/RishieRich/ArcAstraOneAru`), three d
 | `POST /v1/devices/register` | pairing code in body | exchange one-time code for a device token |
 | `POST /v1/sync` | `Authorization: Bearer <device token>` | receive one snapshot (ledgers + bills) |
 | `POST /v1/auth/login` | email + password (legacy 4-digit PIN still accepted) | returns stateless HMAC dashboard token |
-| `GET /v1/auth/signup/status` | none | public trial capacity and ARQ contact details |
+| `GET /v1/auth/signup/status` | none | public availability flag and ARQ contact details; no counts |
 | `POST /v1/auth/signup` | none | create one of 10 isolated free trials, else upsert a waitlist lead |
 | `GET /v1/dashboard/companies` | `Bearer <dashboard token>` | tenant list |
 | `GET /v1/dashboard/metrics/{tenant_id}` | `Bearer <dashboard token>` | all dashboard numbers |
@@ -88,7 +88,9 @@ Routers live in `backend/app/routers/`; wiring is in `backend/app/main.py`.
   signups from exceeding it. Each accepted signup creates its own tenant plus one explicit
   grant. Existing managed users do not consume trial slots. Overflow entries store name,
   company and normalized email in `trial_waitlist`; their submitted password is deliberately
-  discarded. List leads with `python -m app.admin list-trial-waitlist`.
+  discarded. Public API responses never expose capacity, remaining places or waitlist
+  position. `python -m app.admin list-trial-waitlist` is the private source for active/waiting
+  counts and lead details.
 - **The exe never writes to Tally** — only read/export XML requests. Keep it that way.
 - **Data cleanup re-authenticates** — exact company name plus current password/PIN are
   verified server-side; tenant, dashboard access and registered devices are preserved.

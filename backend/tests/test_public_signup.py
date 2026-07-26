@@ -1,5 +1,4 @@
 from contextlib import contextmanager
-from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
@@ -17,7 +16,6 @@ class _SignupCursor:
         self.query = ""
         self.params = None
         self.tenant_id = uuid4()
-        self.waitlist_created_at = datetime.now(timezone.utc)
         self.executed = []
 
     def __enter__(self):
@@ -38,10 +36,6 @@ class _SignupCursor:
             return (self.active_trials,)
         if "insert into tenants" in self.query:
             return (self.tenant_id,)
-        if "returning created_at" in self.query:
-            return (self.waitlist_created_at,)
-        if "from trial_waitlist" in self.query:
-            return (4,)
         raise AssertionError(f"Unexpected fetch after query: {self.query}")
 
 
@@ -102,6 +96,7 @@ def test_first_ten_signup_gets_an_isolated_trial_tenant(monkeypatch):
     assert response.status == "active"
     assert response.account_type == "free_trial"
     assert response.token == "token-for-asha@example.com"
+    assert "capacity" not in response.model_dump()
     assert connection.committed
     statements = "\n".join(query for query, _ in cursor.executed)
     assert "insert into tenants" in statements
@@ -123,8 +118,9 @@ def test_eleventh_signup_is_waitlisted_without_persisting_password(monkeypatch):
     response = auth_dashboard.signup(_payload())
 
     assert response.status == "waitlisted"
-    assert response.waitlist_position == 4
     assert response.token is None
+    assert "capacity" not in response.model_dump()
+    assert "waitlist_position" not in response.model_dump()
     assert connection.committed
     waitlist_statement = next(
         item for item in cursor.executed if "insert into trial_waitlist" in item[0]
@@ -152,3 +148,21 @@ def test_existing_dashboard_email_cannot_create_a_second_tenant(monkeypatch):
 
     assert error.value.status_code == 409
     assert not any("insert into tenants" in query for query, _ in cursor.executed)
+
+
+def test_public_signup_status_exposes_availability_not_private_counts(monkeypatch):
+    cursor = _SignupCursor(active_trials=7)
+    connection = _SignupConnection(cursor)
+
+    @contextmanager
+    def connection_factory():
+        yield connection
+
+    monkeypatch.setattr(auth_dashboard, "get_connection", connection_factory)
+
+    payload = auth_dashboard.signup_status().model_dump()
+
+    assert payload["accepting_trials"] is True
+    assert "capacity" not in payload
+    assert "active_trials" not in payload
+    assert "remaining" not in payload

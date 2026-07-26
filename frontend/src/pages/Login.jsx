@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
-import { fetchSignupStatus, login, signup } from "../api";
+import { useState } from "react";
+import { login, signup } from "../api";
 import BrandLogo from "../components/BrandLogo";
 import ThemeToggle from "../components/ThemeToggle";
+import WaitlistPreview from "../components/WaitlistPreview";
 import { LANGS } from "../i18n";
 import {
   IconCheck,
@@ -27,12 +28,7 @@ export default function Login({
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const [signupStatus, setSignupStatus] = useState(null);
   const [waitlisted, setWaitlisted] = useState(null);
-
-  useEffect(() => {
-    fetchSignupStatus().then(setSignupStatus).catch(() => {});
-  }, []);
 
   const validEmail = /\S+@\S+\.\S+/.test(email);
   const ready =
@@ -74,11 +70,6 @@ export default function Login({
       } else {
         setWaitlisted(result);
         setPassword("");
-        setSignupStatus((current) => ({
-          ...(current || {}),
-          accepting_trials: false,
-          remaining: 0,
-        }));
       }
     } catch (requestError) {
       setError(requestError.message);
@@ -88,11 +79,19 @@ export default function Login({
     }
   }
 
-  const statusCopy = !signupStatus
-    ? t.trialCapacityChecking
-    : signupStatus.accepting_trials
-      ? t.trialSpotsLeft(signupStatus.remaining)
-      : t.trialWaitlistOpen;
+  if (waitlisted) {
+    return (
+      <WaitlistPreview
+        t={t}
+        lang={lang}
+        setLang={setLang}
+        theme={theme}
+        setTheme={setTheme}
+        result={waitlisted}
+        onBack={() => switchMode("login")}
+      />
+    );
+  }
 
   return (
     <div className="login-screen">
@@ -168,41 +167,7 @@ export default function Login({
             </button>
           </div>
 
-          {mode === "signup" && (
-            <span
-              className={`trial-capacity ${
-                signupStatus?.accepting_trials ? "open" : "waiting"
-              }`}
-            >
-              <i />
-              {statusCopy}
-            </span>
-          )}
-
-          {waitlisted ? (
-            <div className="waitlist-success" aria-live="polite">
-              <span className="waitlist-check"><IconCheck /></span>
-              <span className="login-eyebrow">{t.waitlistEyebrow}</span>
-              <h2>{t.waitlistTitle}</h2>
-              <p>{t.waitlistBody(waitlisted.waitlist_position)}</p>
-              <div className="waitlist-contact">
-                <a href={`mailto:${waitlisted.contact_email}`}>
-                  {waitlisted.contact_email}
-                </a>
-                <a href={`tel:${waitlisted.contact_phone.replace(/\s/g, "")}`}>
-                  {waitlisted.contact_phone}
-                </a>
-              </div>
-              <button
-                className="secondary-auth-btn"
-                type="button"
-                onClick={() => switchMode("login")}
-              >
-                {t.backToLogin}
-              </button>
-            </div>
-          ) : (
-            <>
+          <>
               <span className="login-eyebrow">
                 {mode === "login" ? t.secureWorkspace : t.limitedFreeTrial}
               </span>
@@ -287,17 +252,14 @@ export default function Login({
                     : t.creatingWorkspace
                   : mode === "login"
                     ? t.loginBtn
-                    : signupStatus?.accepting_trials === false
-                      ? t.joinWaitlist
-                      : t.startFreeTrial}
+                    : t.startFreeTrial}
               </button>
 
               <div className="login-foot">
                 <IconShield width={14} height={14} />
                 {mode === "login" ? t.loginFooter : t.signupSecurity}
               </div>
-            </>
-          )}
+          </>
         </form>
       </div>
     </div>

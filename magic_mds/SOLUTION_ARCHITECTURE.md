@@ -1154,7 +1154,7 @@ owner's explicit go-ahead.**
 | 3 | `POST /v1/devices/register` | connector | pairing code in body | Exchange a one-time code for a device token | 404 invalid · 400 used/expired · 403 GUID mismatch |
 | 4 | `POST /v1/sync` | connector | `Bearer <device token>` | Ingest one snapshot | 401 invalid/revoked · 403 GUID mismatch · 409 run id owned by another tenant · **200 replay** on duplicate id |
 | 5 | `POST /v1/auth/login` | SPA | email + password (legacy 4-digit PIN accepted) | Issue a 7-day HMAC session token | 400 missing credential · 401 wrong (uniform message + 0.8 s delay) |
-| 6 | `GET /v1/auth/signup/status` | public SPA | none | Return ten-place trial capacity and contact details | 500 database unavailable |
+| 6 | `GET /v1/auth/signup/status` | public SPA | none | Return availability flag and contact details; counts remain admin-only | 500 database unavailable |
 | 7 | `POST /v1/auth/signup` | public SPA | none | Atomically create an isolated free trial or upsert a waitlist lead | 409 existing account · 422 invalid required fields |
 | 8 | `GET /v1/dashboard/companies` | SPA | `Bearer <session>` | Companies this user may see, with sync/import status | 401 |
 | 9 | `GET /v1/dashboard/metrics/{tenant_id}` | SPA | `Bearer <session>` | **Every** dashboard number in one document | 401 · 403 no access · 404 no such company |
