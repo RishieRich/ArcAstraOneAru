@@ -230,9 +230,9 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
   empty test company, or their Tally XML shape doesn't match `parse_bills_receivable`
   (`connector/src/arq_connector/tally/parsers.py`), which is live-verified against only one
   bill layout. Needs their real-company push or raw XML to resolve.
-- **Migration 0006 is not applied and its matching application is not deployed.** Apply it
-  only with owner approval, then deploy backend before frontend. Until then production keeps
-  the existing managed-login experience and public signup remains unavailable.
+- **Public signup has no email verification or bot protection yet.** The ten-place capacity
+  prevents more than 10 trial tenants but does not prevent automated waitlist submissions.
+  Add verified email and a Vercel WAF/rate-limit rule before a large acquisition campaign.
 - **Excel voucher removals/cancellations** — re-exports update vouchers that retain the same
   Tally GUID, but a voucher absent from a later workbook is not automatically deleted. Add an
   explicit snapshot/reconciliation workflow before treating imports as a cancellation ledger.

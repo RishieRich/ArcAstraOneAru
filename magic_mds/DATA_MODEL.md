@@ -64,5 +64,5 @@ device can therefore populate a genuinely fresh snapshot after cleanup.
 - 0006: public trial account type, waitlist and Profit & Loss import envelope
 
 Migration 0005 was explicitly approved, applied to the configured Neon database,
-verified and deployed on 2026-07-26. Migration 0006 is implemented but is not
-applied or deployed; applying it remains owner-gated.
+verified and deployed on 2026-07-26. Migration 0006 was explicitly approved,
+applied, verified and deployed on 2026-07-26.

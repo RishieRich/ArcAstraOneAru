@@ -7,11 +7,10 @@
 **Date:** 2026-07-26
 **Status:** Live in production (single-tenant-per-client, early customers)
 **Author / Owner:** Rishikesh Rajendra Pote
-**Verified against commit:** `cebbcbc`
+**Verified against commit:** `b76d7e5`
 
 > Public trial signup, the 10-user capacity gate, waitlist persistence and adaptive
-> Profit & Loss imports are implemented in the current working tree but remain pending
-> migration `0006_public_trials.sql` and production deployment.
+> Profit & Loss imports were migrated and deployed to production on 2026-07-26.
 
 ---
 
