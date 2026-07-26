@@ -6,9 +6,15 @@ outgrows that, swap this for tool-use against the DB.
 
 LLM routing: Google Gemini is primary, Groq is the fallback. Both speak the
 OpenAI chat-completions dialect, so one request/response shape serves both — only
-the base URL, key, and model name differ. If the primary errors (or is
-unconfigured) we transparently try the fallback; if neither is configured the
-endpoint returns a fixable 503, never a 500.
+the base URL, key, model name and a few per-provider knobs differ. If the primary
+errors (or is unconfigured) we transparently try the fallback; if neither is
+configured the endpoint returns a fixable 503, never a 500.
+
+The fallback is the whole point of this module — Gemini's free tier is a few
+dozen requests per day per model, so a working day routinely ends up on Groq.
+Anything that silently breaks the second provider breaks the feature, which is
+why the two traps below (Cloudflare's User-Agent filter and Gemini's reasoning
+tokens) are commented where they bite rather than in a doc nobody re-reads.
 
 Answers mirror the language the user wrote in: English, Hinglish,
 Gujarati-English, or Marathi-English.
@@ -17,6 +23,7 @@ import json
 import os
 import urllib.error
 import urllib.request
+from typing import NamedTuple
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -32,13 +39,31 @@ router = APIRouter(
 
 # Primary provider. Gemini exposes an OpenAI-compatible surface at this path.
 GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
-# "gemini-flash-latest" is an alias that always resolves to the current stable
-# Flash model, so it never goes stale the way a pinned version can.
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
+# Flash-Lite, not Flash: the free tier meters requests per day per model, and the
+# plain "gemini-flash-latest" alias drifted onto a model capped at 20 requests a
+# day — enough for one demo, then 429 for everyone. Lite is the tier Google gives
+# real free-tier headroom. Still an alias so it cannot 404 the way a pinned
+# version does once Google retires it ("no longer available to new users").
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-lite-latest")
+# Only set this if you pin GEMINI_MODEL to a thinking model (the 3.x Flash line).
+# Those spend hidden reasoning tokens out of max_tokens and can return
+# finish_reason="length" with no content at all on a prompt as large as
+# <business_data>; "none" buys the whole budget back for the actual answer.
+# Left unset by default because support is per-model, not per-provider — the
+# Flash-Lite default rejects the field outright with 400 INVALID_ARGUMENT, and it
+# needs no help anyway (it spends zero reasoning tokens on these prompts).
+GEMINI_REASONING_EFFORT = os.environ.get("GEMINI_REASONING_EFFORT", "").strip()
 
 # Fallback provider.
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 GROQ_MODEL = os.environ.get("GROQ_MODEL", "llama-3.3-70b-versatile")
+
+# api.groq.com sits behind Cloudflare, which rejects a bare "Python-urllib/3.x"
+# User-Agent with HTTP 403 "error code: 1010" (banned browser signature) before
+# the request ever reaches Groq. urllib sends that UA unless told otherwise, so
+# the fallback 403'd on every single call and the copilot went dark the moment
+# Gemini hit its daily quota. Send a real product UA on every call.
+USER_AGENT = "arq-astra-backend/1.0 (+https://arcastraone.vercel.app)"
 
 # Per-request wall-clock budget. Comfortably under Vercel's 300s function limit
 # while still letting a slow first token through.
@@ -113,32 +138,59 @@ class _ProviderError(Exception):
         self.message = message
 
 
-def _providers() -> list[tuple[str, str, str, str]]:
-    """Configured providers in priority order: (name, url, key, model)."""
-    out: list[tuple[str, str, str, str]] = []
+class _Provider(NamedTuple):
+    name: str
+    url: str
+    key: str
+    model: str
+    # Extra top-level request fields this provider needs. Per-provider because
+    # the two do not accept the same knobs — see _providers().
+    extra: dict
+
+
+def _providers() -> list[_Provider]:
+    """Configured providers in priority order."""
+    out: list[_Provider] = []
     gemini = os.environ.get("GEMINI_API_KEY", "").strip()
     if gemini:
-        out.append(("gemini", GEMINI_URL, gemini, GEMINI_MODEL))
+        extra = (
+            {"reasoning_effort": GEMINI_REASONING_EFFORT}
+            if GEMINI_REASONING_EFFORT
+            else {}
+        )
+        out.append(_Provider("gemini", GEMINI_URL, gemini, GEMINI_MODEL, extra))
     groq = os.environ.get("GROQ_API_KEY", "").strip()
     if groq:
-        out.append(("groq", GROQ_URL, groq, GROQ_MODEL))
+        # Never forward GEMINI_REASONING_EFFORT here: llama-3.3-70b is not a
+        # reasoning model and Groq hard-400s the field instead of ignoring it.
+        # That is why extras are per-provider rather than one shared dict.
+        out.append(_Provider("groq", GROQ_URL, groq, GROQ_MODEL, {}))
     return out
 
 
-def _call(provider: str, url: str, key: str, model: str, messages: list[dict]) -> str:
-    """POST one OpenAI-style chat completion, return the assistant text."""
+def _call(provider: _Provider, messages: list[dict]) -> str:
+    """POST one OpenAI-style chat completion, return non-empty assistant text.
+
+    Raises _ProviderError for anything the caller should fall back from,
+    including a well-formed response that carries no usable answer.
+    """
     body = json.dumps(
         {
-            "model": model,
+            "model": provider.model,
             "messages": messages,
             "max_tokens": MAX_TOKENS,
             "temperature": 0.3,
+            **provider.extra,
         }
     ).encode()
     req = urllib.request.Request(
-        url,
+        provider.url,
         data=body,
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json"},
+        headers={
+            "Authorization": f"Bearer {provider.key}",
+            "Content-Type": "application/json",
+            "User-Agent": USER_AGENT,
+        },
         method="POST",
     )
     try:
@@ -146,14 +198,26 @@ def _call(provider: str, url: str, key: str, model: str, messages: list[dict]) -
             data = json.loads(resp.read())
     except urllib.error.HTTPError as e:
         detail = e.read().decode("utf-8", "replace")[:300]
-        raise _ProviderError(provider, f"HTTP {e.code}: {detail}")
+        raise _ProviderError(provider.name, f"HTTP {e.code}: {detail}")
     except (urllib.error.URLError, TimeoutError, OSError) as e:
-        raise _ProviderError(provider, f"network error: {e}")
+        raise _ProviderError(provider.name, f"network error: {e}")
+    except ValueError as e:  # JSONDecodeError — a 200 that is not JSON
+        raise _ProviderError(provider.name, f"unreadable response: {e}")
 
     try:
-        return (data["choices"][0]["message"]["content"] or "").strip()
+        choice = data["choices"][0]
+        text = ((choice.get("message") or {}).get("content") or "").strip()
     except (KeyError, IndexError, TypeError):
-        raise _ProviderError(provider, f"unexpected response shape: {str(data)[:200]}")
+        raise _ProviderError(provider.name, f"unexpected response shape: {str(data)[:200]}")
+    if not text:
+        # Empty content is a provider failure, not an answer. Report the reason
+        # so the log says why: "length" means the token budget ran out mid-think.
+        raise _ProviderError(
+            provider.name,
+            f"empty answer (finish_reason={choice.get('finish_reason')!r}, "
+            f"usage={data.get('usage')})",
+        )
+    return text
 
 
 def build_context(tenant_id: str) -> str:
@@ -279,8 +343,8 @@ def ask(
     if not providers:
         raise HTTPException(
             status_code=503,
-            detail="AI is not configured on the server. Set GEMINI_API_KEY "
-            "(and optionally GROQ_API_KEY) and redeploy.",
+            detail="AI is not configured on the server. Set GEMINI_API_KEY and "
+            "GROQ_API_KEY, then redeploy.",
         )
 
     context = build_context(payload.tenant_id)
@@ -299,16 +363,12 @@ def ask(
     ]
 
     failures: list[str] = []
-    for provider, url, key, model in providers:
+    for provider in providers:
         try:
-            answer = _call(provider, url, key, model, messages)
+            return AskResponse(answer=_call(provider, messages))
         except _ProviderError as e:
             print(f"[ask] provider failed, falling back if possible -> {e}")
             failures.append(str(e))
-            continue
-        if answer:
-            return AskResponse(answer=answer)
-        failures.append(f"{provider}: empty answer")
 
     # Every configured provider failed.
     print(f"[ask] all providers failed: {failures}")

@@ -5,8 +5,10 @@ different agents on the same page. Codex CLI loads `AGENTS.md` automatically; Cl
 loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way — one file,
 not two drifting copies.
 
-Last verified against the repo: **2026-07-26** (Smart Excel release commit `35c7fa8`;
-migration 0007 and both Vercel projects verified in production).
+Last verified against the repo: **2026-07-27** (Smart Excel release commit `35c7fa8`;
+migration 0007 and both Vercel projects verified in production. `/v1/ask` provider
+routing re-verified live against both Gemini and Groq — see trap 13; the fix is
+**not yet deployed** to the Vercel backend project).
 
 ---
 
@@ -111,9 +113,13 @@ Backend (`backend/.env` locally, Vercel project env in prod — see `backend/.en
 - `DATABASE_URL` — Neon connection string (`sslmode=require&channel_binding=require`)
 - `DASHBOARD_SECRET` — optional; derived from `DATABASE_URL` if unset
 - `GEMINI_API_KEY` — **primary** LLM for `/v1/ask`
-- `GROQ_API_KEY` — automatic fallback if Gemini errors or is unset
-- `GEMINI_MODEL` / `GROQ_MODEL` — optional overrides (defaults `gemini-flash-latest`,
+- `GROQ_API_KEY` — automatic fallback if Gemini errors or is unset. **Not optional in
+  practice**: Gemini's free tier meters requests per day per model, so normal use lands
+  on Groq most days. Both keys must be set on the Vercel backend project.
+- `GEMINI_MODEL` / `GROQ_MODEL` — optional overrides (defaults `gemini-flash-lite-latest`,
   `llama-3.3-70b-versatile`)
+- `GEMINI_REASONING_EFFORT` — leave unset. Only for a pinned 3.x *thinking* model; the
+  Flash-Lite default rejects the field with 400 (see trap 14)
 - `CORS_ORIGINS` — comma-separated dashboard origins; `*` until locked down
 
 Frontend: `VITE_API_BASE_URL` (build-time). Connector: `ARQ_API_BASE_URL` at **build** time,
@@ -233,7 +239,25 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
    multi-resolution icon, runs connector-only tests, validates the x64 PE/icon/signature,
    and creates a checksum-bearing versioned ZIP. Unsigned developer builds can be blocked
    by Windows Smart App Control and must not be sent to clients.
-13. **Product analytics come only from normalized `item` lines.** Do not infer a product
+13. **`/v1/ask` provider traps — all three broke the copilot at once (fixed 2026-07-27).**
+    Verified live against both provider APIs; don't "clean up" any of these.
+    - **Groq is behind Cloudflare, which 403s `Python-urllib/3.x`** with `error code: 1010`.
+      urllib sends that User-Agent by default, so the fallback failed on *every* call and
+      the copilot died the moment Gemini hit its quota. `_call` now always sends
+      `USER_AGENT`. A/B proof: `Python-urllib/3.13` → 403, `curl/8.5.0` → 200, same key.
+    - **`gemini-flash-latest` drifted onto `gemini-3.6-flash`, free-tier cap 20 req/day**
+      (`GenerateRequestsPerDayPerProjectPerModel-FreeTier`). The alias comment claiming it
+      "never goes stale" was the trap. Default is now `gemini-flash-lite-latest`; Lite has
+      real free-tier headroom and an alias can't 404 the way a pinned model does
+      (`gemini-2.5-flash` already returns 404 "no longer available to new users").
+    - **Provider request knobs are per-model, not per-provider.** `reasoning_effort` is
+      accepted by `gemini-3.1-flash-lite`, rejected with 400 `INVALID_ARGUMENT` by
+      `gemini-flash-lite-latest`, and hard-400s on Groq's llama-3.3. Hence `_Provider.extra`.
+      Never move it to a shared payload.
+    An empty `content` is treated as a provider failure so it falls through instead of
+    returning a blank bubble. Fallback order is exercised by
+    `backend/tests/test_ask_providers.py` with no network.
+14. **Product analytics come only from normalized `item` lines.** Do not infer a product
    from a party or ledger row. Product value, quantity coverage, weighted rate, customers
    and top-customer metrics are computed in `dashboard.product_metrics`. A null unit remains
    unknown. Ask ARQ's one-page report is rendered from authorized dashboard metrics in the
