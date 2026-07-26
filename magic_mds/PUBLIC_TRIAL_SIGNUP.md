@@ -31,6 +31,10 @@ After a waitlisted response, the frontend replaces the signup card with a sample
 experience. All values are explicitly marked illustrative and never presented as the lead's
 own company data. It previews KPIs, sales trend, cost mix, product performance, Ask ARQ,
 one-page reporting, upcoming Tally/database connectivity and direct contact actions.
+The first screen also carries a prominent phone/email conversion bar and an animated,
+truthfully labelled preview of full-access KPIs, grounded AI Q&A, upcoming review-first
+agentic follow-ups and material research. Active trial accounts receive the real Smart Excel
+and Ask ARQ flow; only waitlisted leads remain on illustrative data.
 
 ## Operations
 

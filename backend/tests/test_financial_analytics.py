@@ -1,10 +1,11 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from app.routers.dashboard import (
     build_monthly_financials,
     financial_highlights,
     product_metrics,
+    smart_data_metrics,
 )
 
 
@@ -123,3 +124,58 @@ def test_product_metrics_keep_value_quantity_rate_and_top_customer_together():
         "top_customer": "Acme Customer",
         "top_customer_amount": 900,
     }
+
+
+def test_smart_data_metrics_returns_latest_chart_ready_profiles():
+    class Cursor:
+        def __init__(self):
+            self.results = iter(
+                [
+                    (
+                        "import-id",
+                        "gst.xlsx",
+                        1,
+                        12,
+                        1,
+                        [],
+                        ["One note"],
+                        datetime(2026, 7, 26, 12, 0),
+                    ),
+                    [
+                        (
+                            7,
+                            "GST Summary",
+                            "GST & tax data",
+                            "gst",
+                            Decimal("0.910"),
+                            2,
+                            12,
+                            1,
+                            [{"key": "igst", "label": "IGST"}],
+                            [{"key": "date", "label": "Invoice Date"}],
+                            [{"key": "state", "label": "State"}],
+                            [{"key": "igst", "label": "IGST", "format": "currency"}],
+                            [{"label": "Total IGST", "value": 630, "format": "currency"}],
+                            [{"id": "ranking", "type": "bar", "points": []}],
+                            ["Possible duplicate"],
+                        )
+                    ],
+                ]
+            )
+
+        def execute(self, _query, _params):
+            return None
+
+        def fetchone(self):
+            return next(self.results)
+
+        def fetchall(self):
+            return next(self.results)
+
+    smart = smart_data_metrics(Cursor(), "tenant-id")
+
+    assert smart["has_data"] is True
+    assert smart["filename"] == "gst.xlsx"
+    assert smart["row_count"] == 12
+    assert smart["datasets"][0]["domain"] == "gst"
+    assert smart["datasets"][0]["kpis"][0]["label"] == "Total IGST"

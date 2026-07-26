@@ -127,6 +127,7 @@ export function formatWhen(iso) {
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
 export function formatMonth(ym) {
+  if (!/^\d{4}-\d{2}$/.test(String(ym || ""))) return ym || "—";
   const [y, m] = ym.split("-").map(Number);
   return `${MONTHS[m - 1]} ${String(y).slice(2)}`;
 }

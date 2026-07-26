@@ -531,6 +531,108 @@ def financial_metrics(cur, tenant_id: str) -> dict:
     }
 
 
+def _empty_smart_data() -> dict:
+    return {
+        "has_data": False,
+        "import_id": None,
+        "filename": None,
+        "dataset_count": 0,
+        "row_count": 0,
+        "duplicate_rows": 0,
+        "skipped_sheets": [],
+        "warnings": [],
+        "datasets": [],
+        "last_import_at": None,
+    }
+
+
+def smart_data_metrics(cur, tenant_id: str) -> dict:
+    """Return chart-ready profiles from the tenant's latest generic workbook."""
+    cur.execute(
+        """
+        select id, source_filename, dataset_count, row_count, duplicate_rows,
+               skipped_sheets, warnings, created_at
+        from smart_imports
+        where tenant_id = %s
+        order by created_at desc
+        limit 1
+        """,
+        (tenant_id,),
+    )
+    row = cur.fetchone()
+    if row is None:
+        return _empty_smart_data()
+    (
+        import_id,
+        filename,
+        dataset_count,
+        row_count,
+        duplicate_rows,
+        skipped_sheets,
+        import_warnings,
+        created_at,
+    ) = row
+    cur.execute(
+        """
+        select id, sheet_name, title, domain, confidence, header_row, row_count,
+               duplicate_rows, columns_json, date_columns, dimension_columns,
+               metric_columns, kpis, charts, warnings
+        from smart_datasets
+        where tenant_id = %s and import_id = %s
+        order by sheet_index
+        """,
+        (tenant_id, import_id),
+    )
+    datasets = [
+        {
+            "id": str(dataset_id),
+            "sheet_name": sheet_name,
+            "title": title,
+            "domain": domain,
+            "confidence": float(confidence),
+            "header_row": header_row,
+            "rows": rows,
+            "duplicate_rows": dataset_duplicates,
+            "columns": columns or [],
+            "date_columns": dates or [],
+            "dimension_columns": dimensions or [],
+            "metric_columns": metrics or [],
+            "kpis": kpis or [],
+            "charts": charts or [],
+            "warnings": warnings or [],
+        }
+        for (
+            dataset_id,
+            sheet_name,
+            title,
+            domain,
+            confidence,
+            header_row,
+            rows,
+            dataset_duplicates,
+            columns,
+            dates,
+            dimensions,
+            metrics,
+            kpis,
+            charts,
+            warnings,
+        ) in cur.fetchall()
+    ]
+    return {
+        "has_data": bool(datasets),
+        "import_id": str(import_id),
+        "filename": filename,
+        "dataset_count": dataset_count,
+        "row_count": row_count,
+        "duplicate_rows": duplicate_rows,
+        "skipped_sheets": skipped_sheets or [],
+        "warnings": import_warnings or [],
+        "datasets": datasets,
+        "last_import_at": created_at.isoformat(),
+    }
+
+
 @router.get("/companies")
 def companies(dashboard_user: str = Depends(require_dashboard_user)) -> list[dict]:
     """Every tenant, with enough context for the dashboard's company picker."""
@@ -546,7 +648,11 @@ def companies(dashboard_user: str = Depends(require_dashboard_user)) -> list[dic
                    (select max(created_at) from financial_imports fi
                      where fi.tenant_id = t.id),
                    exists(select 1 from financial_transactions ft
-                     where ft.tenant_id = t.id)
+                     where ft.tenant_id = t.id),
+                   (select max(created_at) from smart_imports si
+                     where si.tenant_id = t.id),
+                   exists(select 1 from smart_datasets sd
+                     where sd.tenant_id = t.id)
             from tenants t
             join dashboard_users du on du.email = %s
             where du.all_tenants
@@ -567,8 +673,13 @@ def companies(dashboard_user: str = Depends(require_dashboard_user)) -> list[dic
                 "devices": devices,
                 "last_sync_at": last_sync.isoformat() if last_sync else None,
                 "has_bills": bill_count > 0,
-                "last_import_at": last_import.isoformat() if last_import else None,
-                "has_financials": has_financials,
+                "last_import_at": (
+                    max(value for value in (last_import, last_smart_import) if value).isoformat()
+                    if last_import or last_smart_import
+                    else None
+                ),
+                "has_financials": has_financials or has_smart_data,
+                "has_smart_data": has_smart_data,
             }
             for (
                 tid,
@@ -580,6 +691,8 @@ def companies(dashboard_user: str = Depends(require_dashboard_user)) -> list[dic
                 bill_count,
                 last_import,
                 has_financials,
+                last_smart_import,
+                has_smart_data,
             ) in cur.fetchall()
         ]
 
@@ -601,6 +714,8 @@ def metrics_snapshot(tenant_id: str) -> dict:
         )
         ledger_count, ledger_balance, ledgers_updated = cur.fetchone()
         financials = financial_metrics(cur, tenant_id)
+        smart_data = smart_data_metrics(cur, tenant_id)
+        has_workbook_data = financials["has_data"] or smart_data["has_data"]
         cur.execute(
             """
             select max(finished_at), max(started_at)
@@ -616,9 +731,10 @@ def metrics_snapshot(tenant_id: str) -> dict:
         empty = {
             "tenant_id": tenant_id,
             "tenant_name": tenant_name,
-            "has_data": financials["has_data"],
+            "has_data": has_workbook_data,
             "has_receivables_data": False,
-            "has_financial_data": financials["has_data"],
+            "has_financial_data": has_workbook_data,
+            "has_smart_data": smart_data["has_data"],
             "totals": {
                 "outstanding": 0.0, "overdue": 0.0, "not_due": 0.0, "bill_count": 0,
                 "party_count": 0, "ledger_count": ledger_count,
@@ -630,9 +746,12 @@ def metrics_snapshot(tenant_id: str) -> dict:
             "aging": [], "top_debtors": [], "bills": [], "due_timeline": [],
             "oldest_bills": [], "alerts": [], "notes": [],
             "financials": financials,
+            "smart_data": smart_data,
             "last_sync_at": last_sync_iso,
             "last_activity_at": _latest_iso(
-                last_sync_iso, financials["last_import_at"]
+                last_sync_iso,
+                financials["last_import_at"],
+                smart_data["last_import_at"],
             ),
         }
 
@@ -803,15 +922,23 @@ def metrics_snapshot(tenant_id: str) -> dict:
         (
             {"id": "scope_extended", "data": {"kinds": financials["kinds"]}}
             if financials["has_data"]
-            else {"id": "scope", "data": {}}
+            else (
+                {
+                    "id": "smart_scope",
+                    "data": {"datasets": smart_data["dataset_count"]},
+                }
+                if smart_data["has_data"]
+                else {"id": "scope", "data": {}}
+            )
         ),
     ]
     return {
         "tenant_id": tenant_id,
         "tenant_name": tenant_name,
-        "has_data": bill_count > 0 or financials["has_data"],
+        "has_data": bill_count > 0 or has_workbook_data,
         "has_receivables_data": bill_count > 0,
-        "has_financial_data": financials["has_data"],
+        "has_financial_data": has_workbook_data,
+        "has_smart_data": smart_data["has_data"],
         "totals": {
             "outstanding": _num(outstanding),
             "overdue": _num(overdue),
@@ -835,8 +962,13 @@ def metrics_snapshot(tenant_id: str) -> dict:
         "alerts": alerts,
         "notes": notes,
         "financials": financials,
+        "smart_data": smart_data,
         "last_sync_at": last_sync_iso,
-        "last_activity_at": _latest_iso(last_sync_iso, financials["last_import_at"]),
+        "last_activity_at": _latest_iso(
+            last_sync_iso,
+            financials["last_import_at"],
+            smart_data["last_import_at"],
+        ),
     }
 
 

@@ -11,7 +11,7 @@ class Turn(BaseModel):
 class AskRequest(BaseModel):
     tenant_id: str
     question: str = Field(min_length=1, max_length=2000)
-    language: Literal["en", "hi", "gu"] = "en"
+    language: Literal["en", "hi", "gu", "mr"] = "en"
     history: list[Turn] = Field(default_factory=list, max_length=20)
 
 

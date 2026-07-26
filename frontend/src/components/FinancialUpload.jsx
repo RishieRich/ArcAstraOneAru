@@ -51,7 +51,7 @@ export default function FinancialUpload({ tenantId, t, onImported, onClose }) {
             </span>
             <input
               type="file"
-              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              accept=".xlsx,.xlsm,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel.sheet.macroEnabled.12,application/vnd.ms-excel,text/csv"
               disabled={Boolean(uploading)}
               onChange={(event) => upload(kind, event)}
             />
@@ -79,7 +79,12 @@ export default function FinancialUpload({ tenantId, t, onImported, onClose }) {
                 </small>
               )}
               <small>
-                {result.source_format === "adaptive-profit-loss"
+                {result.source_format === "smart-multi-sheet"
+                  ? t.smartSchemaDetected(
+                      result.smart?.dataset_count || 0,
+                      result.smart?.row_count || result.transactions,
+                    )
+                  : result.source_format === "adaptive-profit-loss"
                   ? t.profitLossSchemaDetected
                   : result.source_format === "adaptive-flat-register"
                     ? t.adaptiveSchemaDetected

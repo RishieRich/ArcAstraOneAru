@@ -10,8 +10,8 @@ the base URL, key, and model name differ. If the primary errors (or is
 unconfigured) we transparently try the fallback; if neither is configured the
 endpoint returns a fixable 503, never a 500.
 
-Answers mirror the language the user wrote in: English, Hinglish, or
-Gujarati-English.
+Answers mirror the language the user wrote in: English, Hinglish,
+Gujarati-English, or Marathi-English.
 """
 import json
 import os
@@ -47,15 +47,18 @@ MAX_TOKENS = 1200
 
 SYSTEM = """You are the ARQ business-books assistant. You help Indian small-business \
 owners understand receivables and any sales, purchase, expense or Profit & Loss workbooks \
-they uploaded.
+they uploaded, plus unfamiliar business tables that Smart Excel typed without forcing an \
+accounting classification.
 
 LANGUAGE — this matters most:
-Reply in the SAME language and script the user wrote in. Three cases:
+Reply in the SAME language and script the user wrote in. Four cases:
 - English -> plain English.
 - Hinglish (Hindi in Roman script, e.g. "kitna paisa fansa hai") -> reply in Hinglish, \
 Roman script. Never Devanagari.
 - Gujarati-English mix (e.g. "ketla rupiya baki che") -> reply in the same Gujarati-English \
 mix, Roman script. Never Gujarati script.
+- Marathi-English mix (e.g. "majha business kasa chaltoy") -> reply in friendly Marathi-English, \
+Roman script. Never Devanagari unless the user explicitly uses it.
 Mixed input -> mirror the mix. Keep business words (invoice, overdue, ledger) in English \
 in every case; that is how the user's accountant talks.
 
@@ -73,6 +76,9 @@ TRUTHFULNESS:
 - Receivables come from the latest Tally connector snapshot. Sales, purchases and \
 expenses come only from normalized uploaded rows listed in financials.kinds. A Profit & Loss \
 summary may contribute several of those kinds from one workbook.
+- smart_data contains the latest unfamiliar multi-sheet workbook. Its domains, columns, KPIs \
+and charts are deterministic inferences. Use the supplied labels and rows, but never call a \
+generic metric statutory Sales, Profit, GST payable or Expense unless its label says so.
 - If a requested data kind was not uploaded, say it is not available.
 - financials.pnl_complete is true only when Sales, Purchases and Expenses are all uploaded.
 - When pnl_complete is true, operating_result means Sales minus Purchases minus Expenses. \
@@ -94,6 +100,7 @@ LANGUAGE_NAMES = {
     "en": "English",
     "hi": "Hinglish in Roman script",
     "gu": "Gujarati-English in Roman script",
+    "mr": "friendly Marathi-English in Roman script",
 }
 
 
@@ -220,6 +227,26 @@ def build_context(tenant_id: str) -> str:
             {"month": month, "kind": kind, "drivers": drivers}
             for (month, kind), drivers in driver_groups.items()
         ]
+        cur.execute(
+            """
+            select sd.sheet_name, sr.values_json
+            from smart_imports si
+            join smart_datasets sd on sd.import_id = si.id
+            join smart_rows sr on sr.dataset_id = sd.id
+            where si.id = (
+              select id from smart_imports
+              where tenant_id = %s
+              order by created_at desc
+              limit 1
+            )
+            order by sd.sheet_index, sr.source_row
+            limit 600
+            """,
+            (tenant_id,),
+        )
+        smart_samples: dict[str, list[dict]] = {}
+        for sheet_name, values in cur.fetchall():
+            smart_samples.setdefault(sheet_name, []).append(values)
 
     return json.dumps(
         {
@@ -232,6 +259,8 @@ def build_context(tenant_id: str) -> str:
             "financials": data["financials"],
             "monthly_drivers": monthly_drivers,
             "uploaded_transactions": uploaded_transactions,
+            "smart_data": data.get("smart_data", {}),
+            "smart_data_rows": smart_samples,
         },
         indent=2,
         default=str,

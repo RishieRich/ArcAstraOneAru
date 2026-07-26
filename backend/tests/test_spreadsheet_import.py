@@ -10,6 +10,7 @@ from app.spreadsheet_import import (
     _source_key,
     parse_tally_workbook,
 )
+from app.routers.imports import _supplemental_smart_analysis
 
 
 def _tally_workbook(kind: str) -> bytes:
@@ -392,3 +393,25 @@ def test_profit_loss_with_only_one_recognizable_side_is_rejected():
 
     with pytest.raises(ImportValidationError, match="only one side"):
         parse_tally_workbook(output.getvalue(), "pnl.xlsx", "profit_loss")
+
+
+def test_known_finance_workbook_profiles_only_additional_useful_sheets():
+    workbook = load_workbook(BytesIO(_tally_workbook("sales")))
+    research = workbook.create_sheet("Material Watch")
+    research.append(["Month", "Material", "Market Price"])
+    research.append(["Apr 2026", "Brass", 610])
+    research.append(["May 2026", "Brass", 635])
+    output = BytesIO()
+    workbook.save(output)
+    workbook.close()
+    data = output.getvalue()
+
+    parsed = parse_tally_workbook(data, "sales-with-research.xlsx", "sales")
+    supplemental = _supplemental_smart_analysis(
+        data,
+        "sales-with-research.xlsx",
+        parsed,
+    )
+
+    assert supplemental is not None
+    assert [dataset.sheet_name for dataset in supplemental.datasets] == ["Material Watch"]

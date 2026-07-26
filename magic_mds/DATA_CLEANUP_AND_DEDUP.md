@@ -22,6 +22,9 @@ hard to trigger:
 
 `DELETE /v1/dashboard/data/{tenant_id}` removes, in one transaction:
 
+- `smart_rows`
+- `smart_datasets`
+- `smart_imports`
 - `financial_transaction_lines`
 - `financial_transactions`
 - `financial_imports`

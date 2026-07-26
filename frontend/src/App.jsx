@@ -19,6 +19,7 @@ import DataNotes from "./components/DataNotes";
 import DueTimeline from "./components/DueTimeline";
 import FinancialOverview from "./components/FinancialOverview";
 import FinancialUpload from "./components/FinancialUpload";
+import SmartDataExplorer from "./components/SmartDataExplorer";
 import StatTile from "./components/StatTile";
 import ThemeToggle from "./components/ThemeToggle";
 import TrialGuide, { TrialBanner } from "./components/TrialGuide";
@@ -298,7 +299,14 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
               )}
 
               {view === "financial" && data.has_financial_data ? (
-                <FinancialOverview financials={data.financials} t={t} />
+                <>
+                  {data.smart_data?.has_data && (
+                    <SmartDataExplorer smartData={data.smart_data} t={t} />
+                  )}
+                  {data.financials?.has_data && (
+                    <FinancialOverview financials={data.financials} t={t} />
+                  )}
+                </>
               ) : !data.has_receivables_data ? (
                 isTrial && !data.has_financial_data ? (
                   <TrialGuide

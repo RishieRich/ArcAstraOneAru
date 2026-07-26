@@ -24,10 +24,11 @@ email and a password of at least eight characters containing a letter and number
 
 The empty trial workspace gives a four-step guide:
 
-1. Upload a Sales, Purchase, Expense or Profit & Loss `.xlsx` using Smart detect or a
-   specific book type.
+1. Upload `.xlsx`, `.xlsm`, legacy `.xls` or `.csv`. Smart detect can profile unfamiliar
+   GST, expense, inventory, operational or other useful multi-sheet data; use a specific
+   finance type when you already know it.
 2. Review key metrics, trends, product/customer/supplier detail and import warnings.
-3. Ask ARQ AI questions in English, Hinglish or Gujarati-Roman.
+3. Ask ARQ AI questions in English, Hinglish, Gujarati-Roman or Marathi-Roman.
 4. Generate a one-page report from any answer and use Print / Save PDF.
 
 The trial also explains that ARQ can connect with Tally or another business database and
@@ -118,8 +119,9 @@ The app (and the log) always says *why* in plain words:
 
 ## 6. Upload Excel and view products
 
-Use **Upload Excel** and choose Sales, Purchases or Expenses. ARQ accepts both
-standard multi-sheet Tally exports and many single-sheet registers. It detects
+Use **Upload Excel** and choose Smart detect for most files, or Sales, Purchases,
+Expenses and P&L when the type is known. ARQ accepts standard multi-sheet Tally
+exports, unfamiliar business sheets and CSV registers. It detects
 common column names, links dated voucher rows to the product rows beneath them,
 and can reconcile layouts where quantity shifts between columns.
 
@@ -130,7 +132,9 @@ transaction/customer counts, value share and the strongest customer.
 If a workbook has no voucher number/GUID, identical-looking transactions are
 flagged for review rather than silently deleted. If a footer total does not
 match its visible voucher rows, ARQ imports only the visible rows and shows a
-warning. It never fabricates entries to match a stated total.
+warning. It never fabricates entries to match a stated total. For an unfamiliar
+schema, the dashboard shows mapping confidence, typed columns, honest data notes,
+KPIs and chart-ready breakdowns without inventing an accounting classification.
 
 ## 7. Ask ARQ and create a one-page report
 
@@ -151,7 +155,8 @@ to remove all ARQ dashboard data and rebuild it from Tally/Excel.
 
 The confirmation asks for the exact company name, your current dashboard
 password/PIN, and an irreversible-action checkbox. It deletes receivables,
-ledgers, sync history, uploaded Excel transactions and import history from SQL.
+ledgers, sync history, normalized finance uploads, Smart Excel datasets/rows and
+import history from SQL.
 It does **not** delete the company, user access or registered connector device.
 
 After cleanup, press **Push Now** (or wait for auto-sync) to repopulate

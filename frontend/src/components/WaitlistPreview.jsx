@@ -14,6 +14,7 @@ import {
   IconWallet,
 } from "../icons";
 import BrandLogo from "./BrandLogo";
+import ProductShowcase from "./ProductShowcase";
 import ThemeToggle from "./ThemeToggle";
 
 const MONTHLY_SALES = [310000, 370000, 420000, 400000, 510000, 550000, 640000, 720000];
@@ -237,6 +238,8 @@ export default function WaitlistPreview({
             </article>
           </div>
         </section>
+
+        <ProductShowcase t={t} compact />
 
         <section className="waitlist-unlock">
           <div className="waitlist-unlock-copy">

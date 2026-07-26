@@ -61,6 +61,18 @@ def cleanup_company_data(
         deleted = {}
         for label, statement in (
             (
+                "smart_rows",
+                "delete from smart_rows where tenant_id = %s",
+            ),
+            (
+                "smart_datasets",
+                "delete from smart_datasets where tenant_id = %s",
+            ),
+            (
+                "smart_imports",
+                "delete from smart_imports where tenant_id = %s",
+            ),
+            (
                 "financial_transaction_lines",
                 "delete from financial_transaction_lines where tenant_id = %s",
             ),

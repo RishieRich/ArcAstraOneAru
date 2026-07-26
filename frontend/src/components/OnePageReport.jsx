@@ -25,8 +25,39 @@ function availableProductSummary(finance) {
   return byKind.sales?.details?.length ? byKind.sales : byKind.purchase || byKind.sales;
 }
 
+function firstSmartDataset(data) {
+  return data.smart_data?.datasets?.[0] || null;
+}
+
+function formatSmartKpi(kpi) {
+  if (kpi.format === "currency") return formatMoney(kpi.value);
+  if (kpi.format === "percent") {
+    return `${Number(kpi.value).toLocaleString("en-IN", {
+      maximumFractionDigits: 2,
+    })}%`;
+  }
+  return Number(kpi.value).toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+  });
+}
+
+function formatReportValue(value, format = "currency", compact = false) {
+  if (format === "currency") return formatMoney(value, { compact });
+  if (format === "percent") return `${Number(value).toFixed(1)}%`;
+  return Number(value).toLocaleString("en-IN", {
+    maximumFractionDigits: 2,
+    notation: compact && Math.abs(value) >= 100000 ? "compact" : "standard",
+  });
+}
+
 function buildKpis(data, focus, t) {
   const finance = data.financials;
+  const smart = firstSmartDataset(data);
+  if (!finance.has_data && smart?.kpis?.length) {
+    return smart.kpis
+      .slice(0, 4)
+      .map((kpi) => [kpi.label, formatSmartKpi(kpi)]);
+  }
   const products = availableProductSummary(finance);
   const topProduct = products?.details?.[0];
   const topCustomer = finance.counterparties?.sales?.[0];
@@ -82,6 +113,16 @@ function buildKpis(data, focus, t) {
 
 function rankingRows(data, focus) {
   const finance = data.financials;
+  const smart = firstSmartDataset(data);
+  if (!finance.has_data && smart) {
+    const chart = smart.charts?.find((item) => item.type === "bar")
+      || smart.charts?.find((item) => item.type === "donut");
+    return (chart?.points || []).slice(0, 6).map((point) => ({
+      label: point.label,
+      amount: point.value,
+      format: chart.format,
+    }));
+  }
   if (focus === "product") {
     return (availableProductSummary(finance)?.details || [])
       .slice(0, 6)
@@ -113,7 +154,7 @@ function rankingRows(data, focus) {
     }));
 }
 
-function MonthlyReportChart({ monthly, focus, trendLabel, t }) {
+function MonthlyReportChart({ monthly, focus, trendLabel, valueFormat = "currency", t }) {
   const key = focus === "profitability" ? "net_result" : "sales";
   const values = monthly.map((point) => point[key] || 0);
   const signed = key === "net_result";
@@ -154,7 +195,7 @@ function MonthlyReportChart({ monthly, focus, trendLabel, t }) {
               rx="3"
               className={value < 0 ? "negative" : "positive"}
             >
-              <title>{`${formatMonth(point.month)}: ${formatMoney(value)}`}</title>
+              <title>{`${formatMonth(point.month)}: ${formatReportValue(value, valueFormat)}`}</title>
             </rect>
             {showLabel && (
               <text x={x + barWidth / 2} y={height - 9} textAnchor="middle">
@@ -176,7 +217,7 @@ function RankingChart({ rows }) {
         <div key={row.label}>
           <span title={row.label}>{row.label}</span>
           <i><b style={{ width: `${(row.amount / maximum) * 100}%` }} /></i>
-          <strong>{formatMoney(row.amount, { compact: true })}</strong>
+          <strong>{formatReportValue(row.amount, row.format, true)}</strong>
         </div>
       ))}
     </div>
@@ -193,10 +234,13 @@ export default function OnePageReport({
   const focus = reportFocus(question);
   const kpis = buildKpis(data, focus, t);
   const ranking = rankingRows(data, focus);
+  const smartDataset = firstSmartDataset(data);
   const dateRange = data.financials.date_range;
   const period = dateRange.from
     ? `${dateRange.from} — ${dateRange.to || dateRange.from}`
-    : t.allAvailableDates;
+    : smartDataset
+      ? `${data.smart_data.filename} · ${smartDataset.sheet_name}`
+      : t.allAvailableDates;
   const dueMonthly = (data.due_timeline || []).map((point) => ({
     month: point.month,
     sales: (point.overdue || 0) + (point.on_track || 0),
@@ -204,13 +248,29 @@ export default function OnePageReport({
   }));
   const useDueTrend =
     focus === "receivables" ||
-    (!(data.financials.monthly || []).length && dueMonthly.length > 0);
-  const trend = useDueTrend ? dueMonthly : data.financials.monthly || [];
+    (!(data.financials.monthly || []).length && dueMonthly.length > 0 && !smartDataset);
+  const smartTrend = smartDataset?.charts
+    ?.find((chart) => chart.type === "line")
+    ?.points?.map((point) => ({
+      month: point.label,
+      sales: point.value,
+      net_result: point.value,
+    })) || [];
+  const trend = useDueTrend
+    ? dueMonthly
+    : (data.financials.monthly || []).length
+      ? data.financials.monthly
+      : smartTrend;
   const trendLabel = useDueTrend
     ? t.reportDueTrend
     : focus === "profitability"
       ? t.reportResultTrend
       : t.reportSalesTrend;
+  const trendFormat = (
+    !(data.financials.monthly || []).length && !useDueTrend
+      ? smartDataset?.charts?.find((chart) => chart.type === "line")?.format
+      : "currency"
+  ) || "number";
 
   return (
     <div className="report-overlay" role="dialog" aria-modal="true" aria-label={t.onePageReport}>
@@ -271,6 +331,7 @@ export default function OnePageReport({
               monthly={trend}
               focus={focus}
               trendLabel={trendLabel}
+              valueFormat={trendFormat}
               t={t}
             />
           </section>
@@ -289,7 +350,13 @@ export default function OnePageReport({
 
         <footer>
           <span>
-            {t.reportDataScope}: {data.financials.kinds.map((kind) => t.kindLabels[kind]).join(", ") || t.receivablesView}
+            {t.reportDataScope}: {
+              data.financials.kinds.map((kind) => t.kindLabels[kind]).join(", ")
+              || (smartDataset
+                ? `${t.smartDomains?.[smartDataset.domain] || smartDataset.domain} · ${smartDataset.sheet_name}`
+                : null)
+              || t.receivablesView
+            }
           </span>
           <p>{t.reportDisclaimer}</p>
           <strong>ARQ Astra · {t.aiPowered}</strong>

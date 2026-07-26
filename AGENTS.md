@@ -5,7 +5,8 @@ different agents on the same page. Codex CLI loads `AGENTS.md` automatically; Cl
 loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way — one file,
 not two drifting copies.
 
-Last verified against the repo: **2026-07-26** (commit `cebbcbc`).
+Last verified against the repo: **2026-07-26** (working tree based on commit `5eb57d1`;
+Smart Excel migration 0007 is not yet applied or deployed).
 
 ---
 
@@ -13,9 +14,11 @@ Last verified against the repo: **2026-07-26** (commit `cebbcbc`).
 
 **ARQ Astra** — a Tally → cloud receivables product for Indian small businesses. A Windows
 exe reads TallyPrime read-only on the client's PC, pushes receivables to a FastAPI backend
-on Neon Postgres, and the owner sees who owes them money in a trilingual web dashboard with
-an AI copilot. The dashboard also accepts optional Tally-style `.xlsx` exports for sales,
-purchases and expenses; these add business-flow metrics without changing connector sync.
+on Neon Postgres, and the owner sees who owes them money in a multilingual web dashboard
+with an AI copilot. The dashboard also accepts `.xlsx`, `.xlsm`, legacy `.xls` and `.csv`
+uploads. Familiar Sales/Purchase/Expense/P&L books feed the audited finance model; Smart
+Excel profiles unfamiliar multi-sheet business data into explicitly labelled KPIs and charts
+without changing connector sync.
 
 Three components, **one repo** (`github.com/RishieRich/ArcAstraOneAru`), three deploy targets:
 
@@ -23,7 +26,7 @@ Three components, **one repo** (`github.com/RishieRich/ArcAstraOneAru`), three d
 |---|---|---|
 | `connector/` | Windows tkinter app → `dist/arq-connector.exe` | Client's PC, next to Tally |
 | `backend/` | FastAPI + psycopg on Neon Postgres | Vercel (Root Directory = `backend`) |
-| `frontend/` | Vite + React dashboard (EN / Hinglish / Gujarati) | Vercel (separate project, Root Directory = `frontend`) |
+| `frontend/` | Vite + React dashboard (EN / Hinglish / Gujarati / Marathi) | Vercel (separate project, Root Directory = `frontend`) |
 
 ```
 [Client Windows PC]                      [Vercel]                  [Neon Postgres]
@@ -34,7 +37,8 @@ Three components, **one repo** (`github.com/RishieRich/ArcAstraOneAru`), three d
                                              ▲                      bills, sync_runs,
                 browser ──password login──┘                        dashboard_users,
                         │                                         financial_imports,
-                        └──optional .xlsx upload─────────────────▶ financial_transactions
+                        └──optional Excel/CSV upload────────────▶ financial_transactions /
+                                                                  smart datasets + rows
                      frontend (React)
 ```
 
@@ -62,7 +66,7 @@ Three components, **one repo** (`github.com/RishieRich/ArcAstraOneAru`), three d
 | `POST /v1/auth/signup` | none | create one of 10 isolated free trials, else upsert a waitlist lead |
 | `GET /v1/dashboard/companies` | `Bearer <dashboard token>` | tenant list |
 | `GET /v1/dashboard/metrics/{tenant_id}` | `Bearer <dashboard token>` | all dashboard numbers |
-| `POST /v1/imports/financials` | `Bearer <dashboard token>` | detect + import a standard or flat-register `.xlsx` workbook |
+| `POST /v1/imports/financials` | `Bearer <dashboard token>` | normalize a finance book or profile unfamiliar multi-sheet Excel/CSV data |
 | `POST /v1/ask` | `Bearer <dashboard token>` | AI copilot Q&A over the tenant's snapshot |
 | `DELETE /v1/dashboard/data/{tenant_id}` | `Bearer <dashboard token>` + password/name confirmation | clear synced/imported facts while preserving tenant, access and devices |
 
@@ -91,6 +95,10 @@ Routers live in `backend/app/routers/`; wiring is in `backend/app/main.py`.
   discarded. Public API responses never expose capacity, remaining places or waitlist
   position. `python -m app.admin list-trial-waitlist` is the private source for active/waiting
   counts and lead details.
+- **Smart Excel access** — no account-specific bypass exists. Every managed or active
+  free-trial dashboard user may upload only to a tenant already allowed by
+  `ensure_dashboard_tenant_access`; waitlisted leads have no token or tenant and see sample
+  data only.
 - **The exe never writes to Tally** — only read/export XML requests. Keep it that way.
 - **Data cleanup re-authenticates** — exact company name plus current password/PIN are
   verified server-side; tenant, dashboard access and registered devices are preserved.
@@ -171,8 +179,9 @@ There is **no `vercel.json`** in this repo; configuration lives in
 
 - Vercel's Python builder installs from `[project].dependencies` and **ignores
   `requirements.txt`** — keep both lists in sync or the build silently lacks a package.
-- Excel ingestion uses `openpyxl`; it is a deliberate runtime dependency and must remain
-  in both `backend/pyproject.toml` and `backend/requirements.txt`.
+- Excel ingestion uses `openpyxl` plus `xlrd` for legacy `.xls`; both are deliberate
+  runtime dependencies and must remain in `backend/pyproject.toml` and
+  `backend/requirements.txt`.
 - `[tool.vercel] entrypoint = "api.index:app"` is required: the FastAPI preset finds several
   ASGI `app` objects (`api/index.py`, `app/main.py`, `tests/conftest.py`) and refuses to guess.
 - Root Directory **must** be `backend` for the backend project, `frontend` for the frontend.
@@ -211,16 +220,20 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 9. **Apply `0006_public_trials.sql` before deploying public-signup code.** It adds
    `dashboard_users.account_type`, `trial_waitlist`, and the `profit_loss` import-envelope
    constraint. The migration is idempotent, but production application remains owner-gated.
-10. **Advisory-lock tenant IDs must be cast to text.** Psycopg binds the connector's tenant
+10. **Apply `0007_smart_excel_datasets.sql` before deploying Smart Excel code.** The
+    dashboard queries `smart_imports`, `smart_datasets` and `smart_rows`. Known finance sheets
+    keep their existing normalized path; generic profiles never masquerade as statutory
+    accounting classifications. Do not deploy the matching backend first.
+11. **Advisory-lock tenant IDs must be cast to text.** Psycopg binds the connector's tenant
    ID as PostgreSQL `uuid`, while `hashtext()` accepts only text. The writer paths use
    `hashtextextended(cast(%s as text), 0)`; preserve the cast.
-11. **Client connector releases support Windows 10/11 x64 and must be Authenticode-signed.**
+12. **Client connector releases support Windows 10/11 x64 and must be Authenticode-signed.**
    `connector/build.ps1 -Release` refuses to package a release without a current-user
    code-signing certificate/private key and SignTool. It embeds version metadata and a
    multi-resolution icon, runs connector-only tests, validates the x64 PE/icon/signature,
    and creates a checksum-bearing versioned ZIP. Unsigned developer builds can be blocked
    by Windows Smart App Control and must not be sent to clients.
-12. **Product analytics come only from normalized `item` lines.** Do not infer a product
+13. **Product analytics come only from normalized `item` lines.** Do not infer a product
    from a party or ledger row. Product value, quantity coverage, weighted rate, customers
    and top-customer metrics are computed in `dashboard.product_metrics`. A null unit remains
    unknown. Ask ARQ's one-page report is rendered from authorized dashboard metrics in the
@@ -238,6 +251,8 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 - **Excel voucher removals/cancellations** — re-exports update vouchers that retain the same
   Tally GUID, but a voucher absent from a later workbook is not automatically deleted. Add an
   explicit snapshot/reconciliation workflow before treating imports as a cancellation ledger.
+- **Smart Excel migration 0007 is authored but not yet approved/applied in production.**
+  Apply it before deploying the matching backend and frontend.
 
 ## 10. Documentation index (`magic_mds/`)
 
@@ -258,6 +273,7 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 | `EXCEL_IMPORT_SETUP.md` | Neon migration, deploy and verification steps for optional workbook imports |
 | `DATA_CLEANUP_AND_DEDUP.md` | reset boundary, Tally/Excel dedup behavior and migration 0005 deployment order |
 | `PUBLIC_TRIAL_SIGNUP.md` | first-10 signup capacity, isolated tenant creation, waitlist and migration 0006 |
+| `SMART_EXCEL.md` | multi-sheet fallback model, metric/chart inference, dedup boundary and migration 0007 |
 
 ## 11. Working agreement for agents
 
@@ -268,8 +284,8 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 - Python: stdlib-first. `/v1/ask` deliberately uses `urllib` over vendor SDKs to keep Vercel
   cold starts lean. Don't add an SDK dependency without a real reason.
 - Frontend: plain React + Vite, no UI framework, no state library. Keep it that way.
-- All user-facing dashboard strings go through `frontend/src/i18n.js` — **all three languages**
-  (EN / Hinglish / Gujarati-Roman). Never hardcode a string in a component.
+- All user-facing dashboard strings go through `frontend/src/i18n.js` — **all four languages**
+  (EN / Hinglish / Gujarati-Roman / Marathi-Roman). Never hardcode a string in a component.
 - Money is displayed in Indian lakh-crore grouping (`Rs 1,25,000`).
 
 **Before you finish a session**

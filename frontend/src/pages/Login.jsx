@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { login, signup } from "../api";
 import BrandLogo from "../components/BrandLogo";
+import ConversionContactBar from "../components/ConversionContactBar";
+import ProductShowcase from "../components/ProductShowcase";
 import ThemeToggle from "../components/ThemeToggle";
 import WaitlistPreview from "../components/WaitlistPreview";
 import { LANGS } from "../i18n";
@@ -95,6 +97,7 @@ export default function Login({
 
   return (
     <div className="login-screen">
+      <ConversionContactBar t={t} />
       <div className="login-theme">
         <ThemeToggle theme={theme} setTheme={setTheme} t={t} />
       </div>
@@ -107,6 +110,7 @@ export default function Login({
           </span>
           <h2>{t.signupHero}</h2>
           <p>{t.signupHeroSub}</p>
+          <ProductShowcase t={t} />
           <div className="auth-benefits">
             {t.signupBenefits.map((benefit) => (
               <div key={benefit}>
@@ -261,6 +265,9 @@ export default function Login({
               </div>
           </>
         </form>
+        <div className="mobile-product-preview">
+          <ProductShowcase t={t} compact />
+        </div>
       </div>
     </div>
   );

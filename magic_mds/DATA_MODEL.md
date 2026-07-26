@@ -40,6 +40,12 @@ presenting outstanding amounts.
   `(tenant_id, kind, source_key)`.
 - `financial_transaction_lines` — item, category and tax detail; cascades when a
   normalized transaction is removed.
+- `smart_imports` — tenant-scoped audit envelope and exact-file SHA-256 for an
+  unfamiliar workbook.
+- `smart_datasets` — typed columns, mapping confidence, KPIs, charts and warnings
+  for every useful sheet.
+- `smart_rows` — typed JSONB values used by Ask ARQ for the latest generic
+  workbook snapshot.
 
 Workbook files are never stored. Exact files are idempotent, re-exported Tally
 GUIDs upsert, and GUID-less vouchers use a stable semantic fallback. Workbook
@@ -62,7 +68,10 @@ device can therefore populate a genuinely fresh snapshot after cleanup.
 - 0004: per-company dashboard access
 - 0005: current-state bills + legacy Excel key canonicalization
 - 0006: public trial account type, waitlist and Profit & Loss import envelope
+- 0007: Smart Excel multi-sheet profiles and typed generic rows
 
 Migration 0005 was explicitly approved, applied to the configured Neon database,
 verified and deployed on 2026-07-26. Migration 0006 was explicitly approved,
 applied, verified and deployed on 2026-07-26.
+Migration 0007 is authored but intentionally not applied until the owner approves
+the matching release.

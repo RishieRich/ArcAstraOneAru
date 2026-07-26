@@ -67,7 +67,7 @@ entry**:
    stores those snapshots in **Neon Postgres**, and computes every dashboard metric.
 3. A **React dashboard** gives the owner receivables analytics, an optional Excel-upload path
    for sales/purchase/expense data, and an **AI copilot** that answers questions in English,
-   Hinglish or Gujarati-Roman.
+   Hinglish, Gujarati-Roman or Marathi-Roman.
 
 **Why it matters architecturally.** The hard constraint is that the system of record is a
 desktop application on an unmanaged consumer PC, behind a home/office NAT, with no API, no
@@ -100,7 +100,7 @@ zero-to-low operating cost (all free tiers).
 | Owner has **no IT department** | Installation must be a single exe + a 6-character pairing code. No VPN, no port forwarding, no static IP, no cloud agent enrolment. |
 | Tally data is the **business's crown jewels** | Read-only by contract. The connector issues only Export/Collection XML requests — never an Import or Alter request. This is a non-negotiable trust promise. |
 | Owner is **cost-sensitive** and ARQ is pre-revenue | Whole stack sits on free tiers (Vercel Hobby, Neon free, Gemini free tier). Architecture must degrade gracefully on those tiers, not assume them away. |
-| Owner is **not comfortable in English** | Trilingual UI (EN / Hinglish / Gujarati-Roman) is a first-class requirement, enforced by a central `i18n.js` — never hardcoded strings. |
+| Owner is **not comfortable in English** | Four-language UI (EN / Hinglish / Gujarati-Roman / Marathi-Roman) is a first-class requirement, enforced by a central `i18n.js` — never hardcoded strings. |
 | Money must "look right" to an Indian reader | Lakh-crore digit grouping (`₹1,25,000`, not `₹125,000`) everywhere, including in LLM output — enforced by system prompt. |
 
 ### 2.3 Scope
@@ -111,7 +111,7 @@ zero-to-low operating cost (all free tiers).
 - Device pairing, device tokens, per-company binding, device revocation
 - Receivables analytics: outstanding, overdue, aging buckets, top debtors, chase list,
   due timeline, concentration risk, alerts
-- Optional Tally `.xlsx` import for Sales / Purchase / Expense with auto-classification
+- Optional Excel/CSV import: audited finance normalization plus schema-flexible, multi-sheet Smart Excel profiles
 - Derived business metrics: monthly trend, operating result, margin, category and
   counterparty breakdowns
 - AI copilot Q&A over the tenant's own snapshot, trilingual, with provider failover
@@ -145,9 +145,9 @@ zero-to-low operating cost (all free tiers).
 | FR-07 | Authenticate a dashboard user and issue a session | `POST /v1/auth/login` |
 | FR-08 | List the companies a user may see | `GET /v1/dashboard/companies` |
 | FR-09 | Return every dashboard number for one company in one call | `GET /v1/dashboard/metrics/{tenant_id}` |
-| FR-10 | Accept, classify and import a Tally `.xlsx` workbook | `POST /v1/imports/financials` |
+| FR-10 | Normalize a known finance workbook or profile unfamiliar multi-sheet Excel/CSV data | `POST /v1/imports/financials` |
 | FR-11 | Answer natural-language questions over the tenant's data, trilingually | `POST /v1/ask` |
-| FR-12 | Render the whole dashboard in EN / Hinglish / Gujarati-Roman | `frontend/src/i18n.js` |
+| FR-12 | Render the whole dashboard in EN / Hinglish / Gujarati-Roman / Marathi-Roman | `frontend/src/i18n.js` |
 | FR-13 | Create at most 10 isolated self-service trial accounts and waitlist overflow leads | `GET /v1/auth/signup/status`, `POST /v1/auth/signup` |
 | FR-14 | Guide trial users from adaptive Excel upload through metrics, AI Q&A and one-page reports | `TrialGuide.jsx`, `FinancialUpload.jsx`, `Copilot.jsx` |
 
@@ -551,9 +551,9 @@ flowchart LR
 | | P&L-style derivation | `financial_metrics()` — zero-filled monthly series, operating result, margin, cost ratio |
 | ⑤ Experience | Auth & session | PBKDF2 password + stateless HMAC session token |
 | | Visualisation | Hand-built React components, no chart library |
-| | Trilingual UX | `i18n.js` with `en` / `hi` (Hinglish) / `gu` (Gujarati-Roman) |
+| | Multilingual UX | `i18n.js` with `en` / `hi` (Hinglish) / `gu` (Gujarati-Roman) / `mr` (Marathi-Roman) |
 | | Conversational AI | `/v1/ask` with snapshot-in-prompt, provider failover, language mirroring |
-| | Self-serve Excel import | `spreadsheet_import.py` classifier + `/v1/imports/financials` |
+| | Self-serve Excel import | `spreadsheet_import.py` finance normalizer + `smart_spreadsheet.py` multi-sheet profiler + `/v1/imports/financials` |
 
 ---
 
@@ -575,7 +575,7 @@ flowchart LR
 | **Backend validation** | Pydantic | ≥2.7 | `schemas.py` is the wire contract shared conceptually with `pusher.build_payload`. |
 | **DB driver** | psycopg | ≥3.2 (`[binary]`) | Native `executemany` pipelining — one round trip per batch instead of per row. Matters for thousands of bills. |
 | **Config** | python-dotenv | ≥1.0 | Local `.env`; on Vercel the file is absent and env vars come from project settings. |
-| **Excel parsing** | openpyxl | ≥3.1 | Read-only `.xlsx`. **Deliberate runtime dependency** — must stay in *both* `pyproject.toml` and `requirements.txt`. |
+| **Excel parsing** | openpyxl + xlrd | ≥3.1 / ≥2.0.1 | Read-only modern and legacy Excel. **Deliberate runtime dependencies** — both must stay in *both* `pyproject.toml` and `requirements.txt`. |
 | **LLM access** | Python stdlib `urllib` | — | **No vendor SDK by design** (ADR-007). Both providers speak the OpenAI chat-completions dialect, so one request shape serves both. Keeps the lambda small and cold starts fast. |
 | **LLM primary** | Google Gemini | `gemini-flash-latest` (alias — never goes stale) via the OpenAI-compatible endpoint | Free tier, fast, strong at Indic-Roman script mirroring. |
 | **LLM fallback** | Groq | `llama-3.3-70b-versatile` | Different vendor, different failure domain, very low latency. |
@@ -1158,7 +1158,7 @@ owner's explicit go-ahead.**
 | 7 | `POST /v1/auth/signup` | public SPA | none | Atomically create an isolated free trial or upsert a waitlist lead | 409 existing account · 422 invalid required fields |
 | 8 | `GET /v1/dashboard/companies` | SPA | `Bearer <session>` | Companies this user may see, with sync/import status | 401 |
 | 9 | `GET /v1/dashboard/metrics/{tenant_id}` | SPA | `Bearer <session>` | **Every** dashboard number in one document | 401 · 403 no access · 404 no such company |
-| 10 | `POST /v1/imports/financials` | SPA | `Bearer <session>` | Classify + ingest one `.xlsx`, including conservative P&L summaries | 422 validation/classification · 404 no such company · 403 no access · **200 `duplicate:true`** on re-upload |
+| 10 | `POST /v1/imports/financials` | SPA | `Bearer <session>` | Normalize a finance book or type/profile unfamiliar `.xlsx` / `.xlsm` / `.xls` / `.csv` sheets | 422 validation/classification · 404 no such company · 403 no access · **200 `duplicate:true`** on re-upload |
 | 11 | `POST /v1/ask` | SPA | `Bearer <session>` | Trilingual Q&A over the tenant snapshot | 403 no access · 503 AI unconfigured · 502 all providers failed |
 
 **Endpoint 10 note.** The workbook is sent as a **raw request body** with `tenant_id` and

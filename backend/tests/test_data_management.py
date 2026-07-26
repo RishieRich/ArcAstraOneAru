@@ -124,6 +124,9 @@ def test_cleanup_deletes_facts_but_not_company_or_access(monkeypatch):
     assert response["preserved"] == ["tenant", "dashboard_access", "devices"]
     assert connection.committed
     assert delete_queries == [
+        "delete from smart_rows where tenant_id = %s",
+        "delete from smart_datasets where tenant_id = %s",
+        "delete from smart_imports where tenant_id = %s",
         "delete from financial_transaction_lines where tenant_id = %s",
         "delete from financial_transactions where tenant_id = %s",
         "delete from financial_imports where tenant_id = %s",

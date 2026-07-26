@@ -6,7 +6,7 @@ unchanged.
 
 ## What the feature accepts
 
-- `.xlsx` files up to 5 MB.
+- `.xlsx`, `.xlsm`, legacy `.xls` and `.csv` files up to 5 MB.
 - Standard Tally exports containing a `Ledger Entries` sheet; `Vouchers` and
   `Inventory Entries` are used when present.
 - Single-sheet sales, purchase or expense registers with Date, Particulars and
@@ -18,9 +18,14 @@ unchanged.
 
 The public trial upload panel also offers **Smart detect** and **Profit & Loss**:
 
-- Smart detect uses workbook structure, voucher labels, sheet/file names and deterministic
-  accounting rules. If semantics remain ambiguous, it asks the user to select Sales,
-  Purchase or Expense instead of guessing.
+- Smart detect first uses workbook structure, voucher labels, sheet/file names and
+  deterministic accounting rules. When finance semantics remain ambiguous, it profiles
+  every useful visible sheet as explicitly labelled generic business data: typed dates,
+  measures and dimensions; KPIs; charts; confidence and warnings. It never forces an
+  unfamiliar metric into Sales, Expense, Profit or GST payable.
+- A known finance workbook may also contain unrelated useful sheets. The finance sheets stay
+  on the normalized voucher path and only extra sheets enter the generic profile, avoiding
+  double-counting parent/detail rows.
 - A clearly titled Profit & Loss / P&L / Income Statement can contain one- or two-sided
   ledger layouts. The importer maps recognizable income, purchase/COGS and expense rows
   into the existing three normalized kinds. Printed totals and Gross/Net Profit/Loss rows
@@ -30,6 +35,9 @@ The public trial upload panel also offers **Smart detect** and **Profit & Loss**
   layout. These limitations are returned as upload warnings.
 - Migration `0006_public_trials.sql` expands only `financial_imports.detected_kind` to allow
   the `profit_loss` envelope. Normalized transaction rows remain Sales/Purchase/Expense.
+- Migration `0007_smart_excel_datasets.sql` adds tenant-scoped generic import envelopes,
+  dataset profiles and typed JSONB rows. Exact files remain SHA-256-idempotent, and the
+  dashboard uses the latest generic workbook snapshot.
 
 ARQ checks sheet signatures and Tally voucher types before writing. A workbook
 uploaded through the wrong option is rejected. Custom journal/payment voucher
@@ -86,6 +94,8 @@ idempotent. The Excel data model and dashboard-access additions are:
 migrations/0003_financial_imports.sql
 migrations/0004_dashboard_user_access.sql
 migrations/0005_bill_current_state.sql
+migrations/0006_public_trials.sql
+migrations/0007_smart_excel_datasets.sql
 ```
 
 This creates:
@@ -96,6 +106,7 @@ This creates:
 - `dashboard_users.all_tenants` — explicit owner-wide access.
 - `dashboard_user_tenants` — per-company grants for client logins.
 - current-state bill identity plus canonical GUID-less Excel voucher keys.
+- `smart_imports`, `smart_datasets` and `smart_rows` for unfamiliar multi-sheet data.
 
 No existing table is dropped or truncated. Migration 0004 additively alters
 `dashboard_users`: pre-existing accounts become explicit all-company owners and
@@ -104,7 +115,9 @@ new accounts default to no access.
 If you prefer the Neon SQL Editor, open
 `backend/migrations/0003_financial_imports.sql` and
 `backend/migrations/0004_dashboard_user_access.sql`, and
-`backend/migrations/0005_bill_current_state.sql`, paste each complete file in
+`backend/migrations/0005_bill_current_state.sql`,
+`backend/migrations/0006_public_trials.sql` and
+`backend/migrations/0007_smart_excel_datasets.sql`, paste each complete file in
 order, and run them once against the production database.
 
 ## 2. Deploy
@@ -132,7 +145,8 @@ No new environment variable is required.
    `backend/backend`.
 5. Remember that the frontend's `VITE_API_BASE_URL` remains a build-time value.
 
-The backend adds `openpyxl` to both dependency lists that Vercel may read:
+The backend keeps `openpyxl` and legacy-Excel reader `xlrd` in both dependency lists
+that Vercel may read:
 
 - `backend/pyproject.toml`
 - `backend/requirements.txt`
@@ -151,8 +165,9 @@ Then:
 1. Log in to the dashboard.
 2. Pick a company.
 3. Click **Upload Excel**.
-4. Use the matching Sales, Purchases or Expenses tile.
-5. After import, open **Sales & spending**.
+4. Use Smart detect for an unfamiliar or multi-sheet file; use a matching finance tile when
+   its accounting type is already known.
+5. After import, open **Smart Excel & books**.
 6. Confirm the total, full date range, complete-tenure chart, Sales/Purchase/Expense
    lines, monthly profit/loss bars, performance highs/lows, category/item mix,
    counterparties, Product performance, period table and import history.
@@ -165,6 +180,9 @@ Then:
 10. Ask ARQ a product or management question, create the one-page report and use
     Print / Save PDF. Confirm the report stays to one A4 landscape page and its
     KPI/chart values match the dashboard.
+11. Upload a multi-sheet GST/operations workbook and confirm sheet tabs, mapping confidence,
+    typed-column chips, generic KPIs and line/bar/donut charts render without relabelling the
+    data as statutory Sales or Profit.
 
 Optional metadata-only SQL checks in Neon:
 
@@ -201,8 +219,8 @@ These checks avoid displaying party names or amounts.
 - Re-exporting an existing voucher updates it by Tally GUID. A voucher removed
   from a later workbook is not automatically deleted; removal tooling should be
   added before using imports as a cancellation ledger.
-- Legacy `.xls`, mixed sales-and-purchase workbooks, password-protected files and
-  files above 5 MB are rejected with a user-facing error.
+- Password-protected files, unreadable binary formats and files above 5 MB are rejected with
+  a user-facing error. Legacy `.xls` is supported by the generic Smart detect path.
 
 ## Safe rollback
 
