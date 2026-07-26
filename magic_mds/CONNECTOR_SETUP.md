@@ -2,9 +2,11 @@
 
 Reads your Tally data and syncs it to the ARQ cloud. Read-only towards Tally — it never writes to your books.
 
+Supported client systems are **Windows 10 or Windows 11, 64-bit (x64)**.
+
 You need two things from the person who sent you this:
 
-1. **`arq-connector.exe`** — the app.
+1. **The signed ARQ connector release ZIP** — extract it before running the app.
 2. **A pairing code** — a short code like `xcEfebe0H7qh`. One-time use. Ask them for it if you didn't get one.
 
 ---
@@ -25,9 +27,12 @@ Leave Tally **open**, with your company **loaded**. The connector only sees comp
 
 ## Step 2 — Run the exe
 
-Double-click **`arq-connector.exe`**. No installer, nothing to configure.
+Extract the ZIP completely, keep the EXE in a permanent folder such as `C:\ARQ Astra`,
+then double-click it. No installer and no Python installation are required.
 
-Windows may show a blue **"Windows protected your PC"** box — that's just because the app isn't code-signed yet. Click **More info → Run anyway**.
+Before running it, open **Properties → Digital Signatures** and verify the ARQ publisher
+signature. Do not bypass a Windows warning for an unsigned or invalidly signed copy; ask
+your admin for the signed release ZIP and compare its SHA-256 value with `SHA256SUMS.txt`.
 
 The window opens. **Leave the Backend URL exactly as it is** — it's already pointed at the right server.
 

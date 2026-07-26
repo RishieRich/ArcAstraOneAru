@@ -121,7 +121,8 @@ cd frontend; npm run build
 cd connector; .venv\Scripts\Activate.ps1; python -m arq_connector.cli   # no args = GUI
 cd connector; python -m arq_connector.cli doctor                        # Tally health check
 cd connector; python -m pytest                                          # offline, real captured Tally XML
-cd connector; .\build.ps1                                               # rebuild dist\arq-connector.exe
+cd connector; .\build.ps1                                               # validated unsigned developer build
+cd connector; .\build.ps1 -Release -CertificateThumbprint <thumbprint>  # signed client ZIP
 
 # Admin CLI (from backend/, venv active)
 python -m app.admin create-tenant --name "Acme"
@@ -195,6 +196,12 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 9. **Advisory-lock tenant IDs must be cast to text.** Psycopg binds the connector's tenant
    ID as PostgreSQL `uuid`, while `hashtext()` accepts only text. The writer paths use
    `hashtextextended(cast(%s as text), 0)`; preserve the cast.
+10. **Client connector releases support Windows 10/11 x64 and must be Authenticode-signed.**
+   `connector/build.ps1 -Release` refuses to package a release without a current-user
+   code-signing certificate/private key and SignTool. It embeds version metadata and a
+   multi-resolution icon, runs connector-only tests, validates the x64 PE/icon/signature,
+   and creates a checksum-bearing versioned ZIP. Unsigned developer builds can be blocked
+   by Windows Smart App Control and must not be sent to clients.
 
 ## 9. Open items
 

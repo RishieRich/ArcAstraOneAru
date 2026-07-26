@@ -1,6 +1,6 @@
 # ARQ Tally Connector — User Manual
 
-The connector is **one file**: `arq-connector.exe` (in `connector\dist\`). Copy it anywhere — Desktop, `C:\ARQ`, a pen drive to a client machine — it needs nothing else installed (no Python, no setup wizard).
+The connector is distributed as a versioned ZIP for **Windows 10/11 x64**. Extract it first, then keep the included EXE in a permanent folder such as `C:\ARQ Astra`. It needs no Python installation or setup wizard.
 
 What it does: reads receivables data from the TallyPrime running on the same machine (read-only — it can never change anything in Tally) and pushes it to the ARQ backend, which stores it in the cloud database with each client's data kept separate.
 
@@ -33,7 +33,7 @@ Other admin commands: `python -m app.admin list-tenants` and `python -m app.admi
 ## 2. Install & first-time setup (client machine, once)
 
 1. Make sure **TallyPrime is open with the company loaded** (its name visible at the top of Tally).
-2. Copy `arq-connector.exe` anywhere on the machine and **double-click it**. A small window opens.
+2. Extract the release ZIP, verify its checksum/signature, keep the EXE in a permanent folder, and **double-click it**. A small window opens.
 3. **Backend URL** — use `http://127.0.0.1:8010` for local testing; use the production alias in a deployed connector build.
 4. **Tally company** — your open companies appear in the dropdown automatically. Pick the right one. (Empty? Check Tally is open with a company loaded, press **Refresh**.)
 5. **Pairing code** — paste the code from the admin and press **Register**. You'll see *"Registered ✓ — token stored in Windows Credential Manager."* This is once per machine; afterwards this section shows ✓ and stays locked.
@@ -107,4 +107,14 @@ Deleted SQL data cannot be recovered from ARQ.
 cd D:\AI_Projects\ARQ\ARQ_Astra_Launch\connector
 .\build.ps1
 ```
-Output: `connector\dist\arq-connector.exe` (~16 MB).
+This produces an unsigned, validated developer package for internal testing. A client release
+must be signed with a trusted RSA code-signing certificate:
+
+```powershell
+.\build.ps1 -Release -CertificateThumbprint <certificate-thumbprint>
+```
+
+The build regenerates the multi-resolution icon, runs connector tests, embeds Windows product
+metadata, verifies the x64 PE/icon/signature, and creates
+`connector\dist\ARQ-Astra-Connector-v<version>-windows-x64.zip`. Send clients only that signed ZIP,
+never the raw unsigned developer EXE.

@@ -1,77 +1,130 @@
-# Generates the app's icon assets FROM THE REAL ARQ LOGO
-# (canonical source: src\arq_connector\assets\ARQ_Logo.jpeg).
+# Generates a high-contrast Windows icon that remains recognizable at 16px.
+# The full ARQ artwork is excellent at banner size, but its black background and
+# fine lettering disappear when Windows scales it down for File Explorer.
+#
 # Outputs:
-#   src\arq_connector\assets\arq.ico       — multi-size exe/window icon
-#   src\arq_connector\assets\arq_logo.png  — 40px header logo for the GUI
-# Build-time only (System.Drawing); outputs are committed, so normal builds
-# never need to run this. Re-run only if the logo changes.
+#   src\arq_connector\assets\arq.ico       - multi-resolution exe/window icon
+#   src\arq_connector\assets\arq_logo.png  - 40px GUI header mark
 
 $ErrorActionPreference = "Stop"
 Add-Type -AssemblyName System.Drawing
 
 $assets = Join-Path $PSScriptRoot "src\arq_connector\assets"
-New-Item -ItemType Directory -Force $assets | Out-Null
+New-Item -ItemType Directory -Force -Path $assets | Out-Null
 
-$logoPath = Join-Path $assets "ARQ_Logo.jpeg"
-$logo = [System.Drawing.Image]::FromFile($logoPath)
-
-function New-LogoPng([int]$size, [bool]$rounded) {
-    $bmp = New-Object System.Drawing.Bitmap($size, $size)
-    $g = [System.Drawing.Graphics]::FromImage($bmp)
-    $g.SmoothingMode = "AntiAlias"
-    $g.InterpolationMode = "HighQualityBicubic"
-
-    if ($rounded) {
-        $r = [Math]::Max(2, [int]($size * 0.18))
-        $path = New-Object System.Drawing.Drawing2D.GraphicsPath
-        $path.AddArc(0, 0, $r*2, $r*2, 180, 90)
-        $path.AddArc($size - $r*2, 0, $r*2, $r*2, 270, 90)
-        $path.AddArc($size - $r*2, $size - $r*2, $r*2, $r*2, 0, 90)
-        $path.AddArc(0, $size - $r*2, $r*2, $r*2, 90, 90)
-        $path.CloseFigure()
-        $g.SetClip($path)
-    }
-
-    # draw the full square logo scaled to the tile
-    $g.DrawImage($logo, 0, 0, $size, $size)
-
-    $ms = New-Object System.IO.MemoryStream
-    $bmp.Save($ms, [System.Drawing.Imaging.ImageFormat]::Png)
-    $g.Dispose(); $bmp.Dispose()
-    Write-Output -NoEnumerate $ms.ToArray()
+function New-RoundedRectanglePath(
+    [float]$x,
+    [float]$y,
+    [float]$width,
+    [float]$height,
+    [float]$radius
+) {
+    $diameter = $radius * 2
+    $path = [System.Drawing.Drawing2D.GraphicsPath]::new()
+    $path.AddArc($x, $y, $diameter, $diameter, 180, 90)
+    $path.AddArc($x + $width - $diameter, $y, $diameter, $diameter, 270, 90)
+    $path.AddArc($x + $width - $diameter, $y + $height - $diameter, $diameter, $diameter, 0, 90)
+    $path.AddArc($x, $y + $height - $diameter, $diameter, $diameter, 90, 90)
+    $path.CloseFigure()
+    return $path
 }
 
-# ── multi-size ICO (PNG-compressed entries are valid in ICO format) ──
-$sizes = 16, 24, 32, 48, 64, 256
+function New-AppPng([int]$size) {
+    $bitmap = [System.Drawing.Bitmap]::new(
+        $size,
+        $size,
+        [System.Drawing.Imaging.PixelFormat]::Format32bppArgb
+    )
+    $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+    $graphics.Clear([System.Drawing.Color]::Transparent)
+    $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::AntiAlias
+    $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+    $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+    $graphics.TextRenderingHint = [System.Drawing.Text.TextRenderingHint]::AntiAliasGridFit
+
+    $margin = if ($size -le 20) { 0 } else { [Math]::Max(1, [int]($size * 0.035)) }
+    $tileSize = $size - (2 * $margin)
+    $radius = [Math]::Max(2, [float]($tileSize * 0.20))
+    $tile = New-RoundedRectanglePath $margin $margin $tileSize $tileSize $radius
+    $orange = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 238, 139, 24))
+    $graphics.FillPath($orange, $tile)
+
+    # A compact mark is intentional: the full logo is unreadable in Explorer's
+    # 16px and 20px views. "ARQ" is retained wherever the pixel budget permits.
+    $label = if ($size -le 20) { "A" } else { "ARQ" }
+    $fontSize = if ($label -eq "A") { $size * 0.68 } else { $size * 0.34 }
+    $font = [System.Drawing.Font]::new(
+        "Segoe UI",
+        $fontSize,
+        [System.Drawing.FontStyle]::Bold,
+        [System.Drawing.GraphicsUnit]::Pixel
+    )
+    $textBrush = [System.Drawing.SolidBrush]::new([System.Drawing.Color]::FromArgb(255, 24, 28, 35))
+    $format = [System.Drawing.StringFormat]::new()
+    $format.Alignment = [System.Drawing.StringAlignment]::Center
+    $format.LineAlignment = [System.Drawing.StringAlignment]::Center
+    $format.FormatFlags = [System.Drawing.StringFormatFlags]::NoWrap
+    $textBounds = [System.Drawing.RectangleF]::new(0, -($size * 0.04), $size, $size)
+    $graphics.DrawString($label, $font, $textBrush, $textBounds, $format)
+
+    $memory = [System.IO.MemoryStream]::new()
+    try {
+        $bitmap.Save($memory, [System.Drawing.Imaging.ImageFormat]::Png)
+        return ,$memory.ToArray()
+    }
+    finally {
+        $memory.Dispose()
+        $format.Dispose()
+        $textBrush.Dispose()
+        $font.Dispose()
+        $orange.Dispose()
+        $tile.Dispose()
+        $graphics.Dispose()
+        $bitmap.Dispose()
+    }
+}
+
+# Include the sizes Windows commonly requests at 100%-250% display scaling.
+$sizes = @(16, 20, 24, 32, 40, 48, 64, 128, 256)
 $pngs = @{}
-foreach ($s in $sizes) { $pngs[$s] = [byte[]](New-LogoPng $s $true) }
+foreach ($size in $sizes) {
+    $pngs[$size] = [byte[]](New-AppPng $size)
+}
 
 $icoPath = Join-Path $assets "arq.ico"
 $stream = [System.IO.File]::Create($icoPath)
-$writer = New-Object System.IO.BinaryWriter($stream)
+$writer = [System.IO.BinaryWriter]::new($stream)
+try {
+    $writer.Write([UInt16]0)
+    $writer.Write([UInt16]1)
+    $writer.Write([UInt16]$sizes.Count)
 
-$writer.Write([UInt16]0)               # reserved
-$writer.Write([UInt16]1)               # type: icon
-$writer.Write([UInt16]$sizes.Count)    # image count
+    $offset = 6 + (16 * $sizes.Count)
+    foreach ($size in $sizes) {
+        $data = $pngs[$size]
+        $dimension = if ($size -ge 256) { 0 } else { $size }
+        $writer.Write([Byte]$dimension)
+        $writer.Write([Byte]$dimension)
+        $writer.Write([Byte]0)
+        $writer.Write([Byte]0)
+        $writer.Write([UInt16]1)
+        $writer.Write([UInt16]32)
+        $writer.Write([UInt32]$data.Length)
+        $writer.Write([UInt32]$offset)
+        $offset += $data.Length
+    }
 
-$offset = 6 + (16 * $sizes.Count)
-foreach ($s in $sizes) {
-    $data = $pngs[$s]
-    $dim = if ($s -ge 256) { 0 } else { $s }   # 0 means 256 in ICO directories
-    $writer.Write([Byte]$dim); $writer.Write([Byte]$dim)
-    $writer.Write([Byte]0);    $writer.Write([Byte]0)
-    $writer.Write([UInt16]1);  $writer.Write([UInt16]32)
-    $writer.Write([UInt32]$data.Length)
-    $writer.Write([UInt32]$offset)
-    $offset += $data.Length
+    foreach ($size in $sizes) {
+        $writer.Write([byte[]]$pngs[$size])
+    }
 }
-foreach ($s in $sizes) { $writer.Write([byte[]]$pngs[$s]) }
-$writer.Dispose(); $stream.Dispose()
-Write-Host "Icon written: $icoPath"
+finally {
+    $writer.Dispose()
+    $stream.Dispose()
+}
 
-# ── 40px PNG for the GUI header ──
-$hdr = [byte[]](New-LogoPng 40 $true)
-[System.IO.File]::WriteAllBytes((Join-Path $assets "arq_logo.png"), $hdr)
-Write-Host "Header logo written: $assets\arq_logo.png"
+$headerLogo = [byte[]](New-AppPng 40)
+[System.IO.File]::WriteAllBytes((Join-Path $assets "arq_logo.png"), $headerLogo)
 
-$logo.Dispose()
+Write-Host "Generated icon: $icoPath"
+Write-Host "Embedded sizes: $($sizes -join ', ')"
