@@ -25,6 +25,7 @@ import ThemeToggle from "./components/ThemeToggle";
 import TrialGuide, { TrialBanner } from "./components/TrialGuide";
 import TopDebtors from "./components/TopDebtors";
 import Login from "./pages/Login";
+import ResearchAgent from "./components/ResearchAgent";
 
 export default function App() {
   const [lang, setLang] = useState(() => {
@@ -91,6 +92,7 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
   const [view, setView] = useState("receivables");
   const [chatOpen, setChatOpen] = useState(false);
   const [showCleanup, setShowCleanup] = useState(false);
+  const researchEnabled = import.meta.env.VITE_RESEARCH_ENABLED !== "false";
 
   useEffect(() => {
     fetchCompanies()
@@ -298,7 +300,15 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
                 </nav>
               )}
 
-              {view === "financial" && data.has_financial_data ? (
+              {researchEnabled && (
+                <nav className="view-tabs" aria-label="Research Agent">
+                  <button type="button" aria-pressed={view === "research"} onClick={() => setView("research")}>Research Agent</button>
+                </nav>
+              )}
+
+              {view === "research" && researchEnabled ? (
+                <ResearchAgent tenantId={tenantId} onAuthError={onLogout} />
+              ) : view === "financial" && data.has_financial_data ? (
                 <>
                   {data.smart_data?.has_data && (
                     <SmartDataExplorer smartData={data.smart_data} t={t} />

@@ -70,6 +70,7 @@ Three components, **one repo** (`github.com/RishieRich/ArcAstraOneAru`), three d
 | `GET /v1/dashboard/metrics/{tenant_id}` | `Bearer <dashboard token>` | all dashboard numbers |
 | `POST /v1/imports/financials` | `Bearer <dashboard token>` | normalize a finance book or profile unfamiliar multi-sheet Excel/CSV data |
 | `POST /v1/ask` | `Bearer <dashboard token>` | AI copilot Q&A over the tenant's snapshot |
+| `/research/*` | `Bearer <dashboard token>` | Optional, feature-flagged Research Agent; tenant access is checked on every request |
 | `DELETE /v1/dashboard/data/{tenant_id}` | `Bearer <dashboard token>` + password/name confirmation | clear synced/imported facts while preserving tenant, access and devices |
 
 Routers live in `backend/app/routers/`; wiring is in `backend/app/main.py`.
@@ -121,6 +122,10 @@ Backend (`backend/.env` locally, Vercel project env in prod — see `backend/.en
 - `GEMINI_REASONING_EFFORT` — leave unset. Only for a pinned 3.x *thinking* model; the
   Flash-Lite default rejects the field with 400 (see trap 14)
 - `CORS_ORIGINS` — comma-separated dashboard origins; `*` until locked down
+- `ARQ_RESEARCH_ENABLED` — optional Research Agent switch; defaults to `true` for demos.
+  Set `false` to remove its API surface and frontend nav entry.
+- `TAVILY_API_KEY` — required only when running cited customer or supplier discovery;
+  no research results are fabricated when it is absent.
 
 Frontend: `VITE_API_BASE_URL` (build-time). Connector: `ARQ_API_BASE_URL` at **build** time,
 or edit `DEFAULT_API_BASE_URL` in `connector/src/arq_connector/settings.py` before `build.ps1`.
@@ -158,6 +163,7 @@ python -m app.admin grant-dashboard-access --email x@y.com --tenant-id <id>
 python -m app.admin list-dashboard-users
 python -m app.admin list-trial-waitlist
 python -m app.admin delete-dashboard-user --email x@y.com
+python scripts\seed_research_demo.py  # creates a separate, labelled synthetic demo tenant
 
 # DB migrations
 cd backend; python migrations\run_migration.py

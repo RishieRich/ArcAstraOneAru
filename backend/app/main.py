@@ -13,6 +13,7 @@ from app.routers import (
     data_management,
     devices,
     imports,
+    research,
     sync,
 )
 
@@ -54,6 +55,7 @@ app.include_router(data_management.router)
 app.include_router(ask.router)
 app.include_router(auth_dashboard.router)
 app.include_router(imports.router)
+app.include_router(research.router)
 
 
 @app.get("/health")
