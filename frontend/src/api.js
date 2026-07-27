@@ -80,9 +80,9 @@ export const fetchMetrics = (tenantId) => request(`/v1/dashboard/metrics/${tenan
 
 export const getResearchIcp = (tenantId) => request(`/research/icp?tenant_id=${tenantId}`);
 export const generateResearchIcp = (tenantId) => request(`/research/icp/generate?tenant_id=${tenantId}`, { method: "POST" });
-export const runCustomerResearch = (tenantId) => request(`/research/customers/run?tenant_id=${tenantId}`, { method: "POST" });
+export const runCustomerResearch = (tenantId, body = {}) => request(`/research/customers/run?tenant_id=${tenantId}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
 export const runMaterialResearch = (tenantId, body) => request(`/research/materials/run?tenant_id=${tenantId}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-export const fetchResearchCandidates = (tenantId, runId) => request(`/research/runs/${runId}/candidates?tenant_id=${tenantId}`);
+export const fetchResearchCandidates = (tenantId, runId) => request(`/research/runs/${runId}/candidates?tenant_id=${tenantId}&status=all`);
 export const updateResearchCandidate = (tenantId, id, status) => request(`/research/candidates/${id}?tenant_id=${tenantId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
 export const deliverResearchCandidates = (tenantId, candidateIds) => request(`/research/candidates/deliver?tenant_id=${tenantId}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidate_ids: candidateIds, limit: 5 }) });
 

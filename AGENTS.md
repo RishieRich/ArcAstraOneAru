@@ -126,6 +126,10 @@ Backend (`backend/.env` locally, Vercel project env in prod — see `backend/.en
   Set `false` to remove its API surface and frontend nav entry.
 - `TAVILY_API_KEY` — required only when running cited customer or supplier discovery;
   no research results are fabricated when it is absent.
+- `RESEARCH_SEARCH_DEPTH` — Tavily depth; defaults to `advanced`. Research cost is
+  bounded by `RESEARCH_MAX_QUERIES` (default 4, hard max 6),
+  `RESEARCH_RESULTS_PER_QUERY` (default 6, hard max 8), and
+  `RESEARCH_MAX_CANDIDATES` (default 20, hard max 30).
 
 Frontend: `VITE_API_BASE_URL` (build-time). Connector: `ARQ_API_BASE_URL` at **build** time,
 or edit `DEFAULT_API_BASE_URL` in `connector/src/arq_connector/settings.py` before `build.ps1`.
@@ -310,6 +314,7 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 | `DATA_CLEANUP_AND_DEDUP.md` | reset boundary, Tally/Excel dedup behavior and migration 0005 deployment order |
 | `PUBLIC_TRIAL_SIGNUP.md` | first-10 signup capacity, isolated tenant creation, waitlist and migration 0006 |
 | `SMART_EXCEL.md` | multi-sheet fallback model, metric/chart inference, dedup boundary and migration 0007 |
+| `RESEARCH_AGENT.md` | ICP scoring, bounded Tavily discovery, evidence scoring, curation and UI behavior |
 
 ## 11. Working agreement for agents
 

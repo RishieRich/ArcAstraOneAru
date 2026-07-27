@@ -301,13 +301,13 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
               )}
 
               {researchEnabled && (
-                <nav className="view-tabs" aria-label="Research Agent">
-                  <button type="button" aria-pressed={view === "research"} onClick={() => setView("research")}>Research Agent</button>
+                <nav className="view-tabs" aria-label={t.research.nav}>
+                  <button type="button" aria-pressed={view === "research"} onClick={() => setView("research")}>{t.research.nav}</button>
                 </nav>
               )}
 
               {view === "research" && researchEnabled ? (
-                <ResearchAgent tenantId={tenantId} onAuthError={onLogout} />
+                <ResearchAgent tenantId={tenantId} t={t} onAuthError={onLogout} />
               ) : view === "financial" && data.has_financial_data ? (
                 <>
                   {data.smart_data?.has_data && (
