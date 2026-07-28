@@ -1,4 +1,4 @@
-from app.research import build_search_plan, candidates_from_results, research_web
+from app.research import build_icp, build_search_plan, candidates_from_results, research_web
 
 
 def test_search_plan_uses_multiple_bounded_angles(monkeypatch):
@@ -54,11 +54,11 @@ def test_duplicate_company_results_become_corroborating_evidence():
             {
                 "title": "Acme Engineering Private Limited - Company Profile",
                 "url": "https://directory.example/acme",
-                "content": "Verified business profile for Acme Engineering industrial pumps Pune.",
+                "content": "Verified supplier profile for Acme Engineering industrial pumps Pune.",
                 "score": 0.7,
             },
         ],
-        "customer",
+        "material",
         ["industrial pump"],
     )
     assert len(candidates) == 1
@@ -72,3 +72,32 @@ def test_unconfigured_web_search_returns_honest_guidance(monkeypatch):
     assert candidates == []
     assert summary["web_search_ready"] is False
     assert summary["queries"]
+
+
+def test_receivables_only_profile_still_returns_collection_actions():
+    class Cursor:
+        rows = []
+
+        def execute(self, query, _params):
+            if "from bills" in query:
+                self.rows = [("Acme Traders", 125000, 90000, 48, 3, 125000, 90000)]
+            else:
+                self.rows = []
+
+        def fetchall(self):
+            return self.rows
+
+    profile, _narrative, completeness = build_icp(Cursor(), "tenant-id")
+    assert profile["profile_version"] == 2
+    assert profile["snapshot"]["outstanding_analyzed"] == 125000
+    assert profile["action_plan"][0]["type"] == "collect"
+    assert completeness["receivables"] is True
+
+
+def test_supplier_search_plan_uses_current_price_context():
+    queries = build_search_plan(
+        "material",
+        ["EN8 steel bar"],
+        {"geography": "Gujarat", "baseline": 72},
+    )
+    assert any("INR 72" in query for query in queries)

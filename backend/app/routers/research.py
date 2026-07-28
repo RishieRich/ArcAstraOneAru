@@ -63,7 +63,17 @@ def _run(tenant_id, email, kind, params):
             cur.execute("select profile_json from icp_profiles where tenant_id=%s",(tenant_id,)); row=cur.fetchone()
             if not row: raise HTTPException(status_code=409, detail="Generate an ICP before customer research")
             terms=[x["name"] for x in row[0].get("top_products",[])][:3]
-            if not terms: raise HTTPException(status_code=422, detail="Needs more data: sales item lines are required before customer research")
+            industry = str(params.get("industry") or "").strip()
+            if not terms and industry:
+                terms = [industry]
+            if not terms:
+                raise HTTPException(
+                    status_code=422,
+                    detail=(
+                        "Tell the Agent what product or industry you sell to first. "
+                        "You can also upload an item-level sales book so ARQ fills this in."
+                    ),
+                )
         else:
             product=str(params.get("product","")).strip(); baseline=params.get("baseline")
             if not product or baseline is None: raise HTTPException(status_code=422, detail="Product and current cost baseline are required")
@@ -91,6 +101,66 @@ async def run_customers(request: Request, tenant_id: UUID = Query(), email: str 
 async def run_materials(request: Request, tenant_id: UUID = Query(), email: str = Depends(require_dashboard_user)):
     return _run(str(tenant_id),email,"material",await request.json())
 
+@router.get("/latest")
+def latest_runs(tenant_id: UUID = Query(), email: str = Depends(require_dashboard_user)):
+    """Restore the latest completed customer and supplier work after a refresh."""
+    _enabled()
+    restored = {}
+    with get_connection() as conn, conn.cursor() as cur:
+        _access(cur, email, str(tenant_id))
+        cur.execute(
+            """
+            with ranked as (
+              select id, type, params_json, created_at,
+                     row_number() over (
+                       partition by type order by created_at desc, id desc
+                     ) as run_rank
+              from research_runs
+              where tenant_id = %s and status = 'completed'
+            )
+            select id, type, params_json, created_at
+            from ranked
+            where run_rank = 1
+            """,
+            (str(tenant_id),),
+        )
+        for run_id, kind, params, created_at in cur.fetchall():
+            cur.execute(
+                """
+                select id,name,location,contact,source_url,retrieved_at,
+                       fit_score,fit_reason,status,enrichment_json
+                from research_candidates
+                where tenant_id=%s and run_id=%s
+                order by fit_score desc
+                """,
+                (str(tenant_id), str(run_id)),
+            )
+            candidates = [
+                {
+                    "id": str(candidate_id),
+                    "name": name,
+                    "location": location,
+                    "contact": contact,
+                    "source_url": source_url,
+                    "retrieved_at": retrieved_at.isoformat(),
+                    "fit_score": fit_score,
+                    "fit_reason": fit_reason,
+                    "status": status,
+                    "enrichment": enrichment,
+                }
+                for (
+                    candidate_id, name, location, contact, source_url,
+                    retrieved_at, fit_score, fit_reason, status, enrichment,
+                ) in cur.fetchall()
+            ]
+            restored["customers" if kind == "customer" else "suppliers"] = {
+                "run_id": str(run_id),
+                "completed_at": created_at.isoformat(),
+                "summary": (params or {}).get("research_summary"),
+                "candidates": candidates,
+            }
+    return {"runs": restored}
+
 @router.get("/runs/{run_id}/candidates")
 def list_candidates(run_id: UUID, tenant_id: UUID = Query(), status: str | None = Query(default="draft"), email: str = Depends(require_dashboard_user)):
     _enabled()
@@ -115,5 +185,11 @@ async def deliver(request: Request, tenant_id: UUID = Query(), email: str = Depe
     with get_connection() as conn, conn.cursor() as cur:
         _access(cur,email,str(tenant_id)); cur.execute("select id,name,location,contact,source_url,fit_reason from research_candidates where tenant_id=%s and id=any(%s) and status='approved' order by fit_score desc limit %s",(str(tenant_id),ids,limit)); rows=cur.fetchall()
         cur.execute("update research_candidates set status='delivered' where tenant_id=%s and id=any(%s) and status='approved'",(str(tenant_id),[str(x[0]) for x in rows])); conn.commit()
-    block="\n\n".join(f"*{n}*{(' — '+l) if l else ''}\n{r}\nSource: {u}" for _,n,l,_,u,r in rows)
+    block = "\n\n".join(
+        f"*{name}*{(' — ' + location) if location else ''}\n"
+        f"{reason}\n"
+        f"{('Contact: ' + contact + chr(10)) if contact else ''}"
+        f"Source: {source_url}"
+        for _, name, location, contact, source_url, reason in rows
+    )
     return {"delivered":len(rows),"message":block}

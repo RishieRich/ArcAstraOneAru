@@ -399,3 +399,161 @@
   .delivery-dock { align-items: stretch; flex-direction: column; }
   .delivery-dock button { justify-content: center; }
 }
+
+/* Useful first: the Agent opens with an actual business action plan. */
+.agent-plan {
+  position: relative;
+  margin: 18px 0 16px;
+  padding: clamp(20px, 3vw, 30px);
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--research-violet) 24%, var(--border));
+  border-radius: 22px;
+  background:
+    radial-gradient(600px 220px at 100% 0, color-mix(in srgb, var(--research-blue) 14%, transparent), transparent 68%),
+    linear-gradient(140deg, color-mix(in srgb, var(--research-violet) 8%, var(--surface-1)), var(--surface-1));
+  box-shadow: 0 20px 55px rgba(35, 33, 86, .09);
+}
+.agent-plan::after {
+  position: absolute;
+  right: -60px;
+  bottom: -90px;
+  width: 210px;
+  height: 210px;
+  border: 1px solid color-mix(in srgb, var(--research-violet) 16%, transparent);
+  border-radius: 50%;
+  content: "";
+}
+.agent-plan-heading {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+.agent-plan-heading h3 { margin: 7px 0 5px; font-size: clamp(22px, 2.7vw, 30px); letter-spacing: -.035em; }
+.agent-plan-heading p { margin: 0; color: var(--text-muted); font-size: 13px; }
+.agent-plan-count {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  color: #fff;
+  border-radius: 14px;
+  background: linear-gradient(145deg, var(--research-violet), var(--research-blue));
+  box-shadow: 0 12px 25px color-mix(in srgb, var(--research-violet) 25%, transparent);
+  font-size: 16px;
+  font-weight: 800;
+}
+.agent-actions {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 20px;
+}
+.agent-actions article {
+  position: relative;
+  min-height: 142px;
+  padding: 18px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--surface-1) 88%, transparent);
+  animation: research-enter .48s calc(var(--delay) + 80ms) both;
+  transition: transform .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+.agent-actions article:hover {
+  border-color: color-mix(in srgb, var(--research-violet) 28%, var(--border));
+  box-shadow: 0 14px 30px rgba(30, 31, 48, .08);
+  transform: translateY(-3px);
+}
+.agent-actions article i {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  color: var(--research-violet);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--research-violet) 10%, transparent);
+}
+.agent-actions article i svg { width: 17px; }
+.agent-actions article p { margin: 15px 0 0; color: var(--text-secondary); font-size: 13px; line-height: 1.55; }
+.agent-action-number { position: absolute; top: 16px; right: 17px; color: var(--text-muted); font: 700 10px/1 var(--font); }
+.agent-plan-empty, .agent-plan-loading {
+  display: flex;
+  min-height: 118px;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  color: var(--text-secondary);
+}
+.agent-plan-empty > svg, .agent-plan-loading > svg { width: 25px; color: var(--research-violet); }
+.agent-plan-empty strong { display: block; font-size: 14px; }
+.agent-plan-empty p { max-width: 560px; margin: 5px 0 0; color: var(--text-muted); font-size: 12px; line-height: 1.5; }
+
+.collection-priorities { margin-top: 18px; padding: 19px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface-2); }
+.collection-priority-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin-top: 13px; }
+.collection-priority-grid article { display: grid; grid-template-columns: 27px minmax(0,1fr) auto; align-items: center; gap: 10px; padding: 12px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-1); }
+.collection-priority-grid article > span { color: var(--research-violet); font-size: 9px; font-weight: 800; }
+.collection-priority-grid strong, .collection-priority-grid small { display: block; }
+.collection-priority-grid strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.collection-priority-grid small { margin-top: 3px; color: var(--text-muted); font-size: 10px; }
+.collection-priority-grid b { color: var(--loss); font-size: 12px; }
+
+.research-plan-result {
+  display: grid;
+  grid-template-columns: auto minmax(220px, .8fr) minmax(300px, 1.2fr);
+  gap: 18px;
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--research-violet) 26%, var(--border));
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--research-violet) 6%, var(--surface-1));
+  animation: research-enter .45s ease both;
+}
+.research-plan-icon { display: grid; width: 38px; height: 38px; place-items: center; color: #fff; border-radius: 12px; background: var(--research-violet); }
+.research-plan-icon svg { width: 18px; }
+.research-plan-copy h4 { margin: 6px 0; font-size: 17px; }
+.research-plan-copy p { margin: 0; color: var(--text-secondary); font-size: 12px; line-height: 1.5; }
+.research-plan-copy > small { display: block; margin-top: 8px; color: var(--text-muted); font-size: 11px; line-height: 1.45; }
+.planned-searches { padding: 14px 16px; border-radius: 13px; color: #f4f4fb; background: #151721; }
+.planned-searches > strong { font-size: 11px; }
+.planned-searches ol { margin: 9px 0 0; padding-left: 18px; }
+.planned-searches li { margin: 6px 0; color: rgba(244,244,251,.7); font-size: 10px; line-height: 1.45; }
+.research-helper { display: flex; align-items: flex-start; gap: 8px; margin-top: 11px; padding: 10px 12px; color: var(--warn); border-radius: 11px; background: var(--warn-soft); font-size: 11px; line-height: 1.45; }
+.research-helper svg { flex: 0 0 auto; width: 15px; }
+
+/* Business readers should never need to squint at an Agent result. */
+.capability-body, .research-hero p, .fit-reason { font-size: 13px; }
+.research-capability-meta, .research-field > span, .queue-heading p,
+.summary-metrics small, .summary-insights li, .candidate-location,
+.status-pill, .confidence, .candidate-actions button, .candidate-actions a,
+.research-empty p, .research-error p { font-size: 11px; }
+.research-tabs button, .queue-filters button, .delivery-dock button,
+.delivery-result button { font-size: 11px; }
+.progress-steps { font-size: 10px; }
+
+@media (max-width: 760px) {
+  .research-plan-result { grid-template-columns: auto 1fr; }
+  .planned-searches { grid-column: 1 / -1; }
+  .collection-priority-grid { grid-template-columns: 1fr; }
+  .agent-actions { grid-template-columns: 1fr; }
+  .candidate-score { position: static; display: block; opacity: 1; pointer-events: auto; }
+  .candidate-card { grid-template-columns: 62px 1fr; }
+}
+
+@media (max-width: 480px) {
+  .research-hero { min-height: 230px; }
+  .research-tabs { top: 106px; }
+  .research-plan-result { grid-template-columns: 1fr; }
+  .planned-searches { grid-column: auto; }
+  .candidate-card { grid-template-columns: 1fr; }
+  .candidate-score { position: absolute; top: 14px; right: 14px; }
+  .score-ring { width: 48px; height: 48px; }
+  .score-ring::after { width: 40px; height: 40px; }
+  .score-ring > strong { margin-top: -5px; font-size: 14px; }
+  .score-ring > small { margin-top: 15px; font-size: 6px; }
+  .candidate-title-row { padding-right: 55px; }
+}

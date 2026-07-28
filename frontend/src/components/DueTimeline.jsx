@@ -5,11 +5,21 @@ import { IconCalendar } from "../icons";
    Two segments with a hairline gap; legend below names them. */
 export default function DueTimeline({ timeline, t }) {
   const max = Math.max(...timeline.map((m) => m.overdue + m.on_track), 1);
+  const lateTotal = timeline.reduce((sum, month) => sum + month.overdue, 0);
+  const onTrackTotal = timeline.reduce((sum, month) => sum + month.on_track, 0);
 
   return (
     <div className="card">
       <h3><span className="ico"><IconCalendar /></span>{t.dueTimeline}</h3>
       <p className="sub">{t.dueTimelineSub}</p>
+      {timeline.length > 0 && (
+        <div className="chart-insight">
+          {t.dueInsight(
+            formatMoney(lateTotal, { compact: true }),
+            formatMoney(onTrackTotal, { compact: true }),
+          )}
+        </div>
+      )}
 
       {timeline.length === 0 ? (
         <div className="empty-mini">{t.empty}</div>

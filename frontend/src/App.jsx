@@ -288,7 +288,7 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
                   onClick={() => setView("receivables")}
                 >
                   <IconRupee width={16} height={16} />
-                  <span><strong>{t.receivablesView}</strong><small>{t.tagline}</small></span>
+                  <span><strong>{t.receivablesView}</strong><small>{t.receivablesViewSub}</small></span>
                 </button>
                 {data.has_financial_data && (
                   <button
@@ -297,7 +297,7 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
                     onClick={() => setView("financial")}
                   >
                     <IconChart width={16} height={16} />
-                    <span><strong>{t.financialView}</strong><small>{t.financialSub}</small></span>
+                    <span><strong>{t.financialView}</strong><small>{t.financialViewSub}</small></span>
                   </button>
                 )}
                 {researchEnabled && (
@@ -307,7 +307,7 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
                     onClick={() => setView("research")}
                   >
                     <IconSpark width={16} height={16} />
-                    <span><strong>{t.research.nav}</strong><small>{t.research.subtitle}</small></span>
+                    <span><strong>{t.research.nav}</strong><small>{t.agentsViewSub}</small></span>
                   </button>
                 )}
               </nav>
@@ -388,7 +388,8 @@ function ReceivablesView({ data, totals, t }) {
         <StatTile
           label={t.outstanding}
           value={formatMoney(totals.outstanding, { compact: true })}
-          foot={formatMoney(totals.outstanding)}
+          foot={t.billCountFoot(totals.bill_count)}
+          help={t.outstandingHelp}
           icon={<IconRupee />}
           delay={0}
         />
@@ -401,6 +402,7 @@ function ReceivablesView({ data, totals, t }) {
               : "—"
           }
           footTone={totals.overdue > 0 ? "alert" : "ok"}
+          help={t.overdueHelp}
           icon={<IconAlarm />}
           tone={totals.overdue > 0 ? "bad" : "good"}
           delay={40}
@@ -409,6 +411,7 @@ function ReceivablesView({ data, totals, t }) {
           label={t.avgOverdue}
           value={`${totals.avg_overdue_days} ${t.daysShort}`}
           foot={t.maxOverdue(totals.max_overdue_days)}
+          help={t.avgOverdueHelp}
           icon={<IconChart />}
           tone={totals.avg_overdue_days > 45 ? "bad" : undefined}
           delay={80}
@@ -418,17 +421,19 @@ function ReceivablesView({ data, totals, t }) {
           value={totals.bill_count}
           foot={`${totals.overdue_bill_count} ${t.overdue.toLowerCase()}`}
           footTone={totals.overdue_bill_count > 0 ? "alert" : undefined}
+          help={t.billsHelp}
           icon={<IconFile />}
           delay={120}
         />
         <StatTile
-          label={t.customers}
+          label={t.owingCustomers}
           value={totals.party_count}
           foot={
             totals.top_party
               ? `${totals.top_party} · ${totals.concentration_pct}%`
               : undefined
           }
+          help={t.customersHelp}
           icon={<IconUsers />}
           delay={160}
         />

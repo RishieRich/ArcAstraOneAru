@@ -282,6 +282,11 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
    and top-customer metrics are computed in `dashboard.product_metrics`. A null unit remains
    unknown. Ask ARQ's one-page report is rendered from authorized dashboard metrics in the
    browser and printed/saved as A4 landscape; the AI narrative never supplies chart numbers.
+15. **Research Agent has two honest capability levels.** Internal action plans work from
+   current bills and normalized sales without a web credential. Verified new-customer and
+   supplier names still require `TAVILY_API_KEY`; production currently has no Tavily key.
+   In that state, runs persist a prepared search plan with zero external candidates instead
+   of fabricating company names. `GET /research/latest` restores the latest completed work.
 
 ## 9. Open items
 

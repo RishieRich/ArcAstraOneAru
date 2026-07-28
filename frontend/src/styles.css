@@ -4710,6 +4710,174 @@ th.num { text-align: right; padding-right: 0; }
   .auth-benefits, .auth-connect-note { display: none; }
 }
 
+/* 2026 product polish: expressive where it helps, calm where users read numbers. */
+.workspace-nav {
+  position: relative;
+  gap: 8px;
+  padding: 7px;
+  border-color: color-mix(in srgb, var(--accent) 16%, var(--border));
+  background:
+    radial-gradient(420px 120px at 100% 0, color-mix(in srgb, #6d5ce7 8%, transparent), transparent 70%),
+    color-mix(in srgb, var(--surface-1) 92%, var(--surface-2));
+  box-shadow: 0 14px 42px rgba(22, 25, 34, .07);
+  scrollbar-width: thin;
+  scroll-snap-type: x proximity;
+}
+.workspace-nav button {
+  min-height: 68px;
+  align-items: center;
+  padding: 12px 14px;
+  scroll-snap-align: start;
+  transition: transform .2s ease, border-color .2s ease, background .2s ease, box-shadow .2s ease;
+}
+.workspace-nav button > svg {
+  width: 33px;
+  height: 33px;
+  padding: 8px;
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--accent) 9%, transparent);
+}
+.workspace-nav button strong { font-size: 13px; }
+.workspace-nav button small { font-size: 10px; line-height: 1.4; }
+.workspace-nav button:hover { transform: translateY(-2px); }
+.workspace-nav button[aria-pressed="true"] {
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.workspace-nav .agents-nav {
+  border-color: color-mix(in srgb, #6d5ce7 12%, var(--border));
+  background:
+    radial-gradient(180px 90px at 100% 0, color-mix(in srgb, #2583ef 13%, transparent), transparent 72%),
+    color-mix(in srgb, #6d5ce7 8%, var(--surface-1));
+}
+.workspace-nav .agents-nav > svg {
+  color: #6d5ce7;
+  background: color-mix(in srgb, #6d5ce7 12%, transparent);
+  animation: agent-nav-glow 3.2s ease-in-out infinite;
+}
+@keyframes agent-nav-glow {
+  50% { box-shadow: 0 0 0 6px color-mix(in srgb, #6d5ce7 7%, transparent); transform: rotate(-3deg); }
+}
+
+.tile {
+  isolation: isolate;
+  min-height: 140px;
+  border-color: color-mix(in srgb, var(--accent) 10%, var(--border));
+}
+.tile::before {
+  position: absolute;
+  z-index: -1;
+  right: -36px;
+  bottom: -56px;
+  width: 130px;
+  height: 130px;
+  border: 1px solid color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: 50%;
+  content: "";
+  transition: transform .3s ease;
+}
+.tile:hover::before { transform: scale(1.18); }
+.tile .value { letter-spacing: -.045em; }
+.tile-help {
+  display: inline-grid;
+  width: 16px;
+  height: 16px;
+  margin-left: 6px;
+  place-items: center;
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  cursor: help;
+  font-size: 9px;
+  text-transform: none;
+}
+.bars .bar-fill { transform-origin: left; animation: business-bar-grow .7s cubic-bezier(.2,.8,.2,1) both; }
+@keyframes business-bar-grow { from { transform: scaleX(0); opacity: .35; } }
+.chart-insight {
+  margin: 12px 0 16px;
+  padding: 10px 12px;
+  color: var(--text-secondary);
+  border-left: 3px solid var(--accent);
+  border-radius: 0 10px 10px 0;
+  background: color-mix(in srgb, var(--accent) 6%, var(--surface-2));
+  font-size: 11px;
+  line-height: 1.45;
+}
+.bills-card:hover, .trend-card:hover, .table-wrap:hover { transform: none; }
+.bills-card .table-wrap { max-height: 520px; border: 1px solid var(--border); border-radius: 13px; }
+.bills-card thead { position: sticky; z-index: 2; top: 0; background: var(--surface-1); }
+.bills-card tbody tr { transition: background .15s ease; }
+.bills-card tbody tr:hover { background: color-mix(in srgb, var(--accent) 5%, transparent); }
+
+/* Bring back the cascading product tour without bringing back the old clutter. */
+.login-screen {
+  background:
+    radial-gradient(760px 440px at 6% 8%, color-mix(in srgb, var(--purchase) 12%, transparent), transparent 72%),
+    radial-gradient(760px 420px at 94% 4%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 70%),
+    var(--page);
+}
+.login-topbar { width: min(1260px, calc(100% - 48px)); }
+.auth-shell {
+  width: min(1220px, calc(100% - 48px));
+  grid-template-columns: minmax(0, 1.35fr) minmax(370px, 420px);
+  gap: clamp(36px, 5vw, 72px);
+  padding-block: clamp(24px, 4vh, 48px);
+}
+.auth-story { max-width: 720px; }
+.auth-story h2 { max-width: 690px; font-size: clamp(42px, 4.4vw, 62px); }
+.auth-story > p { max-width: 650px; margin-bottom: 15px; }
+.auth-product-showcase {
+  margin: 14px 0 14px;
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--border));
+  box-shadow: 0 28px 72px rgba(16, 39, 28, .14);
+}
+.auth-benefits { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.auth-benefits > div { font-size: 11px; }
+.auth-shell .login-card {
+  border: 1px solid color-mix(in srgb, var(--accent) 14%, var(--border));
+  box-shadow: 0 28px 80px rgba(16, 17, 19, .14);
+}
+.login-btn { position: relative; overflow: hidden; }
+.login-btn::after {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(110deg, transparent 28%, rgba(255,255,255,.28) 46%, transparent 64%);
+  transform: translateX(-120%);
+  transition: transform .65s ease;
+  content: "";
+}
+.login-btn:hover::after { transform: translateX(120%); }
+
+@media (max-width: 980px) {
+  .auth-shell { width: min(100% - 28px, 580px); grid-template-columns: 1fr; }
+  .auth-story { display: none; }
+  .mobile-product-preview { display: block; }
+  .mobile-product-preview .auth-product-showcase { margin-top: 0; }
+}
+
+@media (max-width: 760px) {
+  .auth-story { display: none; }
+  .auth-shell { width: min(100% - 20px, 560px); padding-top: 18px; }
+  .workspace-nav { padding-bottom: 9px; }
+  .workspace-nav button { min-width: 210px; }
+  .workspace-nav::after {
+    position: sticky;
+    right: 0;
+    flex: 0 0 18px;
+    background: linear-gradient(90deg, transparent, var(--surface-1));
+    content: "";
+  }
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 480px) {
+  .login-topbar { width: calc(100% - 20px); }
+  .login-topcontrols .lang-group button { font-size: 9px; }
+  .auth-shell .login-card { padding: 24px 20px; }
+  .auth-product-showcase.compact .showcase-stage { height: 245px; }
+  .tiles { grid-template-columns: 1fr; }
+  .tile { min-height: 126px; }
+}
+
 @media print {
   @page { size: A4 landscape; margin: 0; }
   html,

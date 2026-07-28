@@ -60,7 +60,7 @@ def _normalise(value: float, maximum: float) -> float:
 
 
 def build_icp(cur, tenant_id: str) -> tuple[dict, str, dict]:
-    """Rank products and customers from normalized, tenant-scoped sales facts."""
+    """Build a useful profile from the tenant's trusted sales and collection facts."""
     cur.execute(
         """
         select fl.name, coalesce(sum(fl.amount), 0), count(distinct ft.id),
@@ -139,26 +139,103 @@ def build_icp(cur, tenant_id: str) -> tuple[dict, str, dict]:
     customers.sort(key=lambda row: (-row["icp_score"], -row["revenue"], row["name"]))
     customers = customers[:10]
 
+    # Receivables-only Tally users still deserve an Agent output. Collection
+    # priorities remain separate from sales-derived growth signals so a debtor
+    # name is never misrepresented as product or industry evidence.
+    cur.execute(
+        """
+        select party_name,
+               coalesce(sum(abs(pending_amount)), 0),
+               coalesce(sum(abs(pending_amount))
+                 filter (where coalesce(overdue_days, 0) > 0), 0),
+               coalesce(max(overdue_days), 0),
+               count(*),
+               sum(sum(abs(pending_amount))) over (),
+               sum(
+                 coalesce(sum(abs(pending_amount))
+                   filter (where coalesce(overdue_days, 0) > 0), 0)
+               ) over ()
+        from bills
+        where tenant_id = %s and closed_at is null
+        group by party_name
+        order by sum(abs(pending_amount)) desc, party_name
+        limit 10
+        """,
+        (tenant_id,),
+    )
+    collection_rows = cur.fetchall()
+    collections = [
+        {
+            "name": name,
+            "outstanding": float(outstanding),
+            "overdue": float(overdue),
+            "max_overdue_days": max_overdue_days,
+            "bill_count": bill_count,
+        }
+        for name, outstanding, overdue, max_overdue_days, bill_count, _, _
+        in collection_rows
+    ]
+    total_outstanding = float(collection_rows[0][5]) if collection_rows else 0.0
+    total_overdue = float(collection_rows[0][6]) if collection_rows else 0.0
+
     needs = []
     if not products:
         needs.append("sales item lines")
-    if not customers:
+    if not customers and not collections:
         needs.append("sales customer history")
     needs.extend(["customer industry", "customer geography", "customer size", "product margin"])
     completeness = {
         "products": bool(products),
         "customers": bool(customers),
+        "receivables": bool(collections),
         "margin": False,
         "industry": False,
         "geography": False,
         "size": False,
-        "available_count": sum((bool(products), bool(customers))),
-        "total_count": 6,
+        "available_count": sum((bool(products), bool(customers), bool(collections))),
+        "total_count": 7,
         "needs_more_data": needs,
     }
+    action_plan = []
+    for row in sorted(
+        collections,
+        key=lambda item: (-item["overdue"], -item["max_overdue_days"]),
+    )[:3]:
+        if row["overdue"] <= 0:
+            continue
+        action_plan.append(
+            {
+                "type": "collect",
+                "party": row["name"],
+                "amount": row["overdue"],
+                "overdue_days": row["max_overdue_days"],
+                "bill_count": row["bill_count"],
+            }
+        )
+    if products:
+        action_plan.append(
+            {
+                "type": "protect_product",
+                "product": products[0]["name"],
+                "share_pct": products[0]["revenue_share_pct"],
+                "revenue": products[0]["revenue"],
+            }
+        )
+    if customers:
+        action_plan.append(
+            {
+                "type": "grow_customer",
+                "customer": customers[0]["name"],
+                "revenue": customers[0]["revenue"],
+                "orders": customers[0]["orders"],
+            }
+        )
     profile = {
+        "profile_version": 2,
         "top_products": products,
         "best_customers": customers,
+        "collection_priorities": collections,
+        "action_plan": action_plan[:5],
         "customer_attributes": {
             "industry": "unknown",
             "geography": "unknown",
@@ -170,8 +247,11 @@ def build_icp(cur, tenant_id: str) -> tuple[dict, str, dict]:
         ),
         "snapshot": {
             "products_analyzed": len(products),
-            "customers_analyzed": len(customer_rows),
+            "customers_analyzed": max(len(customer_rows), len(collection_rows)),
             "sales_value_analyzed": round(sum(float(row[1]) for row in customer_rows), 2),
+            "outstanding_analyzed": round(total_outstanding, 2),
+            "overdue_analyzed": round(total_overdue, 2),
+            "open_bills_analyzed": sum(row["bill_count"] for row in collections),
         },
     }
     if products and customers:
@@ -182,10 +262,18 @@ def build_icp(cur, tenant_id: str) -> tuple[dict, str, dict]:
             f"ICP score of {customers[0]['icp_score']}/100. Industry, geography, size and "
             "product margin remain unknown because the connected data does not establish them."
         )
+    elif collections:
+        narrative = (
+            f"{collections[0]['name']} has the largest current open balance at "
+            f"{collections[0]['outstanding']:.2f}. The Agent found "
+            f"{len(collections)} customer collection priorities from current Tally bills. "
+            "Upload item-level sales when you also want product-led customer discovery."
+        )
     else:
         narrative = (
-            "The ICP can be generated, but connected sales history is too thin for a reliable "
-            "customer pattern. Upload sales lines with products and customer names to improve it."
+            "The Agent is ready, but this company does not yet have current receivables or "
+            "item-level sales to analyse. Sync Tally or upload a sales book to create the "
+            "first action plan."
         )
     return profile, narrative, completeness
 
@@ -243,11 +331,17 @@ def build_search_plan(kind: str, terms: list[str], params: dict) -> list[str]:
     else:
         product = clean_terms[0]
         specification = str(params.get("specification") or "").strip()
+        baseline = params.get("baseline")
+        price_context = (
+            f"quotation price below INR {baseline}"
+            if baseline not in (None, "")
+            else "quotation price"
+        )
         queries = [
             f'"{product}" {specification} manufacturer supplier {geography} contact',
             f'"{product}" authorized distributor industrial India',
             f'"{product}" factory manufacturer Gujarat Maharashtra',
-            f'"{product}" supplier certification capacity India',
+            f'"{product}" supplier certification capacity India {price_context}',
             f'"{product}" alternative supplier India contact',
             f'"{product}" trade association manufacturer India',
         ]
@@ -416,16 +510,28 @@ def candidates_from_results(
             if term and term.casefold() in text.casefold()
         ]
         provider_relevance = float(result.get("score") or 0)
-        business_signal = bool(
-            COMPANY_SUFFIX.search(text)
-            or re.search(
-                r"\b(manufacturer|factory|plant|supplier|distributor|exporter|"
-                r"business|products?|contact us|about us|procurement)\b",
+        seller_signal = bool(
+            re.search(
+                r"\b(manufacturer|supplier|distributor|exporter|dealer|stockist)\b",
                 text,
                 re.IGNORECASE,
             )
         )
-        if not matched or (not business_signal and provider_relevance < 0.55):
+        buyer_signal = bool(
+            re.search(
+                r"\b(procurement|buyer|buys|uses|end user|consumer|plant|factory|"
+                r"project|tender|expansion|operations)\b",
+                text,
+                re.IGNORECASE,
+            )
+        )
+        kind_signal = seller_signal if kind == "material" else buyer_signal
+        business_signal = bool(COMPANY_SUFFIX.search(text) or kind_signal)
+        if (
+            not matched
+            or (not business_signal and provider_relevance < 0.55)
+            or (not kind_signal and provider_relevance < 0.72)
+        ):
             continue
         location = _location(text)
         contact, contact_type = _contact(text, url)

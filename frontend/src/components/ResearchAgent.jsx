@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   deliverResearchCandidates, fetchResearchCandidates, formatMoney,
-  generateResearchIcp, getResearchIcp, runCustomerResearch,
+  fetchLatestResearch, generateResearchIcp, getResearchIcp, runCustomerResearch,
   runMaterialResearch, updateResearchCandidate,
 } from "../api";
 import {
@@ -46,18 +46,46 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
       suppliers: { candidates: [], summary: null, delivery: "" },
     });
     if (!tenantId) return;
+    setBusy("profile");
+    setError("");
     getResearchIcp(tenantId)
+      .then(async (result) => {
+        if (result.profile?.profile_version === 2) return result;
+        return generateResearchIcp(tenantId);
+      })
       .then(setIcp)
       .catch(async (requestError) => {
         if (requestError.constructor.name === "AuthError") return onAuthError();
-        // Start with a useful, data-backed business summary whenever possible.
-        // This removes the extra setup step that made the agent feel empty.
         try {
           setIcp(await generateResearchIcp(tenantId));
         } catch (generationError) {
           if (generationError.constructor.name === "AuthError") onAuthError();
           else setError(generationError.message);
         }
+      })
+      .finally(() => setBusy(""));
+    fetchLatestResearch(tenantId)
+      .then((result) => {
+        const restored = result.runs || {};
+        setWorkspaces((current) => ({
+          customers: restored.customers
+            ? {
+              candidates: restored.customers.candidates || [],
+              summary: restored.customers.summary,
+              delivery: "",
+            }
+            : current.customers,
+          suppliers: restored.suppliers
+            ? {
+              candidates: restored.suppliers.candidates || [],
+              summary: restored.suppliers.summary,
+              delivery: "",
+            }
+            : current.suppliers,
+        }));
+      })
+      .catch((requestError) => {
+        if (requestError.constructor.name === "AuthError") onAuthError();
       });
   }, [tenantId]);
 
@@ -163,6 +191,7 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
     [candidates, filter],
   );
   const approvedCount = candidates.filter((row) => row.status === "approved").length;
+  const hasCustomerSeed = Boolean(icp?.profile?.top_products?.length);
   const readiness = icp
     ? Math.round(
       (icp.data_completeness.available_count /
@@ -206,12 +235,17 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
 
       {error && (
         <div className="research-error" role="alert">
-          <IconNote /><div><strong>{copy.title}</strong><p>{error}</p></div>
+          <IconNote /><div><strong>{copy.errorTitle}</strong><p>{error}</p></div>
         </div>
       )}
 
       {view === "home" && (
-        <ResearchHome copy={copy} setView={setView} icp={icp} />
+        <ResearchHome
+          copy={copy}
+          setView={setView}
+          icp={icp}
+          busy={busy === "profile"}
+        />
       )}
       {view === "icp" && (
         <IcpView
@@ -228,6 +262,7 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
           copy={copy}
           busy={busy}
           onRun={runCustomers}
+          runDisabled={!hasCustomerSeed && !customerBrief.industry.trim()}
           summary={activeWorkspace.summary}
           candidates={visibleCandidates}
           allCandidates={candidates}
@@ -247,7 +282,7 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
               label={copy.geography}
               hint={copy.optional}
               value={customerBrief.geography}
-              placeholder="e.g. Gujarat, West India"
+              placeholder={copy.placeholders.geography}
               onChange={(value) =>
                 setCustomerBrief((current) => ({ ...current, geography: value }))}
             />
@@ -255,7 +290,7 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
               label={copy.industry}
               hint={copy.optional}
               value={customerBrief.industry}
-              placeholder="e.g. chemicals, pumps"
+              placeholder={copy.placeholders.industry}
               onChange={(value) =>
                 setCustomerBrief((current) => ({ ...current, industry: value }))}
             />
@@ -287,7 +322,7 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
             <ResearchField
               label={copy.product}
               value={supplierBrief.product}
-              placeholder="e.g. EN8 steel bar"
+              placeholder={copy.placeholders.product}
               onChange={(value) =>
                 setSupplierBrief((current) => ({ ...current, product: value }))}
             />
@@ -295,7 +330,7 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
               label={copy.specification}
               hint={copy.optional}
               value={supplierBrief.specification}
-              placeholder="e.g. 40 mm, annealed"
+              placeholder={copy.placeholders.specification}
               onChange={(value) =>
                 setSupplierBrief((current) => ({ ...current, specification: value }))}
             />
@@ -303,7 +338,7 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
               label={copy.baseline}
               value={supplierBrief.baseline}
               type="number"
-              placeholder="₹ / unit"
+              placeholder={copy.placeholders.baseline}
               onChange={(value) =>
                 setSupplierBrief((current) => ({ ...current, baseline: value }))}
             />
@@ -314,35 +349,133 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
   );
 }
 
-function ResearchHome({ copy, setView, icp }) {
+function actionDetails(action, copy) {
+  if (action.type === "collect") {
+    return {
+      icon: <IconUsers />,
+      text: copy.actionCollect(
+        action.party,
+        formatMoney(action.amount, { compact: true }),
+        action.overdue_days,
+      ),
+    };
+  }
+  if (action.type === "protect_product") {
+    return {
+      icon: <IconBox />,
+      text: copy.actionProtectProduct(action.product, action.share_pct),
+    };
+  }
+  return {
+    icon: <IconChart />,
+    text: copy.actionGrowCustomer(action.customer, action.orders),
+  };
+}
+
+function AgentActionPlan({ copy, icp, busy }) {
+  if (busy) {
+    return (
+      <div className="agent-plan agent-plan-loading">
+        <IconRefresh className="spin" />
+        <span>{copy.profileBuilding}</span>
+      </div>
+    );
+  }
+  const actions = icp?.profile?.action_plan || [];
+  return (
+    <section className="agent-plan">
+      <div className="agent-plan-heading">
+        <div>
+          <span className="panel-kicker">{copy.worksNow}</span>
+          <h3>{copy.actionPlan}</h3>
+          <p>{copy.actionPlanSub}</p>
+        </div>
+        <span className="agent-plan-count">{actions.length}</span>
+      </div>
+      {actions.length ? (
+        <div className="agent-actions">
+          {actions.map((action, index) => {
+            const details = actionDetails(action, copy);
+            return (
+              <article key={`${action.type}-${index}`} style={{ "--delay": `${index * 70}ms` }}>
+                <span className="agent-action-number">{String(index + 1).padStart(2, "0")}</span>
+                <i>{details.icon}</i>
+                <p>{details.text}</p>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="agent-plan-empty">
+          <IconChart />
+          <div><strong>{copy.noActionsTitle}</strong><p>{copy.noActionsBody}</p></div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function ResearchHome({ copy, setView, icp, busy }) {
   const cards = [
-    { id: "icp", icon: <IconChart />, number: "01", title: copy.understandTitle, body: copy.understandBody, meta: icp ? "Profile available" : "Start here" },
-    { id: "customers", icon: <IconUsers />, number: "02", title: copy.customerTitle, body: copy.customerBody, meta: "Primary workflow" },
-    { id: "suppliers", icon: <IconBox />, number: "03", title: copy.supplierTitle, body: copy.supplierBody, meta: "Triggered only" },
+    { id: "icp", icon: <IconChart />, number: "01", title: copy.understandTitle, body: copy.understandBody, meta: icp ? copy.profileAvailable : copy.startHere },
+    { id: "customers", icon: <IconUsers />, number: "02", title: copy.customerTitle, body: copy.customerBody, meta: copy.searchNeeded },
+    { id: "suppliers", icon: <IconBox />, number: "03", title: copy.supplierTitle, body: copy.supplierBody, meta: copy.searchNeeded },
   ];
   return (
-    <div className="research-capability-grid">
-      {cards.map((card, index) => (
-        <button
-          className={`research-capability capability-${index + 1}`}
-          key={card.id}
-          type="button"
-          onClick={() => setView(card.id)}
-          style={{ "--delay": `${index * 70}ms` }}
-        >
-          <span className="capability-number">{card.number}</span>
-          <span className="capability-icon">{card.icon}</span>
-          <span className="capability-meta">{card.meta}</span>
-          <strong>{card.title}</strong>
-          <span className="capability-body">{card.body}</span>
-          <span className="capability-link">{copy.open}<ArrowIcon /></span>
-        </button>
-      ))}
-    </div>
+    <>
+      <AgentActionPlan copy={copy} icp={icp} busy={busy} />
+      <div className="research-capability-grid">
+        {cards.map((card, index) => (
+          <button
+            className={`research-capability capability-${index + 1}`}
+            key={card.id}
+            type="button"
+            onClick={() => setView(card.id)}
+            style={{ "--delay": `${index * 70}ms` }}
+          >
+            <span className="capability-number">{card.number}</span>
+            <span className="capability-icon">{card.icon}</span>
+            <span className="capability-meta">{card.meta}</span>
+            <strong>{card.title}</strong>
+            <span className="capability-body">{card.body}</span>
+            <span className="capability-link">{copy.open}<ArrowIcon /></span>
+          </button>
+        ))}
+      </div>
+    </>
   );
 }
 
 function IcpView({ copy, icp, readiness, busy, refresh }) {
+  const profile = icp?.profile;
+  const snapshot = profile?.snapshot || {};
+  const topProduct = profile?.top_products?.[0];
+  const topCustomer = profile?.best_customers?.[0];
+  const topCollection = profile?.collection_priorities?.[0];
+  const narrative = topProduct && topCustomer
+    ? copy.salesSnapshot(
+      topProduct.name,
+      topProduct.revenue_share_pct,
+      topCustomer.name,
+    )
+    : topCollection
+      ? copy.collectionSnapshot(
+        topCollection.name,
+        formatMoney(topCollection.outstanding, { compact: true }),
+      )
+      : copy.emptySnapshot;
+  const snapshotStats = [
+    [snapshot.products_analyzed, copy.productsChecked],
+    [snapshot.customers_analyzed, copy.customersChecked],
+    [snapshot.sales_value_analyzed
+      ? formatMoney(snapshot.sales_value_analyzed, { compact: true })
+      : null, copy.salesChecked],
+    [snapshot.outstanding_analyzed
+      ? formatMoney(snapshot.outstanding_analyzed, { compact: true })
+      : null, copy.outstandingChecked],
+    [snapshot.open_bills_analyzed, copy.billsChecked],
+  ].filter(([value]) => value);
+
   return (
     <div className="research-panel research-icp-view">
       <div className="research-panel-heading">
@@ -370,40 +503,68 @@ function IcpView({ copy, icp, readiness, busy, refresh }) {
               </div>
             </div>
             <div className="icp-narrative">
-              <span className="panel-kicker">Deterministic snapshot</span>
-              <p>{icp.narrative}</p>
+              <span className="panel-kicker">{copy.snapshot}</span>
+              <p>{narrative}</p>
               <div className="icp-stat-row">
-                <span><strong>{icp.profile.snapshot.products_analyzed}</strong> products</span>
-                <span><strong>{icp.profile.snapshot.customers_analyzed}</strong> customers</span>
-                <span><strong>{formatMoney(icp.profile.snapshot.sales_value_analyzed, { compact: true })}</strong> analyzed</span>
+                {snapshotStats.map(([value, label]) => (
+                  <span key={label}><strong>{value}</strong>{label}</span>
+                ))}
               </div>
             </div>
           </div>
-          <div className="icp-columns">
+          {(profile.top_products.length > 0 || profile.best_customers.length > 0) && (
+            <div className="icp-columns">
             <RankedList
               title={copy.topProducts}
-              rows={icp.profile.top_products}
+              rows={profile.top_products}
               render={(row) => `${formatMoney(row.revenue, { compact: true })} · ${row.revenue_share_pct}%`}
             />
             <RankedList
               title={copy.bestCustomers}
-              rows={icp.profile.best_customers}
-              render={(row) => `${row.icp_score}/100 · ${row.orders} orders`}
+              rows={profile.best_customers}
+              render={(row) => `${row.icp_score}/100 · ${copy.ordersLabel(row.orders)}`}
             />
-          </div>
+            </div>
+          )}
+          {profile.collection_priorities?.length > 0 && (
+            <CollectionPriorities rows={profile.collection_priorities} copy={copy} />
+          )}
           <div className="icp-method">
             <IconShield />
-            <div><strong>{copy.method}</strong><p>{icp.profile.ranking_method}</p></div>
+            <div><strong>{copy.method}</strong><p>{copy.rankingMethodBody}</p></div>
           </div>
           {icp.data_completeness.needs_more_data.length > 0 && (
             <div className="needs-data">
               <span>{copy.needsData}</span>
               {icp.data_completeness.needs_more_data.map((item) =>
-                <small key={item}>{item}</small>)}
+                <small key={item}>{copy.dataNeeds[item] || item}</small>)}
             </div>
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function CollectionPriorities({ rows, copy }) {
+  return (
+    <div className="collection-priorities">
+      <div className="queue-heading">
+        <div><span className="panel-kicker">{copy.actionPlan}</span><p>{copy.actionPlanSub}</p></div>
+        <span className="queue-count">{rows.length}</span>
+      </div>
+      <div className="collection-priority-grid">
+        {rows.slice(0, 6).map((row, index) => (
+          <article key={row.name}>
+            <span>{String(index + 1).padStart(2, "0")}</span>
+            <div>
+              <strong>{row.name}</strong>
+              <small>{copy.collectionMeta(row.bill_count, row.max_overdue_days)}</small>
+            </div>
+            <b>{formatMoney(row.overdue || row.outstanding, { compact: true })}</b>
+          </article>
+        ))}
+      </div>
     </div>
   );
 }
@@ -453,6 +614,9 @@ function ResearchWorkspace({
         </div>
       </div>
       {children}
+      {kind === "customers" && runDisabled && (
+        <div className="research-helper"><IconNote />{copy.customerNeedsProduct}</div>
+      )}
       <button
         className="research-primary research-run"
         type="button"
@@ -464,41 +628,60 @@ function ResearchWorkspace({
           ? copy.searching
           : kind === "customers" ? copy.runCustomers : copy.runSuppliers}
       </button>
-      {isSearching && <ResearchProgress />}
+      {isSearching && <ResearchProgress copy={copy} />}
       {summary && <ResearchSummary copy={copy} summary={summary} />}
-      <CandidateQueue
-        copy={copy}
-        candidates={candidates}
-        allCandidates={allCandidates}
-        filter={filter}
-        setFilter={setFilter}
-        expanded={expanded}
-        setExpanded={setExpanded}
-        decide={decide}
-        busy={busy}
-        approvedCount={approvedCount}
-        deliver={deliver}
-        delivery={delivery}
-        copyDelivery={copyDelivery}
-        copied={copied}
-      />
+      {summary?.web_search_ready !== false && (
+        <CandidateQueue
+          copy={copy}
+          candidates={candidates}
+          allCandidates={allCandidates}
+          filter={filter}
+          setFilter={setFilter}
+          expanded={expanded}
+          setExpanded={setExpanded}
+          decide={decide}
+          busy={busy}
+          approvedCount={approvedCount}
+          deliver={deliver}
+          delivery={delivery}
+          copyDelivery={copyDelivery}
+          copied={copied}
+        />
+      )}
     </div>
   );
 }
 
-function ResearchProgress() {
+function ResearchProgress({ copy }) {
   return (
     <div className="research-progress" aria-live="polite">
       <div className="progress-track"><span /></div>
       <div className="progress-steps">
-        <span className="active">Plan</span><span>Discover</span>
-        <span>Verify</span><span>Score</span><span>Curate</span>
+        <span className="active">{copy.progressPlan}</span><span>{copy.progressDiscover}</span>
+        <span>{copy.progressVerify}</span><span>{copy.progressScore}</span><span>{copy.progressReview}</span>
       </div>
     </div>
   );
 }
 
 function ResearchSummary({ copy, summary }) {
+  if (summary.web_search_ready === false) {
+    return (
+      <section className="research-plan-result">
+        <span className="research-plan-icon"><IconCheck /></span>
+        <div className="research-plan-copy">
+          <span className="panel-kicker">{copy.searchPlanTitle}</span>
+          <h4>{copy.webNotConnectedTitle}</h4>
+          <p>{copy.webNotConnectedBody}</p>
+          <small>{copy.searchPlanBody}</small>
+        </div>
+        <div className="planned-searches">
+          <strong>{copy.plannedSearches}</strong>
+          <ol>{(summary.queries || []).map((query) => <li key={query}>{query}</li>)}</ol>
+        </div>
+      </section>
+    );
+  }
   const metrics = [
     [copy.sourcesReviewed, summary.sources_reviewed, <IconEye />],
     [copy.verifiedLeads, summary.candidates_verified, <IconShield />],
@@ -513,7 +696,11 @@ function ResearchSummary({ copy, summary }) {
       </div>
       <div className="summary-insights">
         <span className="panel-kicker">{copy.keyInsights}</span>
-        <ul>{summary.key_insights.map((insight) => <li key={insight}>{insight}</li>)}</ul>
+        <ul>
+          <li>{copy.insightSources(summary.sources_reviewed, summary.queries_run)}</li>
+          <li>{copy.insightMatches(summary.candidates_verified)}</li>
+          <li>{copy.insightStrong(summary.high_fit_candidates)}</li>
+        </ul>
       </div>
     </div>
   );
@@ -559,7 +746,7 @@ function CandidateQueue({
         ))}
       </div>
       <div className="delivery-dock">
-        <div><IconCheck /><span><strong>{approvedCount}</strong> approved</span></div>
+        <div><IconCheck /><span><strong>{copy.approvedCount(approvedCount)}</strong></span></div>
         <button type="button" disabled={!approvedCount || Boolean(busy)} onClick={deliver}>
           <IconSend />{copy.deliver}
         </button>
@@ -580,6 +767,9 @@ function CandidateCard({ copy, candidate, expanded, onExpand, decide, busy, inde
   const enrichment = candidate.enrichment || {};
   const evidence = enrichment.evidence || [];
   const scoreTone = candidate.fit_score >= 78 ? "high" : candidate.fit_score >= 62 ? "medium" : "emerging";
+  const matchedTerms = (enrichment.matched_terms || []).join(", ");
+  const sourceLabel = copy.sourceCount(enrichment.source_count || 1);
+  const confidenceLabel = copy.confidenceLevels[enrichment.verification] || copy.confidenceLevels.emerging;
   return (
     <article className={`candidate-card status-${candidate.status}`} style={{ "--delay": `${index * 45}ms` }}>
       <div className="candidate-score">
@@ -595,13 +785,13 @@ function CandidateCard({ copy, candidate, expanded, onExpand, decide, busy, inde
             <p className="candidate-location">{candidate.location || copy.noLocation}</p>
           </div>
           <span className={`confidence ${enrichment.verification || "emerging"}`}>
-            <i />{enrichment.verification || "emerging"} {copy.confidence}
+            <i />{confidenceLabel} {copy.confidence}
           </span>
         </div>
-        <p className="fit-reason">{candidate.fit_reason}</p>
+        <p className="fit-reason">{copy.matchReason(matchedTerms, candidate.location, sourceLabel)}</p>
         <div className="candidate-tags">
           {(enrichment.matched_terms || []).map((term) => <span key={term}>{term}</span>)}
-          <span>{enrichment.source_count || 1} source{enrichment.source_count === 1 ? "" : "s"}</span>
+          <span>{sourceLabel}</span>
         </div>
         <div className="candidate-actions">
           {candidate.status === "draft" && (
@@ -627,7 +817,7 @@ function CandidateCard({ copy, candidate, expanded, onExpand, decide, busy, inde
             {enrichment.score_components && (
               <div className="score-breakdown">
                 {Object.entries(enrichment.score_components).map(([name, value]) => (
-                  <span key={name}><small>{name.replaceAll("_", " ")}</small><strong>+{value}</strong></span>
+                  <span key={name}><small>{copy.scoreLabels[name] || name.replaceAll("_", " ")}</small><strong>+{value}</strong></span>
                 ))}
               </div>
             )}

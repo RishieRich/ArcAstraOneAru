@@ -1,9 +1,19 @@
 import { formatMoney } from "../api";
 import { IconFile } from "../icons";
 
+function friendlyDate(value) {
+  if (!value) return "—";
+  const date = new Date(`${value}T00:00:00`);
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  }).format(date);
+}
+
 export default function BillsTable({ bills, t }) {
   return (
-    <div className="card">
+    <div className="card bills-card">
       <h3><span className="ico"><IconFile /></span>{t.billsTable}</h3>
       <p className="sub">{t.invoices(bills.length)}</p>
 
@@ -26,7 +36,7 @@ export default function BillsTable({ bills, t }) {
                 <tr key={`${b.party}-${b.bill_ref}-${i}`}>
                   <td>{b.party}</td>
                   <td>{b.bill_ref || "—"}</td>
-                  <td>{b.due_date || "—"}</td>
+                  <td>{friendlyDate(b.due_date)}</td>
                   <td>
                     {b.overdue_days > 0 ? (
                       <span className="pill late">

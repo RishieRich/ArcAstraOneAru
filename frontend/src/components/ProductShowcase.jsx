@@ -65,7 +65,7 @@ export default function ProductShowcase({ t, compact = false }) {
         <strong>{t.showcaseTitle}</strong>
       </div>
 
-      <div className="showcase-stage" aria-live="polite">
+      <div className="showcase-stage">
         <article
           className={windowClass(0, "source-window")}
           aria-hidden={activeSlide !== 0}
@@ -147,7 +147,7 @@ export default function ProductShowcase({ t, compact = false }) {
         >
           <header>
             <span><IconSpark />{t.showcaseResearchTitle}</span>
-            <small>{t.comingNext}</small>
+            <small>{t.research.worksNow}</small>
           </header>
           <p>{t.showcaseResearchQuestion}</p>
           <div className="showcase-materials">

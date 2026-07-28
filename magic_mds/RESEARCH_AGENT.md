@@ -6,8 +6,10 @@ delivers an unapproved candidate.
 
 ## Research pipeline
 
-1. ICP generation reads only normalized `financial_transactions` and item-level
-   `financial_transaction_lines` for the authorized tenant.
+1. Business-profile generation reads normalized `financial_transactions`,
+   item-level `financial_transaction_lines`, and current open `bills` for the
+   authorized tenant. Sales facts drive growth signals; bills drive collection
+   priorities. The two are never silently mixed.
 2. Customer ranking is deterministic: 45% recorded revenue, 30% repeat orders and 25%
    recency. Margin remains explicitly unknown until reliable product-level cost attribution
    exists.
@@ -25,6 +27,8 @@ delivers an unapproved candidate.
    source quality, corroboration and provider relevance. No LLM invents missing facts.
 8. Every accepted result is persisted as `draft`. Only explicit approval makes it eligible
    for the top-five delivery brief.
+9. `GET /research/latest` restores the latest completed customer and supplier run so a
+   browser refresh does not discard finished work.
 
 The candidate `enrichment_json` retains source excerpts, domains, query provenance,
 verification level and score components. `source_url` and `retrieved_at` remain first-class
@@ -49,7 +53,10 @@ companies as verified leads.
 
 ## UI
 
-The dedicated surface has overview, ICP, customer and supplier views. It includes ICP
-readiness, research progress, deterministic run insights, filterable candidate cards,
-expandable evidence, visible score breakdowns and a sticky approval/delivery action. Motion
-respects the app-wide `prefers-reduced-motion` rule, and mobile layouts collapse to one column.
+The dedicated surface opens with a plain-language action plan built from actual collections,
+products and customers. It then offers business pattern, customer and supplier views with
+data readiness, prepared search angles, filterable candidate cards, expandable evidence,
+visible score breakdowns and a sticky approval/delivery action. A missing search credential
+is shown as “internal analysis ready / web search not connected,” not as a failed Agent.
+Motion respects the app-wide `prefers-reduced-motion` rule, and mobile layouts collapse to
+one column.

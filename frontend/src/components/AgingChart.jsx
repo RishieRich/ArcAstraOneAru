@@ -9,11 +9,20 @@ const RAMP = ["var(--axis)", "var(--step-1)", "var(--step-2)", "var(--step-3)", 
 export default function AgingChart({ aging, t }) {
   const max = Math.max(...aging.map((a) => a.amount), 1);
   const anyAmount = aging.some((a) => a.amount > 0);
+  const oldestActive = [...aging].reverse().find((bucket) => bucket.amount > 0);
 
   return (
     <div className="card">
       <h3><span className="ico"><IconClock /></span>{t.aging}</h3>
       <p className="sub">{t.agingSub}</p>
+      {oldestActive && (
+        <div className="chart-insight">
+          {t.agingInsight(
+            oldestActive.bucket === "Not due" ? t.notDue : oldestActive.bucket,
+            formatMoney(oldestActive.amount, { compact: true }),
+          )}
+        </div>
+      )}
 
       {!anyAmount ? (
         <div className="empty-mini">{t.empty}</div>
@@ -31,7 +40,7 @@ export default function AgingChart({ aging, t }) {
                         width: `${Math.max((bucket.amount / max) * 100, 2)}%`,
                         background: RAMP[i],
                       }}
-                      title={`${bucket.bucket}: ${formatMoney(bucket.amount)}`}
+                      title={`${i === 0 ? t.notDue : bucket.bucket}: ${formatMoney(bucket.amount)}`}
                     />
                   )}
                 </div>
