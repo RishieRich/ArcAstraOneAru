@@ -85,9 +85,42 @@ def test_wait_until_healthy_polls_until_ok(monkeypatch):
         DoctorResult(exit_code=EXIT_HEALTHY, message="ok"),
     ])
     monkeypatch.setattr(launcher, "run_doctor",
-                        lambda host, port, configured_company: next(results))
+                        lambda host, port, configured_company, configured_guid="": next(results))
 
     result = launcher.wait_until_healthy("localhost", 9000, "ARQ Code Test",
                                          timeout=60, poll_interval=0, sleep=lambda s: None)
 
     assert result.exit_code == EXIT_HEALTHY
+
+
+def test_wait_until_healthy_matches_on_stored_guid(monkeypatch):
+    seen = []
+
+    def fake_doctor(host, port, configured_company, configured_guid=""):
+        seen.append(configured_guid)
+        return DoctorResult(exit_code=EXIT_HEALTHY, message="ok")
+
+    monkeypatch.setattr(launcher, "run_doctor", fake_doctor)
+    launcher.wait_until_healthy("localhost", 9000, "ARQ Code Test", guid="abc-123",
+                                timeout=1, poll_interval=0, sleep=lambda s: None)
+
+    assert seen == ["abc-123"]
+
+
+def test_ensure_tally_ready_passes_startup_wait_from_settings(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(launcher, "find_tally_exe", lambda p: r"C:\fake\tally.exe")
+    monkeypatch.setattr(launcher, "start_tally", lambda p: True)
+
+    def fake_wait(host, port, company, guid="", timeout=0.0, **kw):
+        captured["timeout"] = timeout
+        captured["guid"] = guid
+        return DoctorResult(exit_code=EXIT_HEALTHY, message="ok")
+
+    monkeypatch.setattr(launcher, "wait_until_healthy", fake_wait)
+    settings = {**SETTINGS, "company_guid": "guid-9", "tally_startup_wait_seconds": 240}
+
+    launcher.ensure_tally_ready(
+        settings, DoctorResult(exit_code=EXIT_NOT_RUNNING, message="not running"), LOGGER)
+
+    assert captured == {"timeout": 240.0, "guid": "guid-9"}

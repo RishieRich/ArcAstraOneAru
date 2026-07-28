@@ -23,18 +23,24 @@ def _json_default(obj):
     raise TypeError(f"Not JSON serializable: {type(obj)}")
 
 
-def pull_snapshot(host: str, port: int, company_name: str) -> dict:
+def pull_snapshot(host: str, port: int, company_name: str,
+                  company_guid: str = "") -> dict:
     """Local-only pull: no cloud calls. Raises SnapshotError if Tally isn't healthy."""
-    doctor = run_doctor(host=host, port=port, configured_company=company_name)
+    doctor = run_doctor(host=host, port=port, configured_company=company_name,
+                        configured_guid=company_guid)
     if doctor.exit_code != EXIT_HEALTHY:
         raise SnapshotError(doctor.message)
 
+    # Query under the name Tally currently reports, not the stored one — after a
+    # rename in Tally those differ, and the export envelopes address the company
+    # by name (SVCURRENTCOMPANY).
+    live_name = doctor.matched_company.name
     client = TallyClient(host=host, port=port)
 
-    ledgers_xml = client.post_envelope(debtor_ledgers(company_name))
+    ledgers_xml = client.post_envelope(debtor_ledgers(live_name))
     ledgers = parse_debtor_ledgers(ledgers_xml)
 
-    bills_xml = client.post_envelope(bills_receivable(company_name))
+    bills_xml = client.post_envelope(bills_receivable(live_name))
     bills = parse_bills_receivable(bills_xml)
 
     return {

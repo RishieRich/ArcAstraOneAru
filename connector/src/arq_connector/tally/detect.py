@@ -30,6 +30,41 @@ class DoctorResult:
     message: str
     companies: list[CompanyRef] = field(default_factory=list)
     matched_company: CompanyRef | None = None
+    matched_by: str = ""  # "guid" | "name" | "" — lets the caller self-heal a drifted name
+
+
+def _normalize(name: str) -> str:
+    return " ".join(name.split()).casefold()
+
+
+def find_company(companies: list[CompanyRef], configured_company: str,
+                 configured_guid: str = "") -> tuple[CompanyRef | None, str]:
+    """Locate the pinned company among the open ones.
+
+    GUID wins over name. The backend binds a tenant to the company GUID for
+    good, so the GUID — not the display name — is the thing that actually
+    identifies the client's books. Matching on it first means renaming the
+    company inside Tally can no longer strand an unattended sync and force the
+    operator back into the app to re-pick.
+
+    Name matching stays as the fallback for a first-ever run (no GUID stored
+    yet) and is whitespace/case tolerant, because operators retype these names.
+    """
+    if configured_guid:
+        for company in companies:
+            if company.guid and company.guid == configured_guid:
+                return company, "guid"
+
+    if configured_company:
+        for company in companies:
+            if company.name == configured_company:
+                return company, "name"
+        wanted = _normalize(configured_company)
+        for company in companies:
+            if _normalize(company.name) == wanted:
+                return company, "name"
+
+    return None, ""
 
 
 def is_tally_process_running() -> bool:
@@ -55,7 +90,8 @@ def tcp_port_open(host: str, port: int, timeout: float = 3.0) -> bool:
         return False
 
 
-def run_doctor(host: str, port: int, configured_company: str) -> DoctorResult:
+def run_doctor(host: str, port: int, configured_company: str,
+               configured_guid: str = "") -> DoctorResult:
     if not is_tally_process_running():
         return DoctorResult(
             exit_code=EXIT_NOT_RUNNING,
@@ -91,9 +127,9 @@ def run_doctor(host: str, port: int, configured_company: str) -> DoctorResult:
             ),
         )
 
-    matches = [c for c in companies if c.name == configured_company]
+    matched, matched_by = find_company(companies, configured_company, configured_guid)
 
-    if len(companies) > 1 and not matches:
+    if matched is None and len(companies) > 1:
         names = ", ".join(c.name for c in companies)
         return DoctorResult(
             exit_code=EXIT_MULTIPLE_COMPANIES,
@@ -105,7 +141,7 @@ def run_doctor(host: str, port: int, configured_company: str) -> DoctorResult:
             companies=companies,
         )
 
-    if not matches:
+    if matched is None:
         names = ", ".join(c.name for c in companies)
         return DoctorResult(
             exit_code=EXIT_NO_COMPANY,
@@ -118,7 +154,8 @@ def run_doctor(host: str, port: int, configured_company: str) -> DoctorResult:
 
     return DoctorResult(
         exit_code=EXIT_HEALTHY,
-        message=f"OK: '{matches[0].name}' is open, GUID={matches[0].guid}",
+        message=f"OK: '{matched.name}' is open, GUID={matched.guid}",
         companies=companies,
-        matched_company=matches[0],
+        matched_company=matched,
+        matched_by=matched_by,
     )

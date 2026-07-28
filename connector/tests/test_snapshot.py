@@ -14,7 +14,7 @@ def test_pull_snapshot_raises_when_unhealthy(monkeypatch):
     monkeypatch.setattr(
         snapshot_mod,
         "run_doctor",
-        lambda host, port, configured_company: DoctorResult(exit_code=10, message="not running"),
+        lambda host, port, configured_company, configured_guid='': DoctorResult(exit_code=10, message="not running"),
     )
     try:
         snapshot_mod.pull_snapshot(host="localhost", port=9000, company_name="ARQ AA")
@@ -28,7 +28,7 @@ def test_pull_snapshot_assembles_structure(monkeypatch):
     monkeypatch.setattr(
         snapshot_mod,
         "run_doctor",
-        lambda host, port, configured_company: DoctorResult(
+        lambda host, port, configured_company, configured_guid='': DoctorResult(
             exit_code=EXIT_HEALTHY, message="ok", companies=[matched], matched_company=matched
         ),
     )

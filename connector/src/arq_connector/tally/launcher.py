@@ -24,10 +24,15 @@ COMMON_TALLY_PATHS = (
     r"C:\Program Files\Tally.ERP9\tally.exe",
 )
 
-STARTUP_WAIT_SECONDS = 120   # total time to wait for Tally + company to come up
+STARTUP_WAIT_SECONDS = 180   # total time to wait for Tally + company to come up
 POLL_INTERVAL_SECONDS = 5
 
 _NO_WINDOW = 0x08000000  # subprocess.CREATE_NO_WINDOW (for the flag-safe shell, not Tally itself)
+
+# ShellExecute nCmdShow. Tally is a GUI app and cannot be started invisibly,
+# but an unattended sync has no business stealing focus from whatever the
+# client is typing into — so it comes up minimized and unfocused.
+_SW_SHOWMINNOACTIVE = 7
 
 
 def find_tally_exe(configured_path: str = "") -> str | None:
@@ -41,7 +46,8 @@ def find_tally_exe(configured_path: str = "") -> str | None:
 
 
 def start_tally(exe_path: str) -> bool:
-    """Launch TallyPrime detached, in its own directory (tally.ini lives there).
+    """Launch TallyPrime detached and minimized, in its own directory
+    (tally.ini lives there).
 
     os.startfile (ShellExecute — the programmatic double-click) is the primary
     path: launching a GUI child via Popen from a *windowed* PyInstaller exe
@@ -50,10 +56,23 @@ def start_tally(exe_path: str) -> bool:
     """
     workdir = os.path.dirname(exe_path)
     try:
-        os.startfile(exe_path, cwd=workdir)  # noqa: S606 — deliberate app launch
+        os.startfile(  # noqa: S606 — deliberate app launch
+            exe_path, cwd=workdir, show_cmd=_SW_SHOWMINNOACTIVE
+        )
         return True
+    except TypeError:
+        # show_cmd needs Python 3.10+; an older interpreter still gets Tally up.
+        try:
+            os.startfile(exe_path, cwd=workdir)  # noqa: S606
+            return True
+        except OSError:
+            pass
     except OSError:
         pass
+
+    startupinfo = subprocess.STARTUPINFO()
+    startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
+    startupinfo.wShowWindow = _SW_SHOWMINNOACTIVE
     try:
         subprocess.Popen(
             [exe_path],
@@ -62,6 +81,7 @@ def start_tally(exe_path: str) -> bool:
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             creationflags=subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP,
+            startupinfo=startupinfo,
             close_fds=True,
         )
         return True
@@ -69,16 +89,18 @@ def start_tally(exe_path: str) -> bool:
         return False
 
 
-def wait_until_healthy(host: str, port: int, company: str,
+def wait_until_healthy(host: str, port: int, company: str, guid: str = "",
                        timeout: float = STARTUP_WAIT_SECONDS,
                        poll_interval: float = POLL_INTERVAL_SECONDS,
                        sleep=time.sleep) -> DoctorResult:
     """Poll doctor until the configured company is up or we run out of patience."""
     deadline = time.monotonic() + timeout
-    result = run_doctor(host=host, port=port, configured_company=company)
+    result = run_doctor(host=host, port=port, configured_company=company,
+                        configured_guid=guid)
     while result.exit_code != EXIT_HEALTHY and time.monotonic() < deadline:
         sleep(poll_interval)
-        result = run_doctor(host=host, port=port, configured_company=company)
+        result = run_doctor(host=host, port=port, configured_company=company,
+                            configured_guid=guid)
     return result
 
 
@@ -112,6 +134,8 @@ def ensure_tally_ready(settings: dict, doctor: DoctorResult,
         host=settings["tally_host"],
         port=int(settings["tally_port"]),
         company=settings["company_name"],
+        guid=settings.get("company_guid", ""),
+        timeout=float(settings.get("tally_startup_wait_seconds", STARTUP_WAIT_SECONDS)),
     )
     logger.info("auto-start: doctor exit=%s after wait", result.exit_code)
 
