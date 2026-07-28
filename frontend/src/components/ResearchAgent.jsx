@@ -169,7 +169,7 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
           <span /><span /><span />
         </div>
         <div className="research-hero-copy">
-          <span className="research-eyebrow"><IconSpark />{copy.eyebrow}</span>
+          <span className="research-eyebrow"><IconSpark />{copy.nav}</span>
           <h2>{copy.title}</h2>
           <p>{copy.subtitle}</p>
         </div>
@@ -198,7 +198,7 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
 
       {error && (
         <div className="research-error" role="alert">
-          <IconNote /><div><strong>Research needs attention</strong><p>{error}</p></div>
+          <IconNote /><div><strong>{copy.title}</strong><p>{error}</p></div>
         </div>
       )}
 

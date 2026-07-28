@@ -1,13 +1,10 @@
 import { useState } from "react";
 import { login, signup } from "../api";
 import BrandLogo from "../components/BrandLogo";
-import ConversionContactBar from "../components/ConversionContactBar";
-import ProductShowcase from "../components/ProductShowcase";
 import ThemeToggle from "../components/ThemeToggle";
 import WaitlistPreview from "../components/WaitlistPreview";
 import { LANGS } from "../i18n";
 import {
-  IconCheck,
   IconEye,
   IconEyeOff,
   IconShield,
@@ -106,8 +103,6 @@ export default function Login({
           </div>
         </div>
 
-        <ConversionContactBar t={t} />
-
         <div className="login-topcontrols">
           <div className="lang-group" aria-label={t.languagePicker}>
             {LANGS.map((language) => (
@@ -138,11 +133,9 @@ export default function Login({
           </span>
           <h2>{t.signupHero}</h2>
           <p>{t.signupHeroSub}</p>
-          <ProductShowcase t={t} />
           <div className="auth-benefits">
             {t.signupBenefits.map((benefit) => (
               <div key={benefit}>
-                <IconCheck width={16} height={16} />
                 <span>{benefit}</span>
               </div>
             ))}
@@ -270,9 +263,6 @@ export default function Login({
               </div>
           </>
         </form>
-        <div className="mobile-product-preview">
-          <ProductShowcase t={t} compact />
-        </div>
       </main>
     </div>
   );

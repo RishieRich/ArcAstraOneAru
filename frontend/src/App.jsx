@@ -281,30 +281,36 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
                 />
               )}
 
-              {data.has_financial_data && (
-                <nav className="view-tabs" aria-label={t.dashboardViews}>
-                  <button
-                    type="button"
-                    aria-pressed={view === "receivables"}
-                    onClick={() => setView("receivables")}
-                  >
-                    {t.receivablesView}
-                  </button>
+              <nav className="workspace-nav" aria-label={t.dashboardViews}>
+                <button
+                  type="button"
+                  aria-pressed={view === "receivables"}
+                  onClick={() => setView("receivables")}
+                >
+                  <IconRupee width={16} height={16} />
+                  <span><strong>{t.receivablesView}</strong><small>{t.tagline}</small></span>
+                </button>
+                {data.has_financial_data && (
                   <button
                     type="button"
                     aria-pressed={view === "financial"}
                     onClick={() => setView("financial")}
                   >
-                    {t.financialView}
+                    <IconChart width={16} height={16} />
+                    <span><strong>{t.financialView}</strong><small>{t.financialSub}</small></span>
                   </button>
-                </nav>
-              )}
-
-              {researchEnabled && (
-                <nav className="view-tabs" aria-label={t.research.nav}>
-                  <button type="button" aria-pressed={view === "research"} onClick={() => setView("research")}>{t.research.nav}</button>
-                </nav>
-              )}
+                )}
+                {researchEnabled && (
+                  <button className="agents-nav"
+                    type="button"
+                    aria-pressed={view === "research"}
+                    onClick={() => setView("research")}
+                  >
+                    <IconSpark width={16} height={16} />
+                    <span><strong>{t.research.nav}</strong><small>{t.research.subtitle}</small></span>
+                  </button>
+                )}
+              </nav>
 
               {view === "research" && researchEnabled ? (
                 <ResearchAgent tenantId={tenantId} t={t} onAuthError={onLogout} />
