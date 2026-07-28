@@ -1,4 +1,4 @@
-from app.research import build_search_plan, candidates_from_results
+from app.research import build_search_plan, candidates_from_results, research_web
 
 
 def test_search_plan_uses_multiple_bounded_angles(monkeypatch):
@@ -64,3 +64,11 @@ def test_duplicate_company_results_become_corroborating_evidence():
     assert len(candidates) == 1
     assert candidates[0]["enrichment"]["source_count"] == 2
     assert candidates[0]["enrichment"]["score_components"]["corroboration"] == 7
+
+
+def test_unconfigured_web_search_returns_honest_guidance(monkeypatch):
+    monkeypatch.delenv("TAVILY_API_KEY", raising=False)
+    candidates, summary = research_web("customer", ["industrial valve"], {"geography": "Gujarat"})
+    assert candidates == []
+    assert summary["web_search_ready"] is False
+    assert summary["queries"]

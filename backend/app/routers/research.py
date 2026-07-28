@@ -1,3 +1,4 @@
+import os
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -67,7 +68,8 @@ def _run(tenant_id, email, kind, params):
             product=str(params.get("product","")).strip(); baseline=params.get("baseline")
             if not product or baseline is None: raise HTTPException(status_code=422, detail="Product and current cost baseline are required")
             terms=[product]
-        cur.execute("insert into research_runs (tenant_id,type,status,params_json,provider) values (%s,%s,'running',%s,'tavily') returning id",(tenant_id,kind,Jsonb(params))); (run_id,)=cur.fetchone()
+        provider = "tavily" if os.environ.get("TAVILY_API_KEY") else "guidance"
+        cur.execute("insert into research_runs (tenant_id,type,status,params_json,provider) values (%s,%s,'running',%s,%s) returning id",(tenant_id,kind,Jsonb(params),provider)); (run_id,)=cur.fetchone()
         try: found, summary = research_web(kind, terms, params)
         except Exception as exc:
             cur.execute("update research_runs set status='failed' where id=%s",(run_id,)); conn.commit(); raise HTTPException(status_code=503,detail=f"Research provider unavailable: {exc}") from exc

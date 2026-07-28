@@ -48,8 +48,16 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
     if (!tenantId) return;
     getResearchIcp(tenantId)
       .then(setIcp)
-      .catch((requestError) => {
-        if (requestError.constructor.name === "AuthError") onAuthError();
+      .catch(async (requestError) => {
+        if (requestError.constructor.name === "AuthError") return onAuthError();
+        // Start with a useful, data-backed business summary whenever possible.
+        // This removes the extra setup step that made the agent feel empty.
+        try {
+          setIcp(await generateResearchIcp(tenantId));
+        } catch (generationError) {
+          if (generationError.constructor.name === "AuthError") onAuthError();
+          else setError(generationError.message);
+        }
       });
   }, [tenantId]);
 

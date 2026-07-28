@@ -5,7 +5,7 @@ different agents on the same page. Codex CLI loads `AGENTS.md` automatically; Cl
 loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way — one file,
 not two drifting copies.
 
-Last verified against the repo: **2026-07-27** (Smart Excel release commit `35c7fa8`;
+Last verified against the repo: **2026-07-28** (Smart Excel release commit `35c7fa8`;
 migration 0007 and both Vercel projects verified in production. `/v1/ask` provider
 routing fixed and **deployed** — verified live in production in all four languages,
 and the Gemini→Groq fallback proven from Vercel's own network. See trap 13).
@@ -124,8 +124,9 @@ Backend (`backend/.env` locally, Vercel project env in prod — see `backend/.en
 - `CORS_ORIGINS` — comma-separated dashboard origins; `*` until locked down
 - `ARQ_RESEARCH_ENABLED` — optional Research Agent switch; defaults to `true` for demos.
   Set `false` to remove its API surface and frontend nav entry.
-- `TAVILY_API_KEY` — required only when running cited customer or supplier discovery;
-  no research results are fabricated when it is absent.
+- `TAVILY_API_KEY` — required only when running cited customer or supplier discovery.
+  Without it, the Agent still builds a data-backed business profile and a ready-to-search
+  plan, but returns no external leads; no research results are fabricated.
 - `RESEARCH_SEARCH_DEPTH` — Tavily depth; defaults to `advanced`. Research cost is
   bounded by `RESEARCH_MAX_QUERIES` (default 4, hard max 6),
   `RESEARCH_RESULTS_PER_QUERY` (default 6, hard max 8), and

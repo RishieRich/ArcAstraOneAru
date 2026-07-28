@@ -42,6 +42,11 @@ audit fields.
 Tavily failures are isolated per query. A run may return useful partial results, but if every
 query fails it is marked failed and no candidates are invented.
 
+When no `TAVILY_API_KEY` is configured, a run completes as a clearly labelled preparation
+step instead: it saves the bounded search angles and business-data insights, but creates no
+external candidates. This keeps the workspace useful without presenting example or invented
+companies as verified leads.
+
 ## UI
 
 The dedicated surface has overview, ICP, customer and supplier views. It includes ICP

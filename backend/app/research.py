@@ -258,6 +258,26 @@ def build_search_plan(kind: str, terms: list[str], params: dict) -> list[str]:
 def research_web(kind: str, terms: list[str], params: dict) -> tuple[list[dict], dict]:
     """Run a bounded multi-angle search and return evidence plus deterministic insights."""
     queries = build_search_plan(kind, terms, params)
+    # A missing provider key must never turn a useful workspace into a broken one.
+    # We deliberately return no leads here: showing invented companies would be worse
+    # than clearly saying that external verification has not been connected yet.
+    if not os.environ.get("TAVILY_API_KEY"):
+        return [], {
+            "queries_run": 0,
+            "queries": queries,
+            "sources_reviewed": 0,
+            "candidates_verified": 0,
+            "high_fit_candidates": 0,
+            "provider_credits_reported": 0,
+            "partial_failures": [],
+            "web_search_ready": False,
+            "key_insights": [
+                "Your business pattern has been prepared from the data already connected to ARQ.",
+                "External company leads are not shown until web search is connected, so no unverified names are presented as recommendations.",
+                "Use the suggested search angles below when web research is enabled.",
+            ],
+            "method": "Business-data preparation only. Web search has not been connected for this workspace.",
+        }
     per_query = _bounded_env("RESEARCH_RESULTS_PER_QUERY", 6, 3, 8)
     results = []
     credits = 0
@@ -303,6 +323,7 @@ def research_web(kind: str, terms: list[str], params: dict) -> tuple[list[dict],
         "high_fit_candidates": high_fit,
         "provider_credits_reported": credits,
         "partial_failures": failures,
+        "web_search_ready": True,
         "key_insights": insights,
         "method": (
             "Multi-angle Tavily search; deterministic business-result filtering, "
