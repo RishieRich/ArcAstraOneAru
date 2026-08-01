@@ -10,7 +10,8 @@ Tally → cloud receivables pipeline. Three components:
 > is the shared brief for Claude Code, Codex, and anything else: architecture, env vars,
 > commands, deploy config, known traps, and the conventions to follow. `CLAUDE.md` just points there.
 
-Docs live in `magic_mds/`:
+Detailed internal docs live in `magic_mds/`, which is **local only and gitignored** — it is not
+part of a clone:
 
 - `HOW_IT_ALL_WORKS.md` — plain-language tour of the whole system
 - `USER_MANUAL.md` — how to install, register, and use the exe

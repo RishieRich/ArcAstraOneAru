@@ -14,6 +14,9 @@ connector/.venv/
 # Local data references (private spreadsheets, not for repo)
 git_ignore_data_ref/
 
+# Internal working docs (local only, not for repo)
+magic_mds/
+
 # Local state & logs
 exports/
 connector/dist/

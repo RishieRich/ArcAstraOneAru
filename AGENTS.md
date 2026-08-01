@@ -302,6 +302,9 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
   explicit snapshot/reconciliation workflow before treating imports as a cancellation ledger.
 ## 10. Documentation index (`magic_mds/`)
 
+`magic_mds/` is gitignored — these files exist in the local working copy only, never in the repo.
+If they are missing, you are in a fresh clone and this file is the only brief you get.
+
 | File | What it is |
 |---|---|
 | `SOLUTION_ARCHITECTURE.md` | **ARB-ready end-to-end architecture**: C4 L1–L3, sequence flows, ERD, threat model, ADRs, risks. Self-contained — hand it to any LLM to generate an architecture deck. |
