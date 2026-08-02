@@ -9,6 +9,7 @@ from app.db import get_connection
 from app.research import build_icp, feature_enabled, research_web
 
 router = APIRouter(prefix="/research", tags=["research"])
+CANDIDATE_STATUSES = {"all", "draft", "approved", "rejected", "delivered"}
 
 def _enabled():
     if not feature_enabled(): raise HTTPException(status_code=404, detail="Research Agent is disabled")
@@ -62,10 +63,9 @@ def _run(tenant_id, email, kind, params):
         if kind == "customer":
             cur.execute("select profile_json from icp_profiles where tenant_id=%s",(tenant_id,)); row=cur.fetchone()
             if not row: raise HTTPException(status_code=409, detail="Generate an ICP before customer research")
-            terms=[x["name"] for x in row[0].get("top_products",[])][:3]
+            product_terms=[x["name"] for x in row[0].get("top_products",[])][:3]
             industry = str(params.get("industry") or "").strip()
-            if not terms and industry:
-                terms = [industry]
+            terms = ([industry] if industry else []) + product_terms
             if not terms:
                 raise HTTPException(
                     status_code=422,
@@ -161,12 +161,29 @@ def latest_runs(tenant_id: UUID = Query(), email: str = Depends(require_dashboar
             }
     return {"runs": restored}
 
+
+def _candidate_rows(cur, tenant_id: str, run_id: str, status: str):
+    if status not in CANDIDATE_STATUSES:
+        raise HTTPException(status_code=422, detail="Invalid candidate status")
+    query = """
+        select id,name,location,contact,source_url,retrieved_at,
+               fit_score,fit_reason,status,enrichment_json
+        from research_candidates
+        where tenant_id=%s and run_id=%s
+    """
+    params = [tenant_id, run_id]
+    if status != "all":
+        query += " and status=%s"
+        params.append(status)
+    query += " order by fit_score desc"
+    cur.execute(query, params)
+    return cur.fetchall()
+
 @router.get("/runs/{run_id}/candidates")
-def list_candidates(run_id: UUID, tenant_id: UUID = Query(), status: str | None = Query(default="draft"), email: str = Depends(require_dashboard_user)):
+def list_candidates(run_id: UUID, tenant_id: UUID = Query(), status: str = Query(default="draft"), email: str = Depends(require_dashboard_user)):
     _enabled()
-    status_filter = None if status == "all" else status
     with get_connection() as conn, conn.cursor() as cur:
-        _access(cur,email,str(tenant_id)); cur.execute("select id,name,location,contact,source_url,retrieved_at,fit_score,fit_reason,status,enrichment_json from research_candidates where tenant_id=%s and run_id=%s and (%s is null or status=%s) order by fit_score desc",(str(tenant_id),str(run_id),status_filter,status_filter)); rows=cur.fetchall()
+        _access(cur,email,str(tenant_id)); rows = _candidate_rows(cur, str(tenant_id), str(run_id), status)
     return [{"id":str(i),"name":n,"location":l,"contact":c,"source_url":u,"retrieved_at":at.isoformat(),"fit_score":s,"fit_reason":r,"status":st,"enrichment":enrichment} for i,n,l,c,u,at,s,r,st,enrichment in rows]
 
 @router.patch("/candidates/{candidate_id}")

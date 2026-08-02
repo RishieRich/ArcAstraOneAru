@@ -1,5 +1,10 @@
 import json
+from uuid import uuid4
 
+import pytest
+from fastapi import HTTPException
+
+from app.db import get_connection
 from app.research import (
     build_icp,
     build_search_plan,
@@ -7,6 +12,7 @@ from app.research import (
     research_web,
     tavily_search,
 )
+from app.routers.research import _candidate_rows
 
 
 def test_tavily_search_uses_standard_plan_compatible_payload(monkeypatch):
@@ -52,12 +58,25 @@ def test_search_plan_uses_multiple_bounded_angles(monkeypatch):
     queries = build_search_plan(
         "customer",
         ["industrial valve", "pump housing"],
-        {"geography": "Gujarat", "industry": "chemicals"},
+        {"geography": "Gujarat"},
     )
     assert len(queries) == 4
     assert all("industrial valve" in query for query in queries)
     assert any("association" in query for query in queries)
     assert any("Gujarat" in query for query in queries)
+
+
+def test_target_industry_drives_customer_discovery(monkeypatch):
+    monkeypatch.setenv("RESEARCH_MAX_QUERIES", "4")
+    queries = build_search_plan(
+        "customer",
+        ["Chemicals Pumps", "Seal - Spring - HIFI CROC"],
+        {"geography": "Vapi", "industry": "Chemicals Pumps"},
+    )
+    assert len(queries) == 4
+    assert all("Chemicals Pumps" in query for query in queries)
+    assert all("Vapi" in query for query in queries)
+    assert all("HIFI CROC" not in query for query in queries)
 
 
 def test_candidates_require_citations_and_preserve_score_evidence():
@@ -110,6 +129,79 @@ def test_duplicate_company_results_become_corroborating_evidence():
     assert len(candidates) == 1
     assert candidates[0]["enrichment"]["source_count"] == 2
     assert candidates[0]["enrichment"]["score_components"]["corroboration"] == 7
+
+
+def test_human_wildcard_product_matches_real_supplier_wording():
+    candidates = candidates_from_results(
+        [
+            {
+                "title": "Annealed Steel Bars Manufacturer in India",
+                "url": "https://urjasteels.example/annealed-steel-bars",
+                "content": (
+                    "Precision annealed steel bars manufacturer and supplier for "
+                    "machining, forging and engineering applications."
+                ),
+                "score": 0.78,
+            }
+        ],
+        "material",
+        ["EN* steel bar"],
+    )
+    assert len(candidates) == 1
+    assert candidates[0]["enrichment"]["matched_terms"] == ["EN* steel bar"]
+
+
+def test_target_industry_can_establish_potential_customer_fit():
+    candidates = candidates_from_results(
+        [
+            {
+                "title": "VND Plastico Pumps Pvt. Ltd.",
+                "url": "https://vndpumps.example/chemical-pumps-vapi",
+                "content": (
+                    "Chemical pump company and industrial manufacturer serving plants "
+                    "from Vapi, Gujarat."
+                ),
+                "score": 0.64,
+            }
+        ],
+        "customer",
+        ["Chemicals Pumps", "Hi-Tech Seal Lock"],
+        params={"industry": "Chemicals Pumps", "geography": "Vapi"},
+    )
+    assert len(candidates) == 1
+    assert candidates[0]["location"] == "Vapi"
+    assert candidates[0]["enrichment"]["matched_terms"] == ["Chemicals Pumps"]
+
+
+def test_candidate_name_prefers_company_identity_from_result_excerpt():
+    candidates = candidates_from_results(
+        [
+            {
+                "title": "SS Chemical Pump In Vapi",
+                "url": "https://vndpumps.example/chemical-pump-vapi",
+                "content": (
+                    "VND Plastico Pumps Pvt. Ltd.\n"
+                    "Chemical pump manufacturer and supplier operating in Vapi."
+                ),
+                "score": 0.81,
+            }
+        ],
+        "customer",
+        ["Chemicals Pumps"],
+        params={"industry": "Chemicals Pumps", "geography": "Vapi"},
+    )
+    assert candidates[0]["name"] == "VND Plastico Pumps Pvt. Ltd."
+
+
+def test_candidate_status_queries_are_postgres_type_safe():
+    tenant_id = str(uuid4())
+    run_id = str(uuid4())
+    with get_connection() as conn, conn.cursor() as cur:
+        assert _candidate_rows(cur, tenant_id, run_id, "all") == []
+        assert _candidate_rows(cur, tenant_id, run_id, "draft") == []
+        with pytest.raises(HTTPException) as exc_info:
+            _candidate_rows(cur, tenant_id, run_id, "unknown")
+    assert exc_info.value.status_code == 422
 
 
 def test_unconfigured_web_search_returns_honest_guidance(monkeypatch):

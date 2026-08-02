@@ -5,7 +5,7 @@ different agents on the same page. Codex CLI loads `AGENTS.md` automatically; Cl
 loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way — one file,
 not two drifting copies.
 
-Last verified against the repo: **2026-08-02** (Smart Excel release commit `35c7fa8`;
+Last verified against the repo: **2026-08-03** (Smart Excel release commit `35c7fa8`;
 migration 0007 and both Vercel projects verified in production. `/v1/ask` provider
 routing fixed and **deployed** — verified live in production in all four languages,
 and the Gemini→Groq fallback proven from Vercel's own network. See trap 13).
@@ -292,7 +292,12 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
    confirming an Enterprise key: the current standard key returns 403 when that field is sent,
    while the same bounded search succeeds without it. Tavily also rejects `country` at `fast`
    and `ultra-fast` depth, so the India boost is intentionally sent only for `basic` and
-   `advanced` searches.
+   `advanced` searches. Candidate listing must branch between an unfiltered `all` query and
+   `status = %s`; a nullable `(%s is null or status = %s)` predicate raises PostgreSQL
+   `IndeterminateDatatype` and hides an otherwise completed Tavily run. Explicit customer
+   target industries intentionally drive discovery ahead of SKU-like sales labels, and
+   punctuation/wildcards in human-entered material names are token-matched against cited
+   evidence instead of treated as literal web text.
 
 ## 9. Open items
 
