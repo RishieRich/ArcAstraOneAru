@@ -1,4 +1,50 @@
-from app.research import build_icp, build_search_plan, candidates_from_results, research_web
+import json
+
+from app.research import (
+    build_icp,
+    build_search_plan,
+    candidates_from_results,
+    research_web,
+    tavily_search,
+)
+
+
+def test_tavily_search_uses_standard_plan_compatible_payload(monkeypatch):
+    captured = {}
+
+    class Response:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *_args):
+            return False
+
+        def read(self):
+            return b'{"results": []}'
+
+    def fake_urlopen(request, timeout):
+        captured["payload"] = json.loads(request.data)
+        captured["authorization"] = request.get_header("Authorization")
+        captured["timeout"] = timeout
+        return Response()
+
+    monkeypatch.setenv("TAVILY_API_KEY", "test-key")
+    monkeypatch.setenv("RESEARCH_SEARCH_DEPTH", "fast")
+    monkeypatch.setattr("app.research.urllib.request.urlopen", fake_urlopen)
+
+    assert tavily_search("industrial valve buyers", limit=4) == {"results": []}
+    assert captured["payload"]["max_results"] == 4
+    assert captured["payload"]["search_depth"] == "fast"
+    assert "country" not in captured["payload"]
+    assert "safe_search" not in captured["payload"]
+    assert "chunks_per_source" not in captured["payload"]
+    assert captured["authorization"] == "Bearer test-key"
+    assert captured["timeout"] == 28
+
+    monkeypatch.setenv("RESEARCH_SEARCH_DEPTH", "advanced")
+    tavily_search("industrial valve buyers", limit=4)
+    assert captured["payload"]["country"] == "india"
+    assert captured["payload"]["chunks_per_source"] == 3
 
 
 def test_search_plan_uses_multiple_bounded_angles(monkeypatch):
