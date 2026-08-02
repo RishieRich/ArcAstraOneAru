@@ -5,7 +5,7 @@ different agents on the same page. Codex CLI loads `AGENTS.md` automatically; Cl
 loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way — one file,
 not two drifting copies.
 
-Last verified against the repo: **2026-07-28** (Smart Excel release commit `35c7fa8`;
+Last verified against the repo: **2026-08-02** (Smart Excel release commit `35c7fa8`;
 migration 0007 and both Vercel projects verified in production. `/v1/ask` provider
 routing fixed and **deployed** — verified live in production in all four languages,
 and the Gemini→Groq fallback proven from Vercel's own network. See trap 13).
@@ -127,7 +127,8 @@ Backend (`backend/.env` locally, Vercel project env in prod — see `backend/.en
 - `TAVILY_API_KEY` — required only when running cited customer or supplier discovery.
   Without it, the Agent still builds a data-backed business profile and a ready-to-search
   plan, but returns no external leads; no research results are fabricated.
-- `RESEARCH_SEARCH_DEPTH` — Tavily depth; defaults to `advanced`. Research cost is
+- `RESEARCH_SEARCH_DEPTH` — Tavily depth; defaults to `advanced`; `basic`, `fast`, and
+  `ultra-fast` are also supported. Research cost is
   bounded by `RESEARCH_MAX_QUERIES` (default 4, hard max 6),
   `RESEARCH_RESULTS_PER_QUERY` (default 6, hard max 8), and
   `RESEARCH_MAX_CANDIDATES` (default 20, hard max 30).
@@ -284,9 +285,14 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
    browser and printed/saved as A4 landscape; the AI narrative never supplies chart numbers.
 15. **Research Agent has two honest capability levels.** Internal action plans work from
    current bills and normalized sales without a web credential. Verified new-customer and
-   supplier names still require `TAVILY_API_KEY`; production currently has no Tavily key.
-   In that state, runs persist a prepared search plan with zero external candidates instead
-   of fabricating company names. `GET /research/latest` restores the latest completed work.
+   supplier names require `TAVILY_API_KEY`; it is configured in the Vercel backend Production
+   environment as of 2026-08-02. If the key is absent, runs persist a prepared search plan
+   with zero external candidates instead of fabricating company names. `GET /research/latest`
+   restores the latest completed work. Do not add Tavily's `safe_search` request field without
+   confirming an Enterprise key: the current standard key returns 403 when that field is sent,
+   while the same bounded search succeeds without it. Tavily also rejects `country` at `fast`
+   and `ultra-fast` depth, so the India boost is intentionally sent only for `basic` and
+   `advanced` searches.
 
 ## 9. Open items
 

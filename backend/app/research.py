@@ -284,20 +284,21 @@ def tavily_search(query: str, limit: int = 6) -> dict:
     if not key:
         raise RuntimeError("Research is configured, but TAVILY_API_KEY is not set")
     depth = os.environ.get("RESEARCH_SEARCH_DEPTH", "advanced").strip().lower()
-    if depth not in {"basic", "advanced", "fast"}:
+    if depth not in {"basic", "advanced", "fast", "ultra-fast"}:
         depth = "advanced"
     payload = {
         "query": query,
         "max_results": min(max(limit, 1), 8),
         "search_depth": depth,
         "topic": "general",
-        "country": "india",
         "include_answer": False,
         "include_raw_content": False,
         "include_favicon": True,
         "include_usage": True,
-        "safe_search": True,
     }
+    # Tavily rejects country boosts for the latency-optimised depths.
+    if depth in {"basic", "advanced"}:
+        payload["country"] = "india"
     if depth == "advanced":
         payload["chunks_per_source"] = 3
     request = urllib.request.Request(
