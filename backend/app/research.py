@@ -7,6 +7,7 @@ remain attached to their source snippets and URLs.
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import urllib.request
@@ -316,19 +317,37 @@ def tavily_search(query: str, limit: int = 6) -> dict:
 
 def build_search_plan(kind: str, terms: list[str], params: dict) -> list[str]:
     """Create diverse discovery angles without letting one run fan out indefinitely."""
-    clean_terms = [str(term).strip() for term in terms if str(term).strip()][:3]
+    clean_terms = []
+    for term in terms:
+        clean = " ".join(re.findall(r"[A-Za-z0-9]+", str(term)))
+        if clean and clean.casefold() not in {item.casefold() for item in clean_terms}:
+            clean_terms.append(clean)
+        if len(clean_terms) == 3:
+            break
     phrase = " OR ".join(f'"{term}"' for term in clean_terms)
     geography = str(params.get("geography") or "India").strip()
-    industry = str(params.get("industry") or "").strip()
+    industry = " ".join(re.findall(r"[A-Za-z0-9]+", str(params.get("industry") or "")))
     if kind == "customer":
-        queries = [
-            f"Indian industrial companies that buy or use {phrase} {industry} {geography}",
-            f"{phrase} procurement buyer manufacturer company {geography}",
-            f"{phrase} end user plant factory contact {industry} India",
-            f"{phrase} industrial association members buyers {geography}",
-            f"{phrase} company annual report expansion plant India",
-            f"{phrase} importer distributor industrial India",
-        ]
+        if industry:
+            # An explicit target market is stronger discovery intent than historical
+            # product labels, which may be SKU-like or too specific for web pages.
+            queries = [
+                f"{industry} companies manufacturers plants {geography} India",
+                f"{industry} procurement industrial buyers factories {geography}",
+                f"{industry} company directory association members {geography}",
+                f"{industry} plant expansion projects {geography} India",
+                f"{industry} manufacturers contact {geography}",
+                f"{industry} industrial cluster companies {geography}",
+            ]
+        else:
+            queries = [
+                f"Indian industrial companies that buy or use {phrase} {geography}",
+                f"{phrase} procurement buyer manufacturer company {geography}",
+                f"{phrase} end user plant factory contact India",
+                f"{phrase} industrial association members buyers {geography}",
+                f"{phrase} company annual report expansion plant India",
+                f"{phrase} importer distributor industrial India",
+            ]
     else:
         product = clean_terms[0]
         specification = str(params.get("specification") or "").strip()
@@ -438,12 +457,28 @@ def _safe_url(url: str) -> bool:
     return parsed.scheme in {"http", "https"} and bool(parsed.netloc)
 
 
-def _candidate_name(title: str) -> str:
+def _candidate_name(title: str, excerpt: str = "") -> str:
+    clean_title = re.sub(r"^\s*[©®]\s*", "", title)
+    clean_title = re.sub(
+        r"\.?\s*all rights reserved.*$",
+        "",
+        clean_title,
+        flags=re.IGNORECASE,
+    )
+    title = clean_title
     parts = [part.strip() for part in re.split(r"\s+[|–—]\s+|\s+-\s+", title) if part.strip()]
     for part in parts:
         if COMPANY_SUFFIX.search(part):
             return part[:180]
-    return (parts[0] if parts else title)[:180]
+    excerpt_parts = [
+        part.strip()
+        for part in re.split(r"[\r\n]+", excerpt)
+        if 3 <= len(part.strip()) <= 180
+    ]
+    for part in excerpt_parts:
+        if COMPANY_SUFFIX.search(part):
+            return part[:180]
+    return (parts[0] if parts else clean_title)[:180]
 
 
 def _name_key(name: str) -> str:
@@ -483,6 +518,34 @@ def _contact(text: str, url: str) -> tuple[str, str]:
     return f"{parsed.scheme}://{parsed.netloc}", "website"
 
 
+def _normalise_token(token: str) -> str:
+    if len(token) > 4 and token.endswith("ies"):
+        return f"{token[:-3]}y"
+    if len(token) > 3 and token.endswith("s") and not token.endswith("ss"):
+        return token[:-1]
+    return token
+
+
+def _term_tokens(value: str) -> list[str]:
+    return [
+        _normalise_token(token)
+        for token in re.findall(r"[a-z0-9]+", value.casefold())
+    ]
+
+
+def _term_matches(term: str, text: str) -> bool:
+    """Match human-entered product text without treating punctuation as literal data."""
+    wanted = _term_tokens(term)
+    if not wanted:
+        return False
+    available = set(_term_tokens(text))
+    if len(wanted) == 1:
+        return wanted[0] in available
+    overlap = sum(token in available for token in set(wanted))
+    required = max(2, math.ceil(len(set(wanted)) * 0.6))
+    return overlap >= required
+
+
 def candidates_from_results(
     results: list[dict],
     kind: str,
@@ -501,15 +564,12 @@ def candidates_from_results(
         excerpt = str(result.get("content") or "").strip()
         if not title or not _safe_url(url) or len(excerpt) < 35 or GENERIC_TITLE.search(title):
             continue
-        name = _candidate_name(title)
+        name = _candidate_name(title, excerpt)
         if len(name) < 3:
             continue
         domain = _domain(url)
         text = f"{title} {excerpt}"
-        matched = [
-            term for term in terms
-            if term and term.casefold() in text.casefold()
-        ]
+        matched = [term for term in terms if term and _term_matches(term, text)]
         provider_relevance = float(result.get("score") or 0)
         seller_signal = bool(
             re.search(
@@ -526,7 +586,9 @@ def candidates_from_results(
                 re.IGNORECASE,
             )
         )
-        kind_signal = seller_signal if kind == "material" else buyer_signal
+        industry = str(params.get("industry") or "").strip()
+        industry_match = bool(industry and _term_matches(industry, text))
+        kind_signal = seller_signal if kind == "material" else buyer_signal or industry_match
         business_signal = bool(COMPANY_SUFFIX.search(text) or kind_signal)
         if (
             not matched

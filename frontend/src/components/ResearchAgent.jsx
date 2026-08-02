@@ -110,6 +110,14 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
 
   async function loadRun(kind, run) {
     if (!run) return;
+    setWorkspaces((current) => ({
+      ...current,
+      [kind]: {
+        candidates: [],
+        summary: run.research_summary,
+        delivery: "",
+      },
+    }));
     const rows = await call("loading-results", () =>
       fetchResearchCandidates(tenantId, run.run_id));
     if (rows) {
