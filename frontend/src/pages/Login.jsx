@@ -31,9 +31,10 @@ export default function Login({
   const [waitlisted, setWaitlisted] = useState(null);
 
   const validEmail = /\S+@\S+\.\S+/.test(email);
+  const validLogin = email.trim().length >= 3;
   const ready =
     !busy &&
-    validEmail &&
+    (mode === "login" ? validLogin : validEmail) &&
     (mode === "login"
       ? password.length >= 4
       : fullName.trim().length >= 2 &&
@@ -207,14 +208,16 @@ export default function Login({
                 </>
               )}
 
-              <label htmlFor="email">{t.email}</label>
+              <label htmlFor="email">
+                {mode === "login" ? t.usernameOrEmail : t.email}
+              </label>
               <input
                 className="auth-input"
                 id="email"
-                type="email"
-                autoComplete="email"
+                type={mode === "login" ? "text" : "email"}
+                autoComplete={mode === "login" ? "username" : "email"}
                 autoFocus={mode === "login"}
-                placeholder="you@company.com"
+                placeholder={mode === "login" ? t.usernamePlaceholder : "you@company.com"}
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
