@@ -224,7 +224,8 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
    + `Load=<n>`. This is a Tally limitation, not a bug to fix.
 5. **`/v1/sync` is idempotent by run ID** — retries return the earlier result rather than
    duplicating rows. Preserve that when touching `routers/sync.py`.
-6. **`gh` CLI is not authenticated** on this dev machine; GitHub work is manual.
+6. **`gh` CLI is authenticated** as `RishieRich` on this dev machine as of 2026-08-09.
+   Re-check `gh auth status` before publishing rather than assuming the session is permanent.
 7. **Apply `0003_financial_imports.sql` before deploying code that queries finance data.**
    Imports accept `.xlsx` up to 5 MB, never store the original file, reject mixed/wrong
    voucher types, deduplicate exact files by SHA-256, and upsert vouchers by Tally GUID.
