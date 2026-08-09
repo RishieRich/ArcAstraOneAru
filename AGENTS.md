@@ -5,10 +5,10 @@ different agents on the same page. Codex CLI loads `AGENTS.md` automatically; Cl
 loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way — one file,
 not two drifting copies.
 
-Last verified against the repo: **2026-08-09** (Smart Excel release commit `35c7fa8`;
-migration 0007 and both Vercel projects verified in production. `/v1/ask` provider
-routing fixed and **deployed** — verified live in production in all four languages,
-and the Gemini→Groq fallback proven from Vercel's own network. See trap 13).
+Last verified against the repo: **2026-08-09** (receivables filters and email-confirmed
+cleanup commit `868fe4f` plus release note `143dac9` are on `main`; both Vercel projects
+were manually deployed and verified in production. Smart Excel migration 0007 and the
+`/v1/ask` Gemini→Groq fallback remain live; see trap 13).
 
 ---
 
