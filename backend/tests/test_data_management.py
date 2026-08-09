@@ -9,8 +9,9 @@ from app.routers.data_management import CleanupRequest
 
 
 class FakeCursor:
-    def __init__(self, password: str = "OrangeOrbit!72"):
+    def __init__(self, password: str = "OrangeOrbit!72", access: bool = True):
         self.password_hash = hash_password(password)
+        self.access = access
         self.queries = []
         self.rowcount = 0
         self._result = None
@@ -27,7 +28,7 @@ class FakeCursor:
         if "select t.name, du.pin_hash" in normalized:
             self._result = ("Pawan Engineering", self.password_hash)
         elif "select coalesce(" in normalized:
-            self._result = (False, True)
+            self._result = (False, self.access)
         elif normalized.startswith("delete from"):
             self.rowcount = 1
             self._result = None
@@ -62,7 +63,7 @@ def fake_connection(cursor):
     yield connection
 
 
-def test_cleanup_requires_exact_company_name(monkeypatch):
+def test_cleanup_requires_signed_in_email(monkeypatch):
     cursor = FakeCursor()
     monkeypatch.setattr(
         data_management,
@@ -73,11 +74,12 @@ def test_cleanup_requires_exact_company_name(monkeypatch):
     with pytest.raises(HTTPException) as error:
         data_management.cleanup_company_data(
             "tenant-1",
-            CleanupRequest(company_name="pawan engineering", password="OrangeOrbit!72"),
+            CleanupRequest(email="someone-else@example.com", password="OrangeOrbit!72"),
             "owner@example.com",
         )
 
-    assert error.value.status_code == 400
+    assert error.value.status_code == 403
+    assert error.value.detail == "Wrong email or password"
     assert not any(query.startswith("delete from") for query, _ in cursor.queries)
 
 
@@ -92,7 +94,27 @@ def test_cleanup_requires_current_password(monkeypatch):
     with pytest.raises(HTTPException) as error:
         data_management.cleanup_company_data(
             "tenant-1",
-            CleanupRequest(company_name="Pawan Engineering", password="wrong-password"),
+            CleanupRequest(email="owner@example.com", password="wrong-password"),
+            "owner@example.com",
+        )
+
+    assert error.value.status_code == 403
+    assert error.value.detail == "Wrong email or password"
+    assert not any(query.startswith("delete from") for query, _ in cursor.queries)
+
+
+def test_cleanup_requires_tenant_access(monkeypatch):
+    cursor = FakeCursor(access=False)
+    monkeypatch.setattr(
+        data_management,
+        "get_connection",
+        lambda: fake_connection(cursor),
+    )
+
+    with pytest.raises(HTTPException) as error:
+        data_management.cleanup_company_data(
+            "tenant-1",
+            CleanupRequest(email="owner@example.com", password="OrangeOrbit!72"),
             "owner@example.com",
         )
 
@@ -113,7 +135,7 @@ def test_cleanup_deletes_facts_but_not_company_or_access(monkeypatch):
     response = data_management.cleanup_company_data(
         "tenant-1",
         CleanupRequest(
-            company_name="Pawan Engineering",
+            email=" Owner@Example.com ",
             password="OrangeOrbit!72",
         ),
         "owner@example.com",
@@ -123,6 +145,10 @@ def test_cleanup_deletes_facts_but_not_company_or_access(monkeypatch):
     assert response["status"] == "cleared"
     assert response["preserved"] == ["tenant", "dashboard_access", "devices"]
     assert connection.committed
+    identity_query = next(
+        params for query, params in cursor.queries if "select t.name, du.pin_hash" in query
+    )
+    assert identity_query == ("owner@example.com", "tenant-1")
     assert delete_queries == [
         "delete from smart_rows where tenant_id = %s",
         "delete from smart_datasets where tenant_id = %s",

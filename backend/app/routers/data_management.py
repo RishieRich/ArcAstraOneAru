@@ -15,7 +15,10 @@ router = APIRouter(prefix="/v1/dashboard/data", tags=["dashboard-data"])
 
 
 class CleanupRequest(BaseModel):
-    company_name: str = Field(min_length=1, max_length=200)
+    email: str | None = Field(default=None, min_length=3, max_length=254)
+    # Keep one staged-deployment bridge for cached frontend bundles. The live UI
+    # now confirms the signed-in email; older bundles still send company_name.
+    company_name: str | None = Field(default=None, min_length=1, max_length=200)
     password: str = Field(min_length=4, max_length=128)
 
 
@@ -42,14 +45,16 @@ def cleanup_company_data(
         company_name, password_hash = row
         ensure_dashboard_tenant_access(cur, dashboard_user, tenant_id)
 
-        if payload.company_name != company_name:
-            raise HTTPException(
-                status_code=400,
-                detail="Company name confirmation does not match",
-            )
-        if not verify_password(payload.password, password_hash):
+        if payload.email is not None:
+            identity_matches = payload.email.strip().lower() == dashboard_user
+        else:
+            # This compatibility path can be removed after the email-confirmation
+            # frontend has been deployed long enough for cached bundles to expire.
+            identity_matches = payload.company_name == company_name
+        password_matches = verify_password(payload.password, password_hash)
+        if not identity_matches or not password_matches:
             time.sleep(0.8)
-            raise HTTPException(status_code=403, detail="Wrong password")
+            raise HTTPException(status_code=403, detail="Wrong email or password")
 
         # All tenant data writers take this same lock, so cleanup cannot
         # interleave with a Tally refresh or workbook upload.

@@ -2,9 +2,10 @@ import { formatMoney, formatMonth } from "../api";
 import { IconCalendar } from "../icons";
 
 /* Money by due month, stacked overdue (status red) vs on-track (series blue).
-   Two segments with a hairline gap; legend below names them. */
+   Older months are combined when the available tenure would make the chart
+   too tall to scan. Legends and direct labels keep meaning independent of colour. */
 export default function DueTimeline({ timeline, t }) {
-  const max = Math.max(...timeline.map((m) => m.overdue + m.on_track), 1);
+  const max = Math.max(...timeline.map((month) => month.overdue + month.on_track), 1);
   const lateTotal = timeline.reduce((sum, month) => sum + month.overdue, 0);
   const onTrackTotal = timeline.reduce((sum, month) => sum + month.on_track, 0);
 
@@ -26,28 +27,37 @@ export default function DueTimeline({ timeline, t }) {
       ) : (
         <>
           <div className="bars">
-            {timeline.map((m) => {
-              const total = m.overdue + m.on_track;
+            {timeline.map((month) => {
+              const total = month.overdue + month.on_track;
+              const label = month.earlier ? t.earlier : formatMonth(month.month);
               return (
-                <div className="bar-row" key={m.month}>
-                  <div className="name">{formatMonth(m.month)}</div>
+                <div className="bar-row" key={month.month}>
+                  <div className="name">{label}</div>
                   <div className="bar-track" style={{ gap: 2 }}>
-                    {m.overdue > 0 && (
-                      <div className="bar-fill seg" style={{
-                        width: `${(m.overdue / max) * 100}%`,
-                        background: "var(--critical)",
-                      }} title={`${formatMonth(m.month)} · ${t.overdue}: ${formatMoney(m.overdue)}`} />
+                    {month.overdue > 0 && (
+                      <div
+                        className="bar-fill seg"
+                        style={{
+                          width: `${(month.overdue / max) * 100}%`,
+                          background: "var(--critical)",
+                        }}
+                        title={`${label} · ${t.overdue}: ${formatMoney(month.overdue)}`}
+                      />
                     )}
-                    {m.on_track > 0 && (
-                      <div className="bar-fill seg" style={{
-                        width: `${(m.on_track / max) * 100}%`,
-                        background: "var(--series-1)",
-                      }} title={`${formatMonth(m.month)} · ${t.onTrack}: ${formatMoney(m.on_track)}`} />
+                    {month.on_track > 0 && (
+                      <div
+                        className="bar-fill seg"
+                        style={{
+                          width: `${(month.on_track / max) * 100}%`,
+                          background: "var(--series-1)",
+                        }}
+                        title={`${label} · ${t.onTrack}: ${formatMoney(month.on_track)}`}
+                      />
                     )}
                   </div>
                   <div className="val">
                     {formatMoney(total, { compact: true })}
-                    <small>{t.invoices(m.bills)}</small>
+                    <small>{t.invoices(month.bills)}</small>
                   </div>
                 </div>
               );

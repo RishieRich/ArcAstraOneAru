@@ -5,7 +5,7 @@ different agents on the same page. Codex CLI loads `AGENTS.md` automatically; Cl
 loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way — one file,
 not two drifting copies.
 
-Last verified against the repo: **2026-08-03** (Smart Excel release commit `35c7fa8`;
+Last verified against the repo: **2026-08-09** (Smart Excel release commit `35c7fa8`;
 migration 0007 and both Vercel projects verified in production. `/v1/ask` provider
 routing fixed and **deployed** — verified live in production in all four languages,
 and the Gemini→Groq fallback proven from Vercel's own network. See trap 13).
@@ -71,7 +71,7 @@ Three components, **one repo** (`github.com/RishieRich/ArcAstraOneAru`), three d
 | `POST /v1/imports/financials` | `Bearer <dashboard token>` | normalize a finance book or profile unfamiliar multi-sheet Excel/CSV data |
 | `POST /v1/ask` | `Bearer <dashboard token>` | AI copilot Q&A over the tenant's snapshot |
 | `/research/*` | `Bearer <dashboard token>` | Optional, feature-flagged Research Agent; tenant access is checked on every request |
-| `DELETE /v1/dashboard/data/{tenant_id}` | `Bearer <dashboard token>` + password/name confirmation | clear synced/imported facts while preserving tenant, access and devices |
+| `DELETE /v1/dashboard/data/{tenant_id}` | `Bearer <dashboard token>` + login email/password confirmation | clear synced/imported facts while preserving tenant, access and devices |
 
 Routers live in `backend/app/routers/`; wiring is in `backend/app/main.py`.
 
@@ -103,8 +103,10 @@ Routers live in `backend/app/routers/`; wiring is in `backend/app/main.py`.
   `ensure_dashboard_tenant_access`; waitlisted leads have no token or tenant and see sample
   data only.
 - **The exe never writes to Tally** — only read/export XML requests. Keep it that way.
-- **Data cleanup re-authenticates** — exact company name plus current password/PIN are
-  verified server-side; tenant, dashboard access and registered devices are preserved.
+- **Data cleanup re-authenticates** — the submitted login email must match the signed-in
+  dashboard token and the current password/PIN is verified server-side; tenant, dashboard
+  access and registered devices are preserved. A temporary `company_name` request fallback
+  keeps cached pre-2026-08-09 frontend bundles working during the staged deployment.
 - **No secrets in files or logs**; logs carry counts and statuses, never party names or amounts.
 
 ## 5. Environment variables
@@ -298,6 +300,13 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
    target industries intentionally drive discovery ahead of SKU-like sales labels, and
    punctuation/wildcards in human-entered material names are token-matched against cited
    evidence instead of treated as literal web text.
+16. **Receivables “trajectory” is current exposure, not historical performance.** Connector
+   sync stores the current open-bill state plus sync audit counts; it does not yet retain a
+   daily outstanding balance series. The dashboard’s invoice-month chart therefore groups
+   today’s still-open amount by original bill month and labels that boundary explicitly.
+   Do not rename it revenue growth, collection trend or payment improvement without adding
+   a real historical snapshot model. Receivables filters are calculated client-side from
+   the authorized bill payload and update every visible KPI/chart/list together.
 
 ## 9. Open items
 

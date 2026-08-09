@@ -87,11 +87,11 @@ export const fetchResearchCandidates = (tenantId, runId) => request(`/research/r
 export const updateResearchCandidate = (tenantId, id, status) => request(`/research/candidates/${id}?tenant_id=${tenantId}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ status }) });
 export const deliverResearchCandidates = (tenantId, candidateIds) => request(`/research/candidates/deliver?tenant_id=${tenantId}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ candidate_ids: candidateIds, limit: 5 }) });
 
-export function cleanupCompanyData({ tenantId, companyName, password }) {
+export function cleanupCompanyData({ tenantId, email, password }) {
   return request(`/v1/dashboard/data/${tenantId}`, {
     method: "DELETE",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ company_name: companyName, password }),
+    body: JSON.stringify({ email, password }),
   });
 }
 

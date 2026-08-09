@@ -5,19 +5,18 @@ import { IconShield, IconTrash } from "../icons";
 export default function DataCleanup({
   tenantId,
   companyName,
+  ownerEmail,
   t,
   onCleared,
   onClose,
 }) {
-  const [confirmation, setConfirmation] = useState("");
+  const [email, setEmail] = useState(ownerEmail || "");
   const [password, setPassword] = useState("");
-  const [understood, setUnderstood] = useState(false);
   const [working, setWorking] = useState(false);
   const [error, setError] = useState("");
   const ready =
-    confirmation === companyName &&
+    email.trim().length >= 3 &&
     password.length >= 4 &&
-    understood &&
     !working;
 
   async function submit(event) {
@@ -28,7 +27,7 @@ export default function DataCleanup({
     try {
       const result = await cleanupCompanyData({
         tenantId,
-        companyName: confirmation,
+        email: email.trim(),
         password,
       });
       await onCleared(result);
@@ -73,12 +72,17 @@ export default function DataCleanup({
         </div>
 
         <form onSubmit={submit}>
-          <label htmlFor="cleanup-company">{t.cleanupTypeName(companyName)}</label>
+          <label htmlFor="cleanup-email">{t.cleanupEmail}</label>
           <input
-            id="cleanup-company"
-            value={confirmation}
-            onChange={(event) => setConfirmation(event.target.value)}
-            autoComplete="off"
+            id="cleanup-email"
+            type="email"
+            value={email}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              setError("");
+            }}
+            autoComplete="username"
+            maxLength={254}
             autoFocus
           />
 
@@ -87,18 +91,12 @@ export default function DataCleanup({
             id="cleanup-password"
             type="password"
             value={password}
-            onChange={(event) => setPassword(event.target.value)}
+            onChange={(event) => {
+              setPassword(event.target.value);
+              setError("");
+            }}
             autoComplete="current-password"
           />
-
-          <label className="cleanup-check">
-            <input
-              type="checkbox"
-              checked={understood}
-              onChange={(event) => setUnderstood(event.target.checked)}
-            />
-            <span>{t.cleanupUnderstand}</span>
-          </label>
 
           {error && <div className="cleanup-error" role="alert">{error}</div>}
 

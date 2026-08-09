@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   AuthError, clearSession, fetchCompanies, fetchMetrics,
   formatMoney, formatWhen, loadSession,
@@ -19,6 +19,8 @@ import DataNotes from "./components/DataNotes";
 import DueTimeline from "./components/DueTimeline";
 import FinancialOverview from "./components/FinancialOverview";
 import FinancialUpload from "./components/FinancialUpload";
+import ReceivablesFilters from "./components/ReceivablesFilters";
+import ReceivablesOverview from "./components/ReceivablesOverview";
 import SmartDataExplorer from "./components/SmartDataExplorer";
 import StatTile from "./components/StatTile";
 import ThemeToggle from "./components/ThemeToggle";
@@ -26,6 +28,12 @@ import TrialGuide, { TrialBanner } from "./components/TrialGuide";
 import TopDebtors from "./components/TopDebtors";
 import Login from "./pages/Login";
 import ResearchAgent from "./components/ResearchAgent";
+import {
+  DEFAULT_RECEIVABLE_FILTERS,
+  deriveReceivables,
+  filterBills,
+  hasScopedReceivableFilters,
+} from "./receivables";
 
 export default function App() {
   const [lang, setLang] = useState(() => {
@@ -360,6 +368,7 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
         <DataCleanup
           tenantId={tenantId}
           companyName={data.tenant_name}
+          ownerEmail={session.email}
           t={t}
           onCleared={handleCleared}
           onClose={() => setShowCleanup(false)}
@@ -381,9 +390,45 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
   );
 }
 
-function ReceivablesView({ data, totals, t }) {
+function ReceivablesView({ data, t }) {
+  const [filters, setFilters] = useState({ ...DEFAULT_RECEIVABLE_FILTERS });
+  const parties = useMemo(
+    () => [...new Set(data.bills.map((bill) => bill.party).filter(Boolean))]
+      .sort((left, right) => left.localeCompare(right)),
+    [data.bills],
+  );
+  const filteredBills = useMemo(
+    () => filterBills(data.bills, filters),
+    [data.bills, filters],
+  );
+  const visible = useMemo(() => deriveReceivables(filteredBills), [filteredBills]);
+  const filtered = hasScopedReceivableFilters(filters);
+
+  useEffect(() => {
+    setFilters({ ...DEFAULT_RECEIVABLE_FILTERS });
+  }, [data.tenant_id]);
+
+  const totals = visible.totals;
+
   return (
     <>
+      <ReceivablesFilters
+        filters={filters}
+        parties={parties}
+        visibleCount={filteredBills.length}
+        totalCount={data.bills.length}
+        onChange={setFilters}
+        onReset={() => setFilters({ ...DEFAULT_RECEIVABLE_FILTERS })}
+        t={t}
+      />
+
+      <ReceivablesOverview
+        summary={totals}
+        trajectory={visible.trajectory}
+        filtered={filtered}
+        t={t}
+      />
+
       <div className="tiles">
         <StatTile
           label={t.outstanding}
@@ -439,20 +484,20 @@ function ReceivablesView({ data, totals, t }) {
         />
       </div>
 
-      <Alerts alerts={data.alerts} t={t} />
+      {!filtered && <Alerts alerts={data.alerts} t={t} />}
 
       <div className="grid-2">
-        <AgingChart aging={data.aging} t={t} />
-        <DueTimeline timeline={data.due_timeline} t={t} />
+        <AgingChart aging={visible.aging} t={t} />
+        <DueTimeline timeline={visible.dueTimeline} t={t} />
       </div>
 
       <div className="grid-2">
-        <TopDebtors debtors={data.top_debtors} t={t} />
-        <ChaseList bills={data.oldest_bills} t={t} />
+        <TopDebtors debtors={visible.topDebtors} t={t} />
+        <ChaseList bills={visible.oldestBills} t={t} />
       </div>
 
-      <BillsTable bills={data.bills} t={t} />
-      <DataNotes notes={data.notes} t={t} />
+      <BillsTable bills={filteredBills} t={t} />
+      {!filtered && <DataNotes notes={data.notes} t={t} />}
 
       <div className="footer-note">
         ARQ Tally Connector · {t.lastSync}: {formatWhen(data.last_sync_at)}
