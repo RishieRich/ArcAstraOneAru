@@ -32,3 +32,16 @@ If Windows says "This app can't run on your PC":
 
 Never send a password, device token, or database connection string in a support
 message. The connector stores its device token in Windows Credential Manager.
+
+Use another pairing code
+------------------------
+If this PC already shows a saved registration, click "Reset registration" and
+read the warning. The reset removes only this PC's protected token, remembered
+company and old sync status, and turns automatic sync off. Tally and dashboard
+data are untouched. Select the intended Tally company and use a fresh one-time
+code; a spent code cannot be reused. The ARQ admin must separately revoke an old
+server device when a PC is lost, stolen or transferred.
+
+If the Activity box says Tally is not accepting connections on port 9000, open
+TallyPrime, load the company, then set F1 > Settings > Connectivity >
+TallyPrime acts as Both, port 9000, and press Refresh.

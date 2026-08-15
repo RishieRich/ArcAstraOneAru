@@ -76,7 +76,14 @@ def _run_sync(settings: dict, logger: logging.Logger) -> SyncOutcome:
     if not company and not company_guid:
         return SyncOutcome(ok=False, message="No company configured. Open the app and pick one.")
 
-    token = credentials.load_token()
+    try:
+        token = credentials.load_token()
+    except Exception as exc:
+        logger.error("could not read device credential: %s", type(exc).__name__)
+        return SyncOutcome(
+            ok=False,
+            message="Windows Credential Manager is unavailable. Open the app or contact ARQ support.",
+        )
     if not token:
         return SyncOutcome(ok=False, message="Device not registered. Open the app and register with a pairing code.")
 

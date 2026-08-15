@@ -87,6 +87,8 @@ def decode_tally_response(content: bytes) -> tuple[str, str]:
 
 class TallyClient:
     def __init__(self, host: str, port: int, timeout: float = DEFAULT_TIMEOUT_SECONDS):
+        self.host = host
+        self.port = port
         self.base_url = f"http://{host}:{port}"
         self.timeout = timeout
 
@@ -105,8 +107,22 @@ class TallyClient:
                 headers={"Content-Type": "text/xml"},
                 timeout=self.timeout,
             )
+        except httpx.ConnectError as e:
+            raise TallyConnectionError(
+                f"Tally is not accepting connections at {self.host}:{self.port}. Open "
+                "TallyPrime, load the company, then set F1 > Settings > Connectivity > "
+                f"TallyPrime acts as Both and port {self.port}. Press Refresh."
+            ) from e
+        except httpx.TimeoutException as e:
+            raise TallyConnectionError(
+                f"Tally did not respond at {self.host}:{self.port}. Wait for TallyPrime to "
+                "finish opening, confirm the company is loaded, then press Refresh."
+            ) from e
         except httpx.RequestError as e:
-            raise TallyConnectionError(f"Could not reach Tally gateway at {self.base_url}: {e}") from e
+            raise TallyConnectionError(
+                f"Could not contact Tally at {self.host}:{self.port}. Check that TallyPrime "
+                "is open and its Connectivity port matches this connector."
+            ) from e
 
         text, _encoding = decode_tally_response(resp.content)
         text = strip_invalid_xml_chars(text)

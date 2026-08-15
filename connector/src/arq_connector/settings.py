@@ -13,10 +13,11 @@ import os
 import tempfile
 from pathlib import Path
 
-# The backend the shipped exe talks to. Set this to the Vercel URL before
-# running build.ps1 — an exe built with the localhost default will fail on any
-# machine but this one. Override at build time with ARQ_API_BASE_URL if you
-# prefer not to edit the file.
+# The backend the shipped exe talks to. ARQ_API_BASE_URL is evaluated when the
+# process starts; PyInstaller does not inline a value merely because it existed
+# in the build shell. Normal client PCs therefore use the literal production
+# alias below. Edit that fallback before building only for a deliberate custom
+# target, and never replace it with a Vercel per-deployment SSO URL.
 DEFAULT_API_BASE_URL = os.environ.get(
     "ARQ_API_BASE_URL", "https://arcastraone.vercel.app"
 )

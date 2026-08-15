@@ -34,6 +34,16 @@ def load_state() -> dict:
     return stored if isinstance(stored, dict) else {}
 
 
+def clear_state() -> None:
+    """Remove status left by the previous local registration.
+
+    Last-run state is deliberately disposable. Keeping it after this PC is
+    de-registered would make a newly paired company appear to have inherited
+    another company's last successful sync.
+    """
+    state_path().unlink(missing_ok=True)
+
+
 def record_run(ok: bool, message: str, ledgers: int = 0, bills: int = 0,
                source: str = "scheduled") -> None:
     """Note the outcome of one sync. Never raises — bookkeeping must not be

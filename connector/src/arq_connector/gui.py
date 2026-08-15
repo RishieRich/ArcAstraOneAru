@@ -16,9 +16,9 @@ import threading
 import tkinter as tk
 from datetime import datetime
 from pathlib import Path
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
-from . import __version__, scheduler, state
+from . import __version__, registration, scheduler, state
 from .logging_setup import setup_logging
 from .runner import run_sync
 from .security import credentials
@@ -74,10 +74,12 @@ class ConnectorApp:
         self.results: queue.Queue = queue.Queue()
         self.companies: dict[str, str] = {}  # name -> guid
         self._advanced_open = False
+        self._last_status_message = ""
 
         root.title("ARQ Tally Connector")
         root.configure(bg=BG)
-        root.resizable(False, False)
+        root.resizable(False, True)
+        root.minsize(610, 520)
         try:
             root.iconbitmap(str(_asset("arq.ico")))
         except tk.TclError:
@@ -109,7 +111,25 @@ class ConnectorApp:
         self._build_header()
         self._build_status_strip()
 
-        outer = tk.Frame(self.root, bg=BG)
+        body = tk.Frame(self.root, bg=BG)
+        body.pack(fill="both", expand=True)
+        self.content_canvas = tk.Canvas(
+            body, bg=BG, highlightthickness=0, bd=0, height=1)
+        self.content_scrollbar = ttk.Scrollbar(
+            body, orient="vertical", command=self.content_canvas.yview)
+        self.content_canvas.configure(yscrollcommand=self.content_scrollbar.set)
+        self.content_scrollbar.pack(side="right", fill="y")
+        self.content_canvas.pack(side="left", fill="both", expand=True)
+
+        self.scroll_content = tk.Frame(self.content_canvas, bg=BG)
+        self._content_window = self.content_canvas.create_window(
+            (0, 0), window=self.scroll_content, anchor="nw")
+        self.scroll_content.bind("<Configure>", self._sync_scroll_region)
+        self.content_canvas.bind("<Configure>", self._resize_scroll_content)
+        self.content_canvas.bind("<Enter>", self._bind_mousewheel)
+        self.content_canvas.bind("<Leave>", self._unbind_mousewheel)
+
+        outer = tk.Frame(self.scroll_content, bg=BG)
         outer.pack(fill="both", expand=True, padx=16, pady=(12, 8))
 
         self._build_setup_card(outer)
@@ -119,11 +139,39 @@ class ConnectorApp:
         self._build_advanced(outer)
 
         tk.Label(
-            self.root,
+            self.scroll_content,
             text="Read-only toward Tally  •  token kept in Windows Credential Manager"
                  "  •  logs in %LOCALAPPDATA%\\ARQ\\logs",
             bg=BG, fg=MUTED, font=(FONT, 8),
         ).pack(pady=(0, 10))
+        self.root.after_idle(self._fit_content_to_screen)
+
+    def _sync_scroll_region(self, _event=None):
+        self.content_canvas.configure(scrollregion=self.content_canvas.bbox("all"))
+
+    def _resize_scroll_content(self, event):
+        self.content_canvas.itemconfigure(self._content_window, width=event.width)
+
+    def _fit_content_to_screen(self):
+        """Show all content when it fits, otherwise leave room for Windows chrome."""
+        self.root.update_idletasks()
+        chrome_height = self.root.winfo_reqheight() - self.content_canvas.winfo_reqheight()
+        available = max(360, self.root.winfo_screenheight() - chrome_height - 90)
+        desired = self.scroll_content.winfo_reqheight()
+        self.content_canvas.configure(height=min(desired, available))
+        self._sync_scroll_region()
+
+    def _bind_mousewheel(self, _event=None):
+        self.content_canvas.bind_all("<MouseWheel>", self._on_mousewheel)
+
+    def _unbind_mousewheel(self, _event=None):
+        self.content_canvas.unbind_all("<MouseWheel>")
+
+    def _on_mousewheel(self, event):
+        if self.scroll_content.winfo_reqheight() <= self.content_canvas.winfo_height():
+            return
+        direction = -1 if event.delta > 0 else 1
+        self.content_canvas.yview_scroll(direction * 3, "units")
 
     def _build_header(self):
         header = tk.Frame(self.root, bg=HEADER_BG)
@@ -175,7 +223,7 @@ class ConnectorApp:
         label.configure(text=f"● {text}", fg=color)
 
     def _build_setup_card(self, outer):
-        card = Card(outer, "One-time setup")
+        card = Card(outer, "Connect this PC")
         card.pack(fill="x", pady=(0, 10))
         grid = card.body
 
@@ -203,12 +251,23 @@ class ConnectorApp:
         self.pairing_entry = ttk.Entry(grid, textvariable=self.pairing_var,
                                        width=30, font=(FONT, 9))
         self.pairing_entry.grid(row=2, column=1, sticky="we", padx=(12, 6), pady=3)
-        self.register_btn = self._flat_button(grid, "Register", self._register,
-                                              primary=False)
-        self.register_btn.grid(row=2, column=2, sticky="e", pady=3)
+        actions = tk.Frame(grid, bg=CARD)
+        actions.grid(row=2, column=2, sticky="e", pady=3)
+        self.register_btn = self._flat_button(actions, "Register", self._register,
+                                              primary=True)
+        self.register_btn.pack(side="left")
+        self.deregister_btn = self._flat_button(
+            actions, "Reset registration", self._deregister, primary=False, danger=True)
+        self.deregister_btn.pack(side="left", padx=(6, 0))
         self.reg_status = tk.Label(grid, text="", bg=CARD, fg=MUTED, font=(FONT, 8),
-                                   wraplength=470, justify="left")
+                                   wraplength=520, justify="left")
         self.reg_status.grid(row=3, column=0, columnspan=3, sticky="w")
+        tk.Label(
+            grid,
+            text="Switching account or company? Reset registration first, then use a "
+                 "fresh one-time code.",
+            bg=CARD, fg=MUTED, font=(FONT, 8), wraplength=520, justify="left",
+        ).grid(row=4, column=0, columnspan=3, sticky="w", pady=(5, 0))
         grid.columnconfigure(1, weight=1)
 
     def _build_push(self, outer):
@@ -287,7 +346,7 @@ class ConnectorApp:
 
         fields = (
             ("Backend URL", self.url_var,
-             "Baked in at build time. Changing it points this PC at a different ARQ backend."),
+             "Production is preconfigured. Change this only when ARQ support asks you to."),
             ("Tally host", self.host_var, ""),
             ("Tally port", self.port_var, ""),
             ("Tally program path", self.tally_exe_var,
@@ -317,12 +376,18 @@ class ConnectorApp:
             self.advanced_toggle.configure(text="▸  Advanced")
         self.root.geometry("")  # let the window re-fit its new content
 
-    def _flat_button(self, parent, text, command, primary: bool) -> tk.Button:
+    def _flat_button(self, parent, text, command, primary: bool,
+                     danger: bool = False) -> tk.Button:
         if primary:
             return tk.Button(parent, text=text, command=command, bg=ACCENT,
                              fg="white", activebackground=ACCENT_DARK,
                              activeforeground="white", relief="flat",
                              cursor="hand2", font=(FONT, 9), padx=14, pady=3)
+        if danger:
+            return tk.Button(parent, text=text, command=command, bg="#fee2e2",
+                             fg=ERR_RED, activebackground="#fecaca",
+                             activeforeground=ERR_RED, relief="flat",
+                             cursor="hand2", font=(FONT, 9), padx=12, pady=3)
         return tk.Button(parent, text=text, command=command, bg="#e2e8f0",
                          fg=INK, activebackground="#cbd5e1", relief="flat",
                          cursor="hand2", font=(FONT, 9), padx=14, pady=3)
@@ -330,6 +395,9 @@ class ConnectorApp:
     # ── helpers ────────────────────────────────────────────────────────
 
     def _log_status(self, message: str, tag: str = "muted"):
+        if message == self._last_status_message:
+            return  # repeated Refresh clicks should not flood the activity box
+        self._last_status_message = message
         stamp = datetime.now().strftime("%H:%M")
         self.status.configure(state="normal")
         self.status.insert("end", f"{stamp}  ", "muted")
@@ -363,8 +431,11 @@ class ConnectorApp:
 
     def _busy(self, busy: bool):
         state_ = "disabled" if busy else "normal"
-        for btn in (self.push_btn, self.register_btn, self.refresh_btn, self.test_btn):
+        for btn in (self.push_btn, self.register_btn, self.deregister_btn,
+                    self.refresh_btn, self.test_btn):
             btn.configure(state=state_)
+        if busy:
+            self.company_box.configure(state="disabled")
         if not busy:
             self._refresh_registration_state()
 
@@ -389,19 +460,46 @@ class ConnectorApp:
     # ── status refreshers ──────────────────────────────────────────────
 
     def _refresh_registration_state(self):
-        if credentials.load_token():
+        try:
+            token = credentials.load_token()
+        except Exception as exc:
+            self.logger.error("could not read device credential: %s", type(exc).__name__)
             self.reg_status.configure(
-                text="✓ Registered — the device token is in Windows Credential Manager.",
-                fg=OK_GREEN)
+                text="Windows Credential Manager is unavailable. Registration controls are "
+                     "paused; restart the app or contact ARQ support.",
+                fg=ERR_RED,
+            )
+            self.company_box.configure(state="disabled")
             self.pairing_entry.configure(state="disabled")
             self.register_btn.configure(state="disabled")
+            self.deregister_btn.configure(state="disabled")
+            self._set_pill(self.pill_device, "Credential error", ERR_RED)
+            self._log_status(
+                "Could not read the saved device registration from Windows Credential Manager.",
+                "err",
+            )
+            return
+
+        if token:
+            company = self.settings.get("company_name") or self.company_var.get().strip()
+            self.reg_status.configure(
+                text=f"✓ Registration is saved on this PC{f' for {company}' if company else ''}. "
+                     "Its device token is protected by Windows Credential Manager.",
+                fg=OK_GREEN)
+            self.company_box.configure(state="disabled")
+            self.pairing_entry.configure(state="disabled")
+            self.register_btn.configure(state="disabled")
+            self.deregister_btn.configure(state="normal")
             self._set_pill(self.pill_device, "Device registered", OK_GREEN)
         else:
             self.reg_status.configure(
-                text="Not registered yet — enter the pairing code from your admin.",
+                text="Not registered — select the intended Tally company and enter a fresh "
+                     "pairing code from your ARQ admin.",
                 fg=MUTED)
+            self.company_box.configure(state="readonly")
             self.pairing_entry.configure(state="normal")
             self.register_btn.configure(state="normal")
+            self.deregister_btn.configure(state="disabled")
             self._set_pill(self.pill_device, "Not registered", WARN_AMBER)
 
     def _refresh_autosync_state(self):
@@ -501,9 +599,53 @@ class ConnectorApp:
                         OK_GREEN if n else WARN_AMBER)
                     self._busy(False)
             except (TallyConnectionError, TallyGatewayError, OSError) as e:
+                self.logger.warning("Tally company discovery failed: %s", type(e).__name__)
+
                 def done(err=e):
-                    self._log_status(f"Could not reach Tally: {err}", "err")
+                    self._log_status(str(err), "err")
                     self._set_pill(self.pill_tally, "Tally not reachable", ERR_RED)
+                    self._busy(False)
+            self.results.put(done)
+        self._run_in_thread(work)
+
+    def _deregister(self):
+        confirmed = messagebox.askyesno(
+            "Reset registration on this PC?",
+            "This removes the ARQ device token stored on this PC, clears the saved "
+            "company choice, and turns automatic sync off.\n\n"
+            "It does not change anything in Tally or delete dashboard data. The old "
+            "one-time pairing code stays used; you will need a fresh code from your "
+            "ARQ admin and must select the intended Tally company again.\n\n"
+            "Continue?",
+            icon="warning",
+            default=messagebox.NO,
+            parent=self.root,
+        )
+        if not confirmed:
+            return
+
+        self._log_status("Resetting registration on this PC…")
+
+        def work():
+            try:
+                result = registration.deregister_local_device(self.settings)
+
+                def done():
+                    self.company_var.set("")
+                    self.pairing_var.set("")
+                    self._log_status(
+                        "Registration reset — select the intended company and enter a fresh code.",
+                        "ok",
+                    )
+                    for warning in result.warnings:
+                        self._log_status(warning, "err")
+                    self._busy(False)
+                    self._refresh_autosync_state()
+                    self._refresh_last_sync()
+                    self.company_box.focus_set()
+            except Exception as exc:
+                def done(err=exc):
+                    self._log_status(f"Could not reset registration on this PC: {err}", "err")
                     self._busy(False)
             self.results.put(done)
         self._run_in_thread(work)
@@ -524,18 +666,43 @@ class ConnectorApp:
             try:
                 token = register_device(self.settings["api_base_url"], pairing_code,
                                         guid, platform.node())
-                credentials.save_token(token)
-                self.logger.info("device registered")
-
-                def done():
-                    self.pairing_var.set("")
-                    self._log_status("Registered ✓ — token stored in Windows Credential Manager.", "ok")
-                    self._busy(False)
-                    self._start_autosync_after_registration()
             except PushError as e:
                 def done(err=e):
                     self._log_status(f"Registration failed: {err}", "err")
                     self._busy(False)
+            except Exception as e:
+                self.logger.error("unexpected registration failure: %s", type(e).__name__)
+
+                def done(err=e):
+                    self._log_status(f"Registration could not finish: {err}", "err")
+                    self._busy(False)
+            else:
+                try:
+                    credentials.save_token(token)
+                except Exception as e:
+                    # The backend has already consumed the one-time code by
+                    # the time it returns the token. Never leave the GUI busy
+                    # or suggest retrying that now-spent code.
+                    self.logger.error(
+                        "device credential could not be stored: %s", type(e).__name__)
+
+                    def done():
+                        self._log_status(
+                            "ARQ accepted the code, but Windows Credential Manager could not "
+                            "save the device. That code is now spent; restart the app and ask "
+                            "your ARQ admin for a fresh code.",
+                            "err",
+                        )
+                        self._busy(False)
+                else:
+                    self.logger.info("device registered")
+
+                    def done():
+                        self.pairing_var.set("")
+                        self._log_status(
+                            "Registered ✓ — token stored in Windows Credential Manager.", "ok")
+                        self._busy(False)
+                        self._start_autosync_after_registration()
             self.results.put(done)
         self._run_in_thread(work)
 

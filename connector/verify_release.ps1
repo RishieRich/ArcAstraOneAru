@@ -44,8 +44,10 @@ if (-not [string]::IsNullOrWhiteSpace($ExpectedVersion)) {
     Assert-Equal $version.ProductVersion $ExpectedVersion "Product version does not match the package version"
 }
 
-# Extract the icon Windows Explorer will use and check for the orange ARQ tile.
-# This catches a build that silently falls back to PyInstaller's default icon.
+# Extract the icon Windows Explorer will use and check all three parts of the
+# ARQ mark: black tile, orange orbit and silver lettering. The old verifier
+# expected orange to fill a quarter of the icon, but the current brand artwork
+# deliberately uses orange as an orbit over a dark field.
 Add-Type -AssemblyName System.Drawing
 $icon = [System.Drawing.Icon]::ExtractAssociatedIcon($resolvedExe)
 if ($null -eq $icon) {
@@ -54,6 +56,8 @@ if ($null -eq $icon) {
 $bitmap = $icon.ToBitmap()
 try {
     $orangePixels = 0
+    $darkPixels = 0
+    $silverPixels = 0
     $visiblePixels = 0
     for ($x = 0; $x -lt $bitmap.Width; $x++) {
         for ($y = 0; $y -lt $bitmap.Height; $y++) {
@@ -63,11 +67,22 @@ try {
                 if ($pixel.R -gt 190 -and $pixel.G -gt 80 -and $pixel.G -lt 190 -and $pixel.B -lt 80) {
                     $orangePixels++
                 }
+                if ($pixel.R -lt 60 -and $pixel.G -lt 60 -and $pixel.B -lt 70) {
+                    $darkPixels++
+                }
+                if ($pixel.R -gt 160 -and
+                    [Math]::Abs($pixel.R - $pixel.G) -lt 35 -and
+                    [Math]::Abs($pixel.G - $pixel.B) -lt 35) {
+                    $silverPixels++
+                }
             }
         }
     }
-    if ($visiblePixels -eq 0 -or ($orangePixels / $visiblePixels) -lt 0.25) {
-        throw "The embedded icon does not match the high-contrast ARQ icon"
+    if ($visiblePixels -eq 0 -or
+        ($orangePixels / $visiblePixels) -lt 0.08 -or
+        ($darkPixels / $visiblePixels) -lt 0.35 -or
+        ($silverPixels / $visiblePixels) -lt 0.03) {
+        throw "The embedded icon does not match the black/orange/silver ARQ mark"
     }
 }
 finally {

@@ -77,3 +77,13 @@ def test_clock_moving_backwards_does_not_report_the_future():
     now = datetime(2026, 7, 29, 12, 0, 0)
     future = (now + timedelta(hours=3)).isoformat()
     assert state.humanize_age(future, now=now) == "just now"
+
+
+def test_clear_state_removes_only_last_run_state():
+    state.record_run(ok=True, message="ok", ledgers=2, bills=3)
+    assert state.state_path().exists()
+
+    state.clear_state()
+
+    assert not state.state_path().exists()
+    state.clear_state()  # already clear is also the desired state
