@@ -5,8 +5,9 @@ different agents on the same page. Codex CLI loads `AGENTS.md` automatically; Cl
 loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way — one file,
 not two drifting copies.
 
-Last verified against the repo: **2026-08-15** (connector v0.2.0 reset-registration source,
-89 offline tests and an unsigned Windows x64 internal build were validated; it is not a
+Last verified against the repo: **2026-08-17** (public product/agent roadmap added;
+connector v0.2.0 reset-registration source, 89 offline tests and an unsigned Windows x64
+internal build were validated; it is not a
 client release because this machine has no SignTool or code-signing certificate. Receivables
 filters and email-confirmed cleanup remain deployed from `main`; Smart Excel migration 0007
 and the `/v1/ask` Gemini→Groq fallback remain live; see traps 13 and 17).
@@ -334,10 +335,23 @@ Full notes: `magic_mds/VERCEL_DEPLOY.md`.
 - **Public signup has no email verification or bot protection yet.** The ten-place capacity
   prevents more than 10 trial tenants but does not prevent automated waitlist submissions.
   Add verified email and a Vercel WAF/rate-limit rule before a large acquisition campaign.
+- **Company-data cleanup does not yet cover Research Agent rows or future operational data.**
+  Before collection actions, contacts or drafts ship, extend the owner-confirmed cleanup and
+  retention policy to derived research and collections content. Preserve only the minimum
+  pseudonymized security/audit evidence for a fixed, disclosed period after legal/DPDP review.
 - **Excel voucher removals/cancellations** — re-exports update vouchers that retain the same
   Tally GUID, but a voucher absent from a later workbook is not automatically deleted. Add an
   explicit snapshot/reconciliation workflow before treating imports as a cancellation ledger.
-## 10. Documentation index (`magic_mds/`)
+
+## 10. Documentation index
+
+Tracked documentation available in every clone:
+
+| File | What it is |
+|---|---|
+| `ROADMAP.md` | Public product and agent roadmap with maturity labels, release gates, safety boundaries and 18-month direction. |
+
+### Local-only implementation notes (`magic_mds/`)
 
 `magic_mds/` is gitignored — these files exist in the local working copy only, never in the repo.
 If they are missing, you are in a fresh clone and this file is the only brief you get.

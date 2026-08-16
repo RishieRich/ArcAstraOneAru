@@ -1,14 +1,20 @@
 # ARQ Astra Launch
 
-Tally → cloud receivables pipeline. Three components:
+ARQ Astra is an agentic business operating system for Tally-first Indian MSMEs. Its current
+commercial entry point is read-only receivables, business intelligence, and review-first AI
+assistance. The implementation has three components:
 
-- **`connector/`** — Windows app (ships as a single `arq-connector.exe`). Talks to a locally running TallyPrime over its port-9000 XML gateway (read-only), extracts debtor ledgers + receivable bills, and pushes them to the backend. Has a small GUI for one-time setup and a "Push Now" button; after that a Windows scheduled task syncs automatically.
+- **`connector/`** — Windows app (packaged as a single `arq-connector.exe`; client releases must be signed). Talks to a locally running TallyPrime over its port-9000 XML gateway (read-only), extracts debtor ledgers + receivable bills, and pushes them to the backend. Has a small GUI for one-time setup and a "Push Now" button; after that a Windows scheduled task syncs automatically.
 - **`backend/`** — FastAPI API on Neon Postgres, deployed to Vercel (https://arcastraone.vercel.app). Receives synced data over device-token auth with per-tenant isolation. Admin CLI (`python -m app.admin`) creates tenants, issues pairing codes, and manages dashboard users.
-- **`frontend/`** — Vite + React dashboard with Excel-powered business analytics, English / Hinglish / Gujarati-Roman UI, light/dark themes, and an AI copilot. Password login with per-company access.
+- **`frontend/`** — Vite + React dashboard with Excel-powered business analytics, English / Hinglish / Gujarati-Roman / Marathi-Roman UI, light/dark themes, an AI copilot, and cited customer/supplier research. Password login with per-company access.
 
 > **Working on this repo with an AI coding agent?** Read **[`AGENTS.md`](AGENTS.md)** first — it
 > is the shared brief for Claude Code, Codex, and anything else: architecture, env vars,
 > commands, deploy config, known traps, and the conventions to follow. `CLAUDE.md` just points there.
+
+The public **[Product and Agent Development Roadmap](ROADMAP.md)** separates implemented
+capability from Alpha commitments, candidates, and long-term vision. It also records the
+release gates and safety boundaries that future agent work must satisfy.
 
 Detailed internal docs live in `magic_mds/`, which is **local only and gitignored** — it is not
 part of a clone:
