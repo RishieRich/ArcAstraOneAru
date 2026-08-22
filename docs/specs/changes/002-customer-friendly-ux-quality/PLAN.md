@@ -2,13 +2,13 @@
 
 | Field | Value |
 |---|---|
-| Status | Draft — owner review required |
+| Status | Approved by owner on 2026-08-23 |
 | Approved specification | `SPEC.md`, approved 2026-08-22 |
-| Product-code gate | Live current-build review, then owner plan approval |
+| Product-code gate | Live current-build review and task-list approval |
 | Expected deploy target | Frontend only |
 
-No product code is authorized by this draft plan. Stage 0 remains open because the in-app
-browser had no available session on 2026-08-22.
+The plan is approved. Product code remains blocked because Stage 0 is open and the task list
+still requires owner review. The in-app browser had no available session on 2026-08-22.
 
 ## Requirement coverage
 
@@ -190,4 +190,4 @@ Neon rather than a hermetic test database. No live database write is part of ver
 - [x] Tests, failure paths, work bounds, and stop conditions documented
 - [x] Rollout and recovery documented
 - [ ] Stage 0 live current-build review completed or explicitly waived with risk recorded
-- [ ] Owner approved this plan
+- [x] Owner approved this plan on 2026-08-23
