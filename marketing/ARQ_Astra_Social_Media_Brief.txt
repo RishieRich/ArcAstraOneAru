@@ -1,0 +1,283 @@
+ARQ ASTRA — BY ARQ ONE AI LABS
+SOCIAL MEDIA & LAUNCH VIDEO GUIDE
+(Instagram + LinkedIn)
+
+Prepared: 22 August 2026
+This is a working draft to help the team write posts and shoot a launch video.
+Get a final sign-off from Team before anything goes live publicly.
+
+
+HOW TO USE THIS FILE
+--------------------------------------------------------------------
+No tech background needed to use this. Read it top to bottom once,
+then come back to whichever section you need while you work.
+
+Anything written in [square brackets] is a placeholder — fill it in
+or ask Team for the exact detail before you publish it.
+
+You do not need to use every section. Pick the pieces that fit the
+platform and the length of content you're making that day.
+
+
+SECTION 1 — THE 10-SECOND PITCH
+--------------------------------------------------------------------
+Say this out loud. If it doesn't fit in one breath, trim it.
+
+  "ARQ Astra connects to a business's Tally and instantly shows the
+  owner who owes them money, and how much, in plain language — with
+  an AI copilot they can just ask questions to."
+
+Shorter version:
+  "ARQ Astra turns your Tally data into answers, not reports."
+
+
+SECTION 2 — THE PROBLEM (why this matters to people)
+--------------------------------------------------------------------
+Millions of Indian small and medium businesses run their accounts on
+Tally. Tally is powerful, but it's built for accountants — not for a
+busy owner who just wants one answer: "Who owes me money right now,
+and who's overdue?"
+
+Today that means:
+  - Scrolling through Tally reports that only the accountant reads
+  - Manually building Excel sheets to track outstanding payments
+  - Calling customers to ask "when will you pay?" without real data
+  - No easy way to see the business in Hindi/Gujarati/Marathi, not
+    just English
+
+ARQ Astra removes all of that friction.
+
+
+SECTION 3 — WHO WE'RE TALKING TO
+--------------------------------------------------------------------
+  - Small and medium business owners already using TallyPrime
+  - Traders, distributors, manufacturers, wholesalers across India
+  - Owners who are comfortable with WhatsApp and Instagram, but not
+    necessarily with spreadsheets or accounting software
+  - People who think in their own language first, English second
+
+Keep the tone respectful of this audience — confident and simple,
+never talking down to them.
+
+
+SECTION 4 — WHAT ARQ ASTRA DOES (plain English, no jargon)
+--------------------------------------------------------------------
+  1. Connects to Tally automatically
+     A small app sits next to Tally on the owner's computer and reads
+     (never changes) receivables data — who owes what, and since when.
+
+  2. Shows it on a clean online dashboard
+     Open it from a phone or laptop, anywhere — no need to be at the
+     shop's computer or open Tally itself.
+
+  3. Speaks the owner's language
+     Available in English, Hinglish, Gujarati and Marathi. Switch
+     languages any time.
+
+  4. Has an AI copilot built in
+     Owners can literally type a question like "which customer owes
+     the most this month?" and get a straight answer — no formulas,
+     no reports to build.
+
+  5. Also works without Tally
+     Businesses can upload an Excel or CSV file of their sales,
+     purchases or expenses instead, and still get the same dashboard.
+
+  6. Is safe by design
+     The connector only reads data — it can never write to or change
+     anything inside Tally. Each business's data is kept completely
+     separate from every other business.
+
+
+SECTION 5 — TRUST POINTS (use these to sound credible, not just catchy)
+--------------------------------------------------------------------
+  - Read-only connection to Tally — nothing is ever modified
+  - One-time secure setup using a pairing code, not a shared password
+  - Each business's data is isolated from every other business
+  - Built specifically for how Indian businesses actually run Tally
+
+
+SECTION 6 — BRAND VOICE
+--------------------------------------------------------------------
+  Tone:        Confident, warm, straightforward. Sound like a smart
+               friend explaining something useful — not a corporate
+               software ad.
+  Avoid:       Heavy tech words (API, backend, database, token, etc).
+               If a word needs explaining, cut it or simplify it.
+  Say instead: "connects to your Tally", "read-only and safe",
+               "ask it a question", "see it on your phone"
+  Language:    English is fine for LinkedIn. For Instagram, a light
+               Hinglish mix usually performs better with this
+               audience — use judgement per post.
+
+
+SECTION 7 — TAGLINE OPTIONS (pick one per post, don't use all at once)
+--------------------------------------------------------------------
+  - "Know who owes you money. Instantly."
+  - "Your Tally data, finally speaking your language."
+  - "Stop chasing spreadsheets. Start chasing growth."
+  - "Ask your business a question. Get a straight answer."
+  - "Built for Tally. Built for Bharat."
+
+
+SECTION 8 — 40 SECOND LAUNCH VIDEO SCRIPT (ready to shoot)
+--------------------------------------------------------------------
+This is written scene by scene. You can film it with a phone and
+screen-recordings of the dashboard — no fancy production needed.
+
+SCENE 1 — HOOK (0:00-0:05)
+  Visual:   Business owner looking stressed, staring at a messy
+            paper ledger or a crowded Tally screen.
+  On-screen text: "Kitna baaki hai? Kaun dega, kab dega?"
+  Voiceover: "Still guessing who owes you money?"
+
+SCENE 2 — THE PROBLEM (0:05-0:15)
+  Visual:   Piles of invoices, a complicated Tally report full of
+            numbers, someone scrolling and frowning.
+  Voiceover: "Every day, business owners across India lose time
+             digging through Tally reports only an accountant can
+             read."
+
+SCENE 3 — THE SOLUTION / DEMO (0:15-0:28)
+  Visual:   Cut to a phone showing the ARQ Astra dashboard — clean
+            cards, a chart of overdue payments, language toggle
+            switching from English to Hinglish.
+  Voiceover: "Meet ARQ Astra. It connects straight to your Tally,
+             safely and read-only, and shows you exactly who owes
+             you, how much, and for how long. In English, Hinglish,
+             Gujarati or Marathi."
+
+SCENE 4 — THE AI COPILOT (0:28-0:35)
+  Visual:   Someone typing into the dashboard's AI chat box:
+            "Which customer owes the most this month?" — and an
+            instant, plain-language answer appears.
+  Voiceover: "Just ask your AI copilot. No formulas. No reports.
+             Just answers."
+
+SCENE 5 — CALL TO ACTION (0:35-0:40)
+  Visual:   ARQ Astra logo, then "By ARQ One AI Labs".
+  On-screen text: "Now accepting early access businesses."
+  Voiceover: "ARQ Astra. By ARQ One AI Labs. Get early access at
+             [website / signup link]."
+
+
+SECTION 9 — 15 SECOND REEL / SHORTS VERSION
+--------------------------------------------------------------------
+  0:00-0:04  Hook: "Still calling customers to ask 'when will you
+             pay me?'"
+  0:04-0:10  Demo: quick screen-record of the dashboard opening,
+             showing the receivables list.
+  0:10-0:15  CTA: "ARQ Astra. Your Tally, finally making sense.
+             Link in bio."
+
+
+SECTION 10 — INSTAGRAM CAPTION (ready to post, edit freely)
+--------------------------------------------------------------------
+Still calling customers just to ask "bhai, payment kab tak?" 📞💸
+
+Meet ARQ Astra — it connects straight to your Tally (safely,
+read-only) and instantly shows you who owes you money, how much,
+and for how long. No more digging through reports.
+
+✅ Works with the Tally you already use
+✅ Available in English, Hinglish, Gujarati & Marathi
+✅ Has a built-in AI copilot — just ask it a question
+✅ Your data stays yours, always
+
+Built for Tally. Built for Bharat. 🇮🇳
+
+Early access is open now — link in bio to get started.
+
+[hashtags — see Section 12]
+
+
+SECTION 11 — LINKEDIN POST (ready to post, edit freely)
+--------------------------------------------------------------------
+Every day, small and medium business owners across India lose hours
+digging through Tally reports just to answer one question: who owes
+me money, and how much?
+
+We built ARQ Astra to fix that.
+
+It connects directly to a business's existing Tally setup — safely
+and read-only — and turns that data into a simple, live dashboard
+the owner can actually use. It speaks their language (English,
+Hinglish, Gujarati, Marathi), and it comes with an AI copilot they
+can literally ask questions to, instead of building reports.
+
+No new accounting system to learn. No risk to existing Tally data.
+Just clarity, in minutes.
+
+We're opening early access to a limited number of businesses now.
+If you or someone you know runs a business on Tally and wants to
+finally see their receivables clearly, get in touch: [website /
+contact email]
+
+ARQ Astra — by ARQ One AI Labs.
+
+[hashtags — see Section 12]
+
+
+SECTION 12 — HASHTAGS
+--------------------------------------------------------------------
+Mix a few broad ones with a few specific ones. Don't use all of them
+on every post — 8 to 12 per post is plenty.
+
+  #ARQAstra #ARQOneAILabs #TallyPrime #MSME #SmallBusinessIndia
+  #MadeInIndia #StartupIndia #DigitalIndia #Fintech #AIforBusiness
+  #CashFlow #Receivables #BusinessAutomation #Entrepreneurship
+
+
+SECTION 13 — WHAT TO FILM OR SCREENSHOT
+--------------------------------------------------------------------
+  - The dashboard home screen (use demo/sample data only — see
+    Section 14)
+  - The receivables list / overdue customers view
+  - The language switcher (English <-> Hinglish/Gujarati/Marathi)
+  - Someone typing a question into the AI copilot and getting an
+    answer
+  - A "before" shot: messy paperwork, a crowded Tally report, or a
+    hand-written ledger, for contrast
+  - The ARQ Astra and ARQ One AI Labs logos, clean, for the outro
+
+
+SECTION 14 — IMPORTANT: THINGS TO GET RIGHT (please read before posting)
+--------------------------------------------------------------------
+  1. Never say ARQ Astra "writes to" or "changes" Tally. It only
+     reads data. This is a core trust promise — don't blur it.
+
+  2. Never show a real customer's business data, names or amounts
+     in a screenshot or video. Use sample/demo data only. Ask
+     Team for an approved demo account if you need one.
+
+  3. Don't quote an exact number of free trial spots or waitlist
+     size in a public post — availability changes. Say "early
+     access" or "limited access" instead, and check with Team
+     first if a specific number is needed.
+
+  4. The AI research assistant (finding new customers/suppliers) is
+     an optional, in-progress feature — don't feature it as a core,
+     always-on capability yet. Check with Team before
+     mentioning it publicly.
+
+  5. Don't make pricing claims (free, paid, discounts) unless
+     Team has confirmed the current offer.
+
+  6. When in doubt about a technical claim, keep the post simple and
+     benefit-focused rather than guessing at a feature detail.
+
+
+SECTION 15 — CALL TO ACTION / LINKS
+--------------------------------------------------------------------
+  Website / signup link:   [add link here]
+  Contact email:           [add email here]
+  Instagram handle:        [add handle here]
+  LinkedIn page:           [add page link here]
+
+
+SECTION 16 — QUESTIONS?
+--------------------------------------------------------------------
+If anything in this brief is unclear, or you need an approved demo
+account, sample screenshots, or the logo files, ask Team before
+publishing. This document is a starting point for the team, not
+final approved marketing copy.

@@ -1,16 +1,18 @@
 # AGENTS.md — shared context for Claude Code, Codex, and any other coding agent
 
-**Read this file first, every session.** It is the single source of truth that keeps
+**Read this file first, every session.** It is the operational entry point that keeps
 different agents on the same page. Codex CLI loads `AGENTS.md` automatically; Claude Code
-loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way — one file,
-not two drifting copies.
+loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way — one working
+brief, not two drifting copies. The tracked engineering constitution, baseline specifications,
+change workflow, and ADRs live under `docs/` and govern future behavior changes.
 
-Last verified against the repo: **2026-08-17** (public product/agent roadmap added;
-connector v0.2.0 reset-registration source, 89 offline tests and an unsigned Windows x64
-internal build were validated; it is not a
-client release because this machine has no SignTool or code-signing certificate. Receivables
-filters and email-confirmed cleanup remain deployed from `main`; Smart Excel migration 0007
-and the `/v1/ask` Gemini→Groq fallback remain live; see traps 13 and 17).
+Last verified against the repo: **2026-08-22** (repository-native SDD constitution, baseline
+specs, change templates, ADRs, and the first draft change spec were added; no product behavior
+changed. Connector v0.2.0 reset-registration source, 89 offline tests and an unsigned Windows
+x64 internal build were previously validated; it is not a client release because this machine
+has no SignTool or code-signing certificate. Receivables filters and email-confirmed cleanup
+remain deployed from `main`; Smart Excel migration 0007 and the `/v1/ask` Gemini→Groq fallback
+remain live; see traps 13 and 17).
 
 ---
 
@@ -350,6 +352,12 @@ Tracked documentation available in every clone:
 | File | What it is |
 |---|---|
 | `ROADMAP.md` | Public product and agent roadmap with maturity labels, release gates, safety boundaries and 18-month direction. |
+| `docs/governance/CONSTITUTION.md` | Ratified product and engineering rules that ordinary changes may not weaken. |
+| `docs/governance/SDD_WORKFLOW.md` | Simple spec → plan → tasks → verification workflow and approval gates. |
+| `docs/specs/baseline/` | Intended current behavior for the six major product capability areas. |
+| `docs/specs/changes/` | One auditable folder per proposed or completed behavior change. |
+| `docs/decisions/` | Architecture Decision Records for durable technical choices. |
+| `archive/` | Tracked historical/reference material that is not used at runtime. |
 
 ### Local-only implementation notes (`magic_mds/`)
 
@@ -358,7 +366,7 @@ If they are missing, you are in a fresh clone and this file is the only brief yo
 
 | File | What it is |
 |---|---|
-| `SOLUTION_ARCHITECTURE.md` | **ARB-ready end-to-end architecture**: C4 L1–L3, sequence flows, ERD, threat model, ADRs, risks. Self-contained — hand it to any LLM to generate an architecture deck. |
+| `SOLUTION_ARCHITECTURE.md` | Historical deep architecture snapshot: C4 L1–L3, flows, ERD, threat model and older ADRs. Some inventory sections predate migrations 0005–0008; use tracked baseline specs for current contracts. |
 | `HOW_IT_ALL_WORKS.md` | plain-language system tour (⚠️ its "next steps" section predates the Vercel deploy) |
 | `USER_MANUAL.md` | end-user install / register / use of the exe |
 | `CONNECTOR_SETUP.md` | connector installation detail |
@@ -369,7 +377,7 @@ If they are missing, you are in a fresh clone and this file is the only brief yo
 | `TALLY_TEST_DATA.md` | test company + captured XML fixtures |
 | `readme_1107_base.md` | original implementation plan |
 | `readme_1107_output.md` | build log of what was actually shipped and verified |
-| `AI_ERA_REVIEW_PLAYBOOK.md` | review playbook |
+| `AI_ERA_REVIEW_PLAYBOOK.md` | Historical July 2026 review playbook; its code and test inventory is no longer current. |
 | `EXCEL_IMPORT_SETUP.md` | Neon migration, deploy and verification steps for optional workbook imports |
 | `DATA_CLEANUP_AND_DEDUP.md` | reset boundary, Tally/Excel dedup behavior and migration 0005 deployment order |
 | `PUBLIC_TRIAL_SIGNUP.md` | first-10 signup capacity, isolated tenant creation, waitlist and migration 0006 |
@@ -377,6 +385,20 @@ If they are missing, you are in a fresh clone and this file is the only brief yo
 | `RESEARCH_AGENT.md` | ICP scoring, bounded Tavily discovery, evidence scoring, curation and UI behavior |
 
 ## 11. Working agreement for agents
+
+**Specification-driven changes**
+
+- Before changing behavior, read `docs/governance/CONSTITUTION.md`,
+  `docs/governance/SDD_WORKFLOW.md`, and the affected baseline specs.
+- Do not implement a feature or cross-component behavior change until its `SPEC.md` status is
+  `Approved` by the owner. Resolve blocking decisions first.
+- Build the plan and tasks from numbered requirements. Every implementation task and
+  verification row cites the requirements it covers.
+- Create an ADR only for a lasting architecture choice, not ordinary implementation detail.
+- After verification and release, update the affected baseline specs and this file when its
+  architecture, endpoint, environment, deployment, or trap summary changed.
+- Documentation-only edits and narrowly mechanical fixes may use the lighter path described in
+  the workflow. Constitution rules always apply.
 
 **Conventions**
 
@@ -394,9 +416,11 @@ If they are missing, you are in a fresh clone and this file is the only brief yo
 1. If you changed architecture, env vars, endpoints, deploy config, or discovered a new trap —
    **update this file** (and bump the "Last verified" date at the top). That is how the next
    agent, human or otherwise, stays in sync.
-2. Log anything substantial in the right `magic_mds/` doc; this file stays a map, not a journal.
-3. Move resolved items out of §9 and add newly discovered ones.
-4. Say plainly in your final message what you changed, what you verified, and what you didn't.
+2. Update the approved change's verification record and affected tracked baseline specs.
+3. Log supporting implementation detail in the right `magic_mds/` doc when useful; local-only
+   notes must not be the sole source of a product contract.
+4. Move resolved items out of §9 and add newly discovered ones.
+5. Say plainly in your final message what you changed, what you verified, and what you didn't.
 
 **Do not, without asking the owner**
 
