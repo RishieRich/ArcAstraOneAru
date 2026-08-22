@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Version | 1.0.0 |
+| Version | 1.1.0 |
 | Status | Ratified |
 | Owner | Rishi |
 | Ratified | 2026-08-22 |
@@ -83,6 +83,17 @@ negative, null, duplicate, stale, retry, and concurrent inputs.
 Plans define deployment order, health checks, failure signals, containment, and rollback or
 forward-recovery. A capability is not called autonomous unless auditability, failure handling,
 kill switches, and human override have been proven.
+
+## 13. Work is bounded and has stop conditions
+
+Every plan, automated workflow, retry, poll, and agent-run loop must define a completion
+condition plus a maximum attempt count, deadline, or cancellation path. The same failed action
+may not be repeated more than three times without new evidence or a materially changed approach.
+At that boundary, work stops and the blocker, evidence, and owner decision needed are recorded.
+
+A review gate may have at most three unresolved revision rounds before the owner chooses to
+approve, narrow, split, defer, or reject the work. A time box never converts incomplete or
+unverified work into success; it makes the unfinished state explicit and prevents endless work.
 
 ## Governance
 

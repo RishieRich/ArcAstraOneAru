@@ -29,6 +29,13 @@ Do not complete this plan until `SPEC.md` is approved.
 - Regression:
 - Manual/visual:
 
+## Work bounds and stop conditions
+
+- Maximum duration or attempt count per audit/test pass:
+- Maximum equivalent retries before reporting a blocker: 3
+- Maximum unresolved review rounds before owner decision: 3
+- Cancellation or pause condition:
+
 ## Rollout and recovery
 
 - Deployment order:

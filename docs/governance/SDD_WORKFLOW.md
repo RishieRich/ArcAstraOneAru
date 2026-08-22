@@ -77,3 +77,15 @@ After release:
 | Release | Owner | Diff and verification evidence match the approved spec |
 
 An agent may prepare every artifact. It may not approve its own work.
+
+## Bounded execution
+
+- Every `PLAN.md` states its work limits and stop conditions.
+- Do not retry the same failed operation more than three times unless new evidence changes the
+  approach. Record the failure and ask for the required decision instead.
+- After three unresolved review rounds at one gate, the owner chooses to approve, narrow, split,
+  defer, or reject the change.
+- Audits and usability sessions use a stated duration. Reaching the limit records an incomplete
+  result; it never creates a false pass.
+- Background polling, external calls, and autonomous workflows require a maximum attempt count
+  or deadline plus a cancellation path.

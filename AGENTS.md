@@ -6,9 +6,10 @@ loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way â€
 brief, not two drifting copies. The tracked engineering constitution, baseline specifications,
 change workflow, and ADRs live under `docs/` and govern future behavior changes.
 
-Last verified against the repo: **2026-08-22** (repository-native SDD constitution, baseline
-specs, change templates, ADRs, and the first draft change spec were added; no product behavior
-changed. Connector v0.2.0 reset-registration source, 89 offline tests and an unsigned Windows
+Last verified against the repo: **2026-08-22** (repository-native SDD constitution v1.1 now
+requires bounded work and explicit stop conditions; baseline specs, change templates, ADRs, and
+draft change specs are tracked; no product behavior changed. Connector v0.2.0
+reset-registration source, 89 offline tests and an unsigned Windows
 x64 internal build were previously validated; it is not a client release because this machine
 has no SignTool or code-signing certificate. Receivables filters and email-confirmed cleanup
 remain deployed from `main`; Smart Excel migration 0007 and the `/v1/ask` Geminiâ†’Groq fallback
