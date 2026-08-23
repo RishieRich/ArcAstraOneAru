@@ -1,87 +1,107 @@
 import { formatMoney, formatMonth } from "../api";
-import { IconChart, IconClock, IconRupee } from "../icons";
+import { directLabelIndexes } from "../chartModel";
+import { IconChart } from "../icons";
+import {
+  formatReceivableExactMoney,
+  formatReceivableShare,
+} from "../receivablesChartModel";
+import BusinessChart, { ChartTooltip, useChartSelection } from "./BusinessChart";
 
-export default function ReceivablesOverview({ summary, trajectory, filtered, t }) {
-  const max = Math.max(...trajectory.map((month) => month.amount), 1);
-  const overduePct = Math.min(Math.max(summary.overdue_pct || 0, 0), 100);
+export default function ReceivablesOverview({ trajectory, coverage, t, period, source, freshness }) {
+  const selection = useChartSelection();
+  const rows = trajectory.map((month) => ({
+    ...month,
+    key: month.month,
+    label: month.earlier ? t.earlier : formatMonth(month.month),
+    value: month.amount,
+  }));
+  const plottedTotal = rows.reduce((sum, row) => sum + row.amount, 0);
+  const max = Math.max(...rows.map((row) => row.amount), 1);
+  const directLabels = new Set(directLabelIndexes(rows));
+  const tableRows = coverage?.missingCount
+    ? [...rows, {
+      key: "missing-date",
+      label: t.notAvailable,
+      value: coverage.missingAmount,
+      amount: coverage.missingAmount,
+      bills: coverage.missingCount,
+    }]
+    : rows;
+  const missingNote = coverage?.missingCount
+    ? ` ${t.ux.missingBillDates(coverage.missingCount)}`
+    : "";
+
+  function factFor(row) {
+    const exact = formatReceivableExactMoney(row.amount);
+    return {
+      key: row.key,
+      label: row.label,
+      metric: t.ux.openBillValue,
+      value: exact,
+      share: formatReceivableShare(row.amount, plottedTotal),
+      interpretation: `${t.invoices(row.bills)}. ${t.ux.exposureSummary}`,
+      ariaLabel: `${row.label}. ${t.ux.openBillValue}: ${exact}. ${t.invoices(row.bills)}`,
+    };
+  }
 
   return (
-    <section className="card receivables-overview" aria-labelledby="portfolio-pulse-title">
-      <div className="portfolio-heading">
-        <div>
-          <span className="eyebrow">{filtered ? t.filteredPortfolio : t.livePortfolio}</span>
-          <h3 id="portfolio-pulse-title"><span className="ico"><IconChart /></span>{t.portfolioPulse}</h3>
-          <p className="sub">{t.portfolioPulseSub}</p>
-        </div>
-        <span className="portfolio-total">
-          <small>{t.outstanding}</small>
-          <strong>{formatMoney(summary.outstanding, { compact: true })}</strong>
-        </span>
-      </div>
-
-      <div className="portfolio-visual-grid">
-        <div className="health-panel">
-          <div
-            className="health-ring"
-            style={{ "--overdue-share": `${overduePct}%` }}
-            role="img"
-            aria-label={t.overdueShareAria(overduePct)}
-          >
-            <div>
-              <strong>{overduePct}%</strong>
-              <span>{t.overdueShare}</span>
-            </div>
-          </div>
-
-          <div className="health-facts">
-            <div>
-              <span><IconClock />{t.ninetyPlusExposure}</span>
-              <strong>{formatMoney(summary.ninety_plus_amount, { compact: true })}</strong>
-              <small>{t.invoices(summary.ninety_plus_count)}</small>
-            </div>
-            <div>
-              <span><IconRupee />{t.averageOpenBill}</span>
-              <strong>{formatMoney(summary.average_bill, { compact: true })}</strong>
-              <small>{t.invoices(summary.bill_count)}</small>
-            </div>
-          </div>
-        </div>
-
-        <div className="exposure-panel">
-          <div className="exposure-heading">
-            <div>
-              <strong>{t.openExposureTrajectory}</strong>
-              <span>{t.openExposureTrajectorySub}</span>
-            </div>
-            <span className="exposure-legend"><i />{t.outstanding}</span>
-          </div>
-
-          {trajectory.length === 0 ? (
-            <div className="empty-mini">{t.empty}</div>
-          ) : (
-            <div className="exposure-scroll">
-              <div className="exposure-chart">
-                {trajectory.map((month) => {
-                  const label = month.earlier ? t.earlier : formatMonth(month.month);
-                  const height = Math.max((month.amount / max) * 100, 4);
-                  return (
-                    <div className="exposure-column" key={month.month}>
-                      <span className="exposure-value">{formatMoney(month.amount, { compact: true })}</span>
-                      <div className="exposure-track">
-                        <i
-                          style={{ height: `${height}%` }}
-                          title={`${label}: ${formatMoney(month.amount)} · ${t.invoices(month.bills)}`}
-                        />
-                      </div>
-                      <span className="exposure-label">{label}</span>
-                    </div>
-                  );
-                })}
+    <BusinessChart
+      title={t.openExposureTrajectory}
+      subtitle={t.openExposureTrajectorySub}
+      metric={t.ux.openBillValue}
+      unit={t.ux.currencyUnit}
+      period={period}
+      source={source}
+      freshness={freshness}
+      axes={{ x: t.ux.exposureAxis, y: t.ux.amountAxis }}
+      legend={[{ key: "open", label: t.outstanding, color: "var(--accent)" }]}
+      summary={`${t.ux.exposureSummary}${missingNote}`}
+      rows={tableRows}
+      columns={[
+        { key: "label", label: t.ux.category },
+        {
+          key: "amount",
+          label: t.ux.value,
+          numeric: true,
+          render: (row) => formatReceivableExactMoney(row.amount),
+        },
+        { key: "bills", label: t.ux.billCount, numeric: true },
+      ]}
+      copy={t.ux}
+      className="receivables-overview"
+      icon={<span className="ico"><IconChart /></span>}
+    >
+      {rows.length === 0 ? (
+        <div className="empty-mini">{t.empty}</div>
+      ) : (
+        <div className="exposure-scroll">
+          <div className="exposure-chart">
+            {rows.map((row, index) => (
+              <div className="exposure-column" key={row.key}>
+                <span className="exposure-value">
+                  {directLabels.has(index)
+                    ? formatMoney(row.amount, { compact: true })
+                    : "\u00a0"}
+                </span>
+                <div
+                  className="exposure-track chart-mark"
+                  {...selection.bind(factFor(row))}
+                >
+                  <i style={{ height: `${Math.max((row.amount / max) * 100, 4)}%` }} />
+                </div>
+                <span className="exposure-label">{row.label}</span>
               </div>
-            </div>
-          )}
+            ))}
+          </div>
         </div>
-      </div>
-    </section>
+      )}
+      {rows.length > 0 && (
+        <ChartTooltip
+          fact={selection.active}
+          copy={t.ux}
+          id={selection.tooltipId}
+        />
+      )}
+    </BusinessChart>
   );
 }

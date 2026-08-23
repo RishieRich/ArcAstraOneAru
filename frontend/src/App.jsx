@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AuthError, clearSession, fetchCompanies, fetchMetrics,
-  formatMoney, formatWhen, loadSession,
+  formatMoney, formatMonth, formatWhen, loadSession,
 } from "./api";
 import { LANGS, T } from "./i18n";
 import {
@@ -11,6 +11,7 @@ import {
 import AgingChart from "./components/AgingChart";
 import Alerts from "./components/Alerts";
 import BillsTable from "./components/BillsTable";
+import BusinessSummary from "./components/BusinessSummary";
 import BrandLogo from "./components/BrandLogo";
 import ChaseList from "./components/ChaseList";
 import Copilot from "./components/Copilot";
@@ -39,6 +40,7 @@ import {
   homeNavigationState,
   workspaceLocation,
 } from "./navigation";
+import { buildReceivablesAnswer } from "./businessSummary";
 
 export default function App() {
   const [lang, setLang] = useState(() => {
@@ -511,9 +513,88 @@ function ReceivablesView({ data, t }) {
   }, [data.tenant_id]);
 
   const totals = visible.totals;
+  const answer = useMemo(
+    () => buildReceivablesAnswer(totals, {
+      bills: filteredBills,
+      totalBillCount: data.bills.length,
+      filtered,
+      lastSyncAt: data.last_sync_at,
+    }),
+    [data.bills.length, data.last_sync_at, filtered, filteredBills, totals],
+  );
+  const freshness = formatWhen(answer.lastSyncAt);
+  const billPeriod = answer.billDateCoverage.first
+    ? t.ux.billDateRange(
+      formatMonth(answer.billDateCoverage.first),
+      formatMonth(answer.billDateCoverage.last),
+    )
+    : t.ux.noValidDateRange;
+  const duePeriod = answer.dueDateCoverage.first
+    ? t.ux.dueDateRange(
+      formatMonth(answer.dueDateCoverage.first),
+      formatMonth(answer.dueDateCoverage.last),
+    )
+    : t.ux.noValidDateRange;
+  const coveredPeriod = answer.billDateCoverage.first || answer.dueDateCoverage.first
+    ? `${billPeriod} · ${duePeriod}`
+    : t.ux.noValidDateRange;
+  const next = answer.nextTarget === "filters"
+    ? { href: "#receivable-filters-title", text: t.ux.resetFilteredNext }
+    : answer.nextTarget === "oldest"
+      ? { href: "#oldest-bills", text: t.ux.receivablesNextOverdue }
+      : { href: "#due-timeline", text: t.ux.receivablesNextClear };
 
   return (
     <>
+      <BusinessSummary
+        eyebrow={t.ux.receivablesEyebrow}
+        title={t.ux.receivablesTitle}
+        body={t.ux.receivablesBody(
+          formatMoney(answer.outstanding),
+          formatMoney(answer.overdue),
+        )}
+        facts={[
+          {
+            key: "outstanding",
+            label: t.outstanding,
+            value: formatMoney(answer.outstanding),
+            help: t.billCountFoot(answer.billCount),
+          },
+          {
+            key: "overdue",
+            label: t.overdue,
+            value: formatMoney(answer.overdue),
+            help: answer.outstanding > 0 ? t.ofTotal(answer.overduePct) : "—",
+            tone: answer.hasOverdue ? "bad" : "good",
+          },
+          {
+            key: "ninety-plus",
+            label: t.ninetyPlusExposure,
+            value: formatMoney(answer.ninetyPlus),
+            help: t.invoices(answer.ninetyPlusCount),
+            tone: answer.ninetyPlus > 0 ? "bad" : undefined,
+          },
+          {
+            key: "customers",
+            label: t.owingCustomers,
+            value: answer.partyCount,
+            help: answer.topParty
+              ? `${answer.topParty} · ${answer.concentrationPct}%`
+              : undefined,
+          },
+        ]}
+        source={t.ux.tallySource}
+        period={coveredPeriod}
+        freshness={freshness}
+        nextLabel={t.ux.nextCheck}
+        nextText={next.text}
+        nextHref={next.href}
+        notice={filtered
+          ? `${t.ux.receivablesScope(answer.visibleCount, answer.totalCount)}. ${t.ux.receivablesFilteredNotice}`
+          : undefined}
+        copy={t.ux}
+      />
+
       <ReceivablesFilters
         filters={filters}
         parties={parties}
@@ -524,78 +605,115 @@ function ReceivablesView({ data, t }) {
         t={t}
       />
 
-      <ReceivablesOverview
-        summary={totals}
-        trajectory={visible.trajectory}
-        filtered={filtered}
-        t={t}
-      />
-
-      <div className="tiles">
-        <StatTile
-          label={t.outstanding}
-          value={formatMoney(totals.outstanding, { compact: true })}
-          foot={t.billCountFoot(totals.bill_count)}
-          help={t.outstandingHelp}
-          icon={<IconRupee />}
-          delay={0}
-        />
-        <StatTile
-          label={t.overdue}
-          value={formatMoney(totals.overdue, { compact: true })}
-          foot={
-            totals.outstanding > 0
-              ? t.ofTotal(Math.round((totals.overdue / totals.outstanding) * 100))
-              : "—"
-          }
-          footTone={totals.overdue > 0 ? "alert" : "ok"}
-          help={t.overdueHelp}
-          icon={<IconAlarm />}
-          tone={totals.overdue > 0 ? "bad" : "good"}
-          delay={40}
-        />
-        <StatTile
-          label={t.avgOverdue}
-          value={`${totals.avg_overdue_days} ${t.daysShort}`}
-          foot={t.maxOverdue(totals.max_overdue_days)}
-          help={t.avgOverdueHelp}
-          icon={<IconChart />}
-          tone={totals.avg_overdue_days > 45 ? "bad" : undefined}
-          delay={80}
-        />
-        <StatTile
-          label={t.bills}
-          value={totals.bill_count}
-          foot={`${totals.overdue_bill_count} ${t.overdue.toLowerCase()}`}
-          footTone={totals.overdue_bill_count > 0 ? "alert" : undefined}
-          help={t.billsHelp}
-          icon={<IconFile />}
-          delay={120}
-        />
-        <StatTile
-          label={t.owingCustomers}
-          value={totals.party_count}
-          foot={
-            totals.top_party
-              ? `${totals.top_party} · ${totals.concentration_pct}%`
-              : undefined
-          }
-          help={t.customersHelp}
-          icon={<IconUsers />}
-          delay={160}
-        />
-      </div>
+      <details className="secondary-detail">
+        <summary>{t.ux.moreReceivablesFacts}</summary>
+        <div className="tiles">
+          <StatTile
+            label={t.outstanding}
+            value={formatMoney(totals.outstanding, { compact: true })}
+            foot={t.billCountFoot(totals.bill_count)}
+            help={t.outstandingHelp}
+            icon={<IconRupee />}
+            delay={0}
+          />
+          <StatTile
+            label={t.overdue}
+            value={formatMoney(totals.overdue, { compact: true })}
+            foot={
+              totals.outstanding > 0
+                ? t.ofTotal(Math.round((totals.overdue / totals.outstanding) * 100))
+                : "—"
+            }
+            footTone={totals.overdue > 0 ? "alert" : "ok"}
+            help={t.overdueHelp}
+            icon={<IconAlarm />}
+            tone={totals.overdue > 0 ? "bad" : "good"}
+            delay={40}
+          />
+          <StatTile
+            label={t.avgOverdue}
+            value={`${totals.avg_overdue_days} ${t.daysShort}`}
+            foot={t.maxOverdue(totals.max_overdue_days)}
+            help={t.avgOverdueHelp}
+            icon={<IconChart />}
+            tone={totals.avg_overdue_days > 45 ? "bad" : undefined}
+            delay={80}
+          />
+          <StatTile
+            label={t.bills}
+            value={totals.bill_count}
+            foot={`${totals.overdue_bill_count} ${t.overdue.toLowerCase()}`}
+            footTone={totals.overdue_bill_count > 0 ? "alert" : undefined}
+            help={t.billsHelp}
+            icon={<IconFile />}
+            delay={120}
+          />
+          <StatTile
+            label={t.owingCustomers}
+            value={totals.party_count}
+            foot={
+              totals.top_party
+                ? `${totals.top_party} · ${totals.concentration_pct}%`
+                : undefined
+            }
+            help={t.customersHelp}
+            icon={<IconUsers />}
+            delay={160}
+          />
+          <StatTile
+            label={t.ninetyPlusExposure}
+            value={formatMoney(totals.ninety_plus_amount, { compact: true })}
+            foot={t.invoices(totals.ninety_plus_count)}
+            icon={<IconAlarm />}
+            tone={totals.ninety_plus_amount > 0 ? "bad" : undefined}
+            delay={200}
+          />
+          <StatTile
+            label={t.averageOpenBill}
+            value={formatMoney(totals.average_bill, { compact: true })}
+            foot={t.invoices(totals.bill_count)}
+            icon={<IconRupee />}
+            delay={240}
+          />
+        </div>
+      </details>
 
       {!filtered && <Alerts alerts={data.alerts} t={t} />}
 
+      <ReceivablesOverview
+        trajectory={visible.trajectory}
+        coverage={answer.billDateCoverage}
+        period={billPeriod}
+        source={t.ux.tallySource}
+        freshness={freshness}
+        t={t}
+      />
+
       <div className="grid-2">
-        <AgingChart aging={visible.aging} t={t} />
-        <DueTimeline timeline={visible.dueTimeline} t={t} />
+        <AgingChart
+          aging={visible.aging}
+          period={t.ux.snapshotAsAt(freshness)}
+          source={t.ux.tallySource}
+          freshness={freshness}
+          t={t}
+        />
+        <div id="due-timeline">
+          <DueTimeline
+            timeline={visible.dueTimeline}
+            coverage={answer.dueDateCoverage}
+            period={duePeriod}
+            source={t.ux.tallySource}
+            freshness={freshness}
+            t={t}
+          />
+        </div>
       </div>
 
       <div className="grid-2">
         <TopDebtors debtors={visible.topDebtors} t={t} />
-        <ChaseList bills={visible.oldestBills} t={t} />
+        <div id="oldest-bills">
+          <ChaseList bills={visible.oldestBills} t={t} />
+        </div>
       </div>
 
       <BillsTable bills={filteredBills} t={t} />

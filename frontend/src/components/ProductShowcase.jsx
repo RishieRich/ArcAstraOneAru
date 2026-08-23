@@ -89,7 +89,7 @@ export default function ProductShowcase({ t, compact = false }) {
             <div style={{ "--item-delay": "150ms" }}><span>{t.showcaseMargin}</span><strong>26.0%</strong><small>{t.showcaseHealthy}</small></div>
             <div style={{ "--item-delay": "220ms" }}><span>{t.showcaseCashDue}</span><strong>₹8.7L</strong><small>{t.showcaseNeedsLove}</small></div>
           </div>
-          <div className="showcase-mini-chart">
+          <div className="showcase-mini-chart" aria-hidden="true">
             {[36, 48, 42, 61, 57, 73, 68, 88].map((height, index) => (
               <i key={index} style={{ height: `${height}%`, "--bar-delay": `${index * 55}ms` }} />
             ))}
@@ -136,7 +136,7 @@ export default function ProductShowcase({ t, compact = false }) {
             <button type="button" tabIndex={-1}>{t.showcaseReview}</button>
           </div>
           <div className="showcase-action-progress">
-            <i><b /></i>
+            <i aria-hidden="true"><b /></i>
             <span><IconCheck />{t.showcaseDemoQueued}</span>
           </div>
         </article>
@@ -155,7 +155,7 @@ export default function ProductShowcase({ t, compact = false }) {
               <div key={material.name} style={{ "--item-delay": `${index * 110}ms` }}>
                 <span>{material.name}</span>
                 <strong className={index === 1 ? "down" : ""}>{material.move}</strong>
-                <i><b style={{ width: material.signal }} /></i>
+                <i aria-hidden="true"><b style={{ width: material.signal }} /></i>
                 <small>{material.note}</small>
               </div>
             ))}

@@ -1,8 +1,20 @@
 import { useEffect, useState } from "react";
 import { formatMoney, formatMonth, formatWhen } from "../api";
+import { buildFinanceAnswer } from "../businessSummary";
+import {
+  chartExtent,
+  comparisonFromPrevious,
+  directLabelIndexes,
+  finiteChartValue,
+  formatChartValue,
+} from "../chartModel";
+import {
+  buildBookMix,
+  buildBookTrend,
+  buildFinanceTrend,
+} from "../financePresentation";
 import {
   IconBox,
-  IconCalendar,
   IconChart,
   IconFile,
   IconRupee,
@@ -12,6 +24,8 @@ import {
 } from "../icons";
 import StatTile from "./StatTile";
 import ProductAnalytics from "./ProductAnalytics";
+import BusinessSummary from "./BusinessSummary";
+import BusinessChart, { ChartTooltip, useChartSelection } from "./BusinessChart";
 
 const KINDS = ["sales", "purchase", "expense"];
 const SERIES = {
@@ -22,6 +36,7 @@ const SERIES = {
 
 export default function FinancialOverview({ financials, t }) {
   const totals = financials.totals;
+  const answer = buildFinanceAnswer(financials);
   const resultPositive = totals.operating_result >= 0;
   const resultLabel = financials.pnl_complete
     ? resultPositive
@@ -29,56 +44,86 @@ export default function FinancialOverview({ financials, t }) {
       : t.estimatedLoss
     : t.partialResult;
 
+  const connectedNames = answer.connectedKinds.map((kind) => t.kindLabels[kind]).join(", ");
+  const missingNames = answer.missingKinds.map((kind) => t.kindLabels[kind]).join(", ");
+  const period = answer.from
+    ? t.ux.financialPeriod(answer.from, answer.to)
+    : t.allAvailableDates;
+  const source = t.ux.financeSource(connectedNames);
+  const freshness = formatWhen(answer.lastImportAt);
+  const nextText = {
+    missing: t.ux.financeNextMissing,
+    weak: t.ux.financeNextWeak,
+    product: t.ux.financeNextProduct,
+    trend: t.ux.financeNext,
+  }[answer.next];
+  const factLabels = {
+    sales: t.salesTotal,
+    purchase: t.purchaseTotal,
+    expense: t.expenseTotal,
+    profit: t.estimatedProfit,
+    loss: t.estimatedLoss,
+    partialPositive: t.ux.partialPositiveResult,
+    partialNegative: t.ux.partialNegativeResult,
+  };
+  const facts = answer.facts.map((fact) => ({
+    key: fact.key,
+    label: factLabels[fact.key],
+    value: formatChartValue(fact.value, "currency"),
+    help: fact.key.startsWith("partial") ? t.partialResultSub : undefined,
+    tone: fact.value < 0 ? "bad" : fact.key === "profit" ? "good" : "",
+  }));
+
   return (
     <section className="financial-overview">
-      <div className="section-intro financial-hero">
-        <div>
-          <span className="eyebrow">{t.financialEyebrow}</span>
-          <h2>{t.financialTitle}</h2>
-          <p>{t.financialSub}</p>
-          <div className="coverage-row">
-            <span>
-              <IconCalendar width={14} height={14} />
-              {t.periodSummary(
-                financials.period.months,
-                financials.period.active_months,
-              )}
-            </span>
-            <span className={financials.pnl_complete ? "complete" : "partial"}>
-              {financials.pnl_complete ? t.pnlReady : t.pnlPartial}
-            </span>
-          </div>
-        </div>
-        <div className="period-chip">
-          {financials.date_range.from
-            ? `${financials.date_range.from} — ${financials.date_range.to}`
-            : t.allAvailableDates}
-        </div>
-      </div>
+      <BusinessSummary
+        eyebrow={t.ux.financeEyebrow}
+        title={t.ux.financeTitle}
+        body={financials.pnl_complete ? t.ux.financeCompleteBody : t.ux.financePartialBody}
+        facts={facts}
+        source={source}
+        period={`${period} · ${t.ux.importedMonths(answer.activeMonths, answer.totalMonths)}`}
+        freshness={freshness}
+        nextLabel={t.ux.nextCheck}
+        nextText={nextText}
+        notice={answer.missingKinds.length ? t.ux.financeMissingBooks(missingNames) : undefined}
+        copy={t.ux}
+        className="financial-hero"
+      />
 
-      <div className="tiles financial-tiles">
-        <StatTile
+      <FinancialTrend financials={financials} source={source} period={period} freshness={freshness} t={t} />
+
+      <details className="secondary-detail financial-supporting-details">
+        <summary>{t.ux.moreFinanceFacts}</summary>
+        <dl className="chart-context">
+          <div><dt>{t.ux.source}</dt><dd>{source}</dd></div>
+          <div><dt>{t.ux.period}</dt><dd>{period}</dd></div>
+          <div><dt>{t.ux.freshness}</dt><dd>{freshness}</dd></div>
+        </dl>
+
+        <div className="tiles financial-tiles">
+        {financials.kinds.includes("sales") && <StatTile
           label={t.salesTotal}
-          value={formatMoney(totals.sales, { compact: true })}
-          foot={t.monthlyAverage(formatMoney(totals.average_monthly_sales))}
+          value={formatChartValue(totals.sales, "currency", { compact: true })}
+          foot={t.monthlyAverage(formatChartValue(totals.average_monthly_sales, "currency"))}
           icon={<IconChart />}
           tone="good"
-        />
-        <StatTile
+        />}
+        {financials.kinds.includes("purchase") && <StatTile
           label={t.purchaseTotal}
-          value={formatMoney(totals.purchase, { compact: true })}
-          foot={t.monthlyAverage(formatMoney(totals.average_monthly_purchase))}
+          value={formatChartValue(totals.purchase, "currency", { compact: true })}
+          foot={t.monthlyAverage(formatChartValue(totals.average_monthly_purchase, "currency"))}
           icon={<IconBox />}
-        />
-        <StatTile
+        />}
+        {financials.kinds.includes("expense") && <StatTile
           label={t.expenseTotal}
-          value={formatMoney(totals.expense, { compact: true })}
-          foot={t.monthlyAverage(formatMoney(totals.average_monthly_expense))}
+          value={formatChartValue(totals.expense, "currency", { compact: true })}
+          foot={t.monthlyAverage(formatChartValue(totals.average_monthly_expense, "currency"))}
           icon={<IconWallet />}
-        />
+        />}
         <StatTile
           label={resultLabel}
-          value={formatSignedMoney(totals.operating_result, true)}
+          value={formatChartValue(totals.operating_result, "currency", { compact: true })}
           foot={
             financials.pnl_complete
               ? t.operatingResultFormula
@@ -94,7 +139,7 @@ export default function FinancialOverview({ financials, t }) {
               ? t.profitableMonths
               : t.positiveResultMonths
           }
-          value={formatMoney(totals.profit, { compact: true })}
+          value={formatChartValue(totals.profit, "currency", { compact: true })}
           foot={t.profitableMonthsSub}
           icon={<IconTrendUp />}
           tone="good"
@@ -105,7 +150,7 @@ export default function FinancialOverview({ financials, t }) {
               ? t.lossMonths
               : t.negativeResultMonths
           }
-          value={formatMoney(totals.loss, { compact: true })}
+          value={formatChartValue(totals.loss, "currency", { compact: true })}
           foot={t.lossMonthsSub}
           icon={<IconTrendDown />}
           tone={totals.loss > 0 ? "bad" : "good"}
@@ -129,11 +174,11 @@ export default function FinancialOverview({ financials, t }) {
         />
         <StatTile
           label={t.taxTracked}
-          value={formatMoney(totals.tax, { compact: true })}
+          value={formatChartValue(totals.tax, "currency", { compact: true })}
           foot={t.transactionCount(totals.transactions)}
           icon={<IconFile />}
         />
-      </div>
+        </div>
 
       {!financials.pnl_complete && (
         <div className="pnl-notice">
@@ -145,14 +190,15 @@ export default function FinancialOverview({ financials, t }) {
         </div>
       )}
 
-      <FinancialTrend
-        monthly={financials.monthly}
-        pnlComplete={financials.pnl_complete}
-        t={t}
-      />
-      <BookExplorer financials={financials} t={t} />
+      <BookExplorer financials={financials} period={period} freshness={freshness} t={t} />
       {financials.products?.has_data && (
-        <ProductAnalytics products={financials.products} t={t} />
+        <ProductAnalytics
+          products={financials.products}
+          source={t.ux.normalizedItemSource}
+          period={period}
+          freshness={freshness}
+          t={t}
+        />
       )}
       <PeakHighlights
         highlights={financials.highlights}
@@ -162,26 +208,62 @@ export default function FinancialOverview({ financials, t }) {
       <BusinessInsights financials={financials} t={t} />
 
       <div className="grid-2">
-        <Breakdown financials={financials} t={t} />
-        <Counterparties financials={financials} t={t} />
+        <Breakdown financials={financials} period={period} freshness={freshness} t={t} />
+        <Counterparties financials={financials} period={period} freshness={freshness} t={t} />
       </div>
 
       <PeriodTable
         monthly={financials.monthly}
         pnlComplete={financials.pnl_complete}
+        connectedKinds={financials.kinds}
         t={t}
       />
       <ImportHistory imports={financials.imports} t={t} />
+      </details>
     </section>
   );
 }
 
-function formatSignedMoney(value, compact = false) {
-  const prefix = value < 0 ? "−" : "";
-  return `${prefix}${formatMoney(value, { compact })}`;
+function comparisonText(comparison, t) {
+  if (!comparison || comparison.percent === null) return null;
+  const percent = Math.abs(comparison.percent).toFixed(1);
+  if (comparison.direction === "up") return t.ux.markComparedUp(percent);
+  if (comparison.direction === "down") return t.ux.markComparedDown(percent);
+  return t.ux.markComparedSame;
 }
 
-function FinancialTrend({ monthly, pnlComplete, t }) {
+function interpretationFor(points, index, t, temporal = true) {
+  const valid = points
+    .map((point, pointIndex) => ({ pointIndex, value: finiteChartValue(point.value) }))
+    .filter((point) => point.value !== null);
+  if (!valid.length) return null;
+  const current = valid.find((point) => point.pointIndex === index);
+  if (!current) return null;
+  const labels = [];
+  if (temporal && current.pointIndex === valid.at(-1).pointIndex) labels.push(t.ux.latest);
+  if (current.value === Math.max(...valid.map((point) => point.value))) labels.push(t.ux.highest);
+  if (current.value === Math.min(...valid.map((point) => point.value))) labels.push(t.ux.lowest);
+  return [...new Set(labels)].join(" · ") || null;
+}
+
+function chartFact(points, index, metric, label, t, share = null, temporal = true) {
+  const value = finiteChartValue(points[index]?.value);
+  const formatted = formatChartValue(value, "currency");
+  return {
+    label,
+    metric,
+    value: formatted,
+    comparison: temporal ? comparisonText(comparisonFromPrevious(points, index), t) : null,
+    share: share === null ? null : formatChartValue(share, "percent", { maximumFractionDigits: 1 }),
+    interpretation: interpretationFor(points, index, t, temporal),
+    ariaLabel: `${label}. ${metric}. ${formatted}`,
+  };
+}
+
+function FinancialTrend({ financials, source, period, freshness, t }) {
+  const model = buildFinanceTrend(financials);
+  const monthly = model.rows;
+  const selection = useChartSelection();
   if (!monthly.length) {
     return (
       <section className="card trend-card">
@@ -190,70 +272,87 @@ function FinancialTrend({ monthly, pnlComplete, t }) {
     );
   }
 
-  const width = Math.max(1040, monthly.length * 52);
-  const height = 460;
-  const left = 72;
-  const right = 28;
-  const lineTop = 28;
-  const lineBottom = 250;
-  const resultTop = 310;
-  const resultBottom = 402;
-  const resultBaseline = (resultTop + resultBottom) / 2;
+  const pnlComplete = financials.pnl_complete;
+  const width = Math.max(840, monthly.length * 62);
+  const height = 370;
+  const left = 76;
+  const right = 72;
+  const top = 26;
+  const bottom = 312;
   const plotWidth = width - left - right;
-  const maximum = Math.max(
-    1,
-    ...monthly.flatMap((point) => [point.sales, point.purchase, point.expense]),
+  const values = model.series.flatMap((series) =>
+    monthly.map((point) => point[series.valueKey]),
   );
-  const maxResult = Math.max(
-    1,
-    ...monthly.map((point) => Math.abs(point.net_result)),
-  );
+  const extent = chartExtent(values);
+  const range = extent.maximum - extent.minimum || 1;
   const x = (index) =>
     monthly.length === 1
       ? left + plotWidth / 2
       : left + (index / (monthly.length - 1)) * plotWidth;
-  const y = (value) =>
-    lineBottom - (value / maximum) * (lineBottom - lineTop);
-  const linePath = (kind) =>
-    monthly
-      .map(
-        (point, index) =>
-          `${index === 0 ? "M" : "L"} ${x(index).toFixed(1)} ${y(point[kind]).toFixed(1)}`,
-      )
-      .join(" ");
+  const y = (value) => top + ((extent.maximum - value) / range) * (bottom - top);
+  const zeroY = y(0);
+  const lineSegments = (valueKey) => {
+    const segments = [];
+    let current = [];
+    monthly.forEach((point, index) => {
+      const value = finiteChartValue(point[valueKey]);
+      if (value === null) {
+        if (current.length) segments.push(current);
+        current = [];
+      } else {
+        current.push(`${x(index).toFixed(1)},${y(value).toFixed(1)}`);
+      }
+    });
+    if (current.length) segments.push(current);
+    return segments;
+  };
   const labelStep = Math.max(1, Math.ceil(monthly.length / 9));
   const barWidth = Math.max(3, Math.min(22, (plotWidth / monthly.length) * 0.55));
+  const seriesMeta = model.series.map((series) => ({
+    ...series,
+    label: series.key === "result"
+      ? pnlComplete ? t.monthlyResult : t.partialMonthlyResult
+      : t.kindLabels[series.key],
+    color: series.key === "result" ? "var(--accent-dark)" : SERIES[series.key],
+    shape: series.key === "result" ? "square" : series.key === "expense" ? "dash" : "line",
+  }));
+  const tableRows = monthly.map((row) => ({ ...row, label: formatMonth(row.month) }));
+  const columns = [
+    { key: "label", label: t.month },
+    ...seriesMeta.map((series) => ({
+      key: series.valueKey,
+      label: series.label,
+      numeric: true,
+      render: (row) => formatChartValue(row[series.valueKey], "currency"),
+    })),
+  ];
+  const axisValues = [...new Set([extent.minimum, 0, extent.maximum])].sort((a, b) => a - b);
+  const resultPoints = monthly.map((row) => ({ value: row.result }));
+  const directResult = new Set(directLabelIndexes(resultPoints, { denseAfter: 8 }));
 
   return (
-    <section className="card trend-card">
-      <div className="chart-heading">
-        <div>
-          <span className="eyebrow">{t.completePeriod}</span>
-          <h3>
-            <IconChart /> {t.financialTrend}
-          </h3>
-          <p className="sub">
-            {pnlComplete ? t.financialTrendSub : t.partialTrendSub}
-          </p>
-        </div>
-        <div className="trend-legend">
-          {KINDS.map((kind) => (
-            <span key={kind}>
-              <i className={kind} />
-              {t.kindLabels[kind]}
-            </span>
-          ))}
-          <span>
-            <i className="profit" />
-            {pnlComplete ? t.profit : t.positiveResult}
-          </span>
-          <span>
-            <i className="loss" />
-            {pnlComplete ? t.loss : t.negativeResult}
-          </span>
-        </div>
-      </div>
-
+    <BusinessChart
+      title={t.financialTrend}
+      subtitle={pnlComplete ? t.financialTrendSub : t.partialTrendSub}
+      metric={t.ux.monthlyBusinessValue}
+      unit={t.ux.currencyUnit}
+      period={period}
+      source={source}
+      freshness={freshness}
+      axes={{ x: t.ux.monthAxis, y: t.ux.amountAxis }}
+      legend={seriesMeta.map((series) => ({
+        key: series.key,
+        label: series.label,
+        color: series.color,
+        shape: series.shape,
+      }))}
+      summary={t.ux.financialTrendSummary}
+      rows={tableRows}
+      columns={columns}
+      copy={t.ux}
+      icon={<IconChart />}
+      className="trend-card"
+    >
       <div className="financial-chart-scroll">
         <svg
           className="financial-chart"
@@ -262,17 +361,10 @@ function FinancialTrend({ monthly, pnlComplete, t }) {
           role="img"
           aria-label={t.financialTrend}
         >
-          <defs>
-            <linearGradient id="salesArea" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="var(--sales)" stopOpacity="0.15" />
-              <stop offset="100%" stopColor="var(--sales)" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-            const gridY = lineBottom - ratio * (lineBottom - lineTop);
+          {axisValues.map((value) => {
+            const gridY = y(value);
             return (
-              <g key={ratio}>
+              <g key={value}>
                 <line
                   x1={left}
                   x2={width - right}
@@ -281,96 +373,125 @@ function FinancialTrend({ monthly, pnlComplete, t }) {
                   className="chart-grid"
                 />
                 <text x={left - 12} y={gridY + 4} className="chart-axis-label">
-                  {formatMoney(maximum * ratio, { compact: true })}
+                  {formatChartValue(value, "currency", { compact: true })}
                 </text>
               </g>
             );
           })}
-
-          <path
-            d={`${linePath("sales")} L ${x(monthly.length - 1)} ${lineBottom} L ${x(0)} ${lineBottom} Z`}
-            fill="url(#salesArea)"
-          />
-          {KINDS.map((kind) => (
-            <path
-              key={kind}
-              d={linePath(kind)}
-              fill="none"
-              stroke={SERIES[kind]}
-              strokeWidth={kind === "sales" ? 3.5 : 2.5}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          ))}
-
-          {monthly.map((point, index) => (
-            <g key={point.month}>
-              {KINDS.map((kind) => (
-                <circle
-                  key={kind}
-                  cx={x(index)}
-                  cy={y(point[kind])}
-                  r={monthly.length <= 18 ? 3.5 : 2}
-                  fill={SERIES[kind]}
-                  stroke="var(--surface-1)"
-                  strokeWidth="1.5"
-                >
-                  <title>
-                    {`${formatMonth(point.month)} · ${t.kindLabels[kind]} ${formatMoney(point[kind])}`}
-                  </title>
-                </circle>
-              ))}
-            </g>
-          ))}
-
-          <text x={left} y={resultTop - 15} className="chart-section-label">
-            {pnlComplete ? t.monthlyResult : t.partialMonthlyResult}
-          </text>
           <line
             x1={left}
             x2={width - right}
-            y1={resultBaseline}
-            y2={resultBaseline}
-            className="result-baseline"
+            y1={zeroY}
+            y2={zeroY}
+            className="chart-zero-line"
           />
-
+          {seriesMeta.filter((series) => series.key !== "result").map((series) => (
+            <g key={series.key}>
+              {lineSegments(series.valueKey).map((points, segmentIndex) => (
+                <polyline
+                  key={segmentIndex}
+                  points={points.join(" ")}
+                  fill="none"
+                  stroke={series.color}
+                  strokeWidth={series.key === "sales" ? 3.5 : 2.5}
+                  strokeDasharray={series.key === "expense" ? "5 4" : undefined}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ))}
+            </g>
+          ))}
           {monthly.map((point, index) => {
-            const positive = point.net_result >= 0;
-            const magnitude =
-              (Math.abs(point.net_result) / maxResult) *
-              ((resultBottom - resultTop) / 2 - 4);
-            const barY = positive ? resultBaseline - magnitude : resultBaseline;
+            const value = finiteChartValue(point.result);
+            if (value === null) return null;
+            const positive = value >= 0;
+            const valueY = y(value);
+            const fact = chartFact(
+              resultPoints,
+              index,
+              pnlComplete ? t.monthlyResult : t.partialMonthlyResult,
+              formatMonth(point.month),
+              t,
+            );
             return (
-              <g key={`${point.month}-result`}>
+              <g
+                key={`${point.month}-result`}
+                className="chart-mark"
+                {...selection.bind(fact)}
+              >
                 <rect
                   x={x(index) - barWidth / 2}
-                  y={barY}
+                  y={Math.min(valueY, zeroY)}
                   width={barWidth}
-                  height={Math.max(point.net_result === 0 ? 1 : magnitude, 1)}
+                  height={Math.max(Math.abs(zeroY - valueY), 1)}
                   rx="3"
                   className={positive ? "result-profit" : "result-loss"}
-                >
-                  <title>
-                    {`${formatMonth(point.month)} · ${positive ? t.profit : t.loss} ${formatMoney(point.net_result)}`}
-                  </title>
-                </rect>
-                {(index % labelStep === 0 || index === monthly.length - 1) && (
+                />
+                {directResult.has(index) && (
                   <text
                     x={x(index)}
-                    y={height - 18}
-                    className="chart-month-label"
+                    y={positive ? Math.max(12, valueY - 7) : Math.min(bottom + 16, valueY + 14)}
+                    className="chart-direct-label"
                     textAnchor="middle"
                   >
-                    {formatMonth(point.month)}
+                    {formatChartValue(value, "currency", { compact: true })}
                   </text>
                 )}
               </g>
             );
           })}
+          {seriesMeta.filter((series) => series.key !== "result").flatMap((series, seriesIndex) => {
+            const points = monthly.map((point) => ({ value: point[series.valueKey] }));
+            const direct = new Set(directLabelIndexes(points, { denseAfter: 8 }));
+            return monthly.map((point, index) => {
+              const value = finiteChartValue(point[series.valueKey]);
+              if (value === null) return null;
+              const fact = chartFact(points, index, series.label, formatMonth(point.month), t);
+              return (
+                <g
+                  key={`${series.key}-${point.month}`}
+                  className="chart-mark"
+                  {...selection.bind(fact)}
+                >
+                  <circle
+                    cx={x(index)}
+                    cy={y(value)}
+                    r={monthly.length <= 18 ? 4 : 3}
+                    fill={series.color}
+                    stroke="var(--surface-1)"
+                    strokeWidth="1.5"
+                  />
+                  {direct.has(index) && (
+                    <text
+                      x={x(index)}
+                      y={Math.max(12, y(value) - 8 - seriesIndex * 2)}
+                      className="chart-direct-label"
+                      textAnchor="middle"
+                    >
+                      {formatChartValue(value, "currency", { compact: true })}
+                    </text>
+                  )}
+                </g>
+              );
+            });
+          })}
+          {monthly.map((point, index) => (
+            (index % labelStep === 0 || index === monthly.length - 1) && (
+              <text
+                key={`${point.month}-label`}
+                x={x(index)}
+                y={height - 18}
+                className="chart-month-label"
+                textAnchor="middle"
+              >
+                {formatMonth(point.month)}
+              </text>
+            )
+          ))}
         </svg>
       </div>
-      <p className="chart-note">{t.chartHoverNote}</p>
-    </section>
+      <ChartTooltip fact={selection.active} copy={t.ux} id={selection.tooltipId} />
+    </BusinessChart>
   );
 }
 
@@ -380,7 +501,7 @@ const MIX_COLORS = {
   expense: ["#c65f24", "#dc783a", "#e79863", "#efb48b", "#f5d0b5", "#fae7d9"],
 };
 
-function BookExplorer({ financials, t }) {
+function BookExplorer({ financials, period, freshness, t }) {
   const [kind, setKind] = useState(financials.kinds[0] || "sales");
   useEffect(() => {
     if (!financials.kinds.includes(kind)) {
@@ -388,20 +509,8 @@ function BookExplorer({ financials, t }) {
     }
   }, [financials, kind]);
 
-  const points = financials.monthly;
-  const active = points.filter((point) => point[kind] > 0);
-  const total = financials.totals[kind] || 0;
-  const average = active.length ? total / active.length : 0;
-  const best = active.reduce(
-    (winner, point) => (!winner || point[kind] > winner[kind] ? point : winner),
-    null,
-  );
-  const first = active[0];
-  const latest = active[active.length - 1];
-  const change =
-    first && latest && first !== latest && first[kind]
-      ? ((latest[kind] - first[kind]) / first[kind]) * 100
-      : null;
+  const model = buildBookTrend(financials, kind);
+  const bookSource = t.ux.financeSource(t.kindLabels[kind]);
 
   return (
     <section className={`card book-explorer ${kind}`}>
@@ -429,40 +538,56 @@ function BookExplorer({ financials, t }) {
       <div className="book-kpis">
         <div>
           <span>{t.bookTotal}</span>
-          <strong>{formatMoney(total)}</strong>
+          <strong>{formatChartValue(model.total, "currency")}</strong>
         </div>
         <div>
           <span>{t.activeMonthAverage}</span>
-          <strong>{formatMoney(average)}</strong>
-          <small>{t.activeMonths(active.length)}</small>
+          <strong>{formatChartValue(model.average, "currency")}</strong>
+          <small>{t.activeMonths(model.activeMonths)}</small>
         </div>
         <div>
           <span>{t.bestMonthLabel}</span>
-          <strong>{best ? formatMoney(best[kind]) : "—"}</strong>
-          <small>{best ? formatMonth(best.month) : t.notAvailable}</small>
+          <strong>{model.best ? formatChartValue(model.best.value, "currency") : "—"}</strong>
+          <small>{model.best ? formatMonth(model.best.month) : t.notAvailable}</small>
         </div>
         <div>
           <span>{t.firstToLatest}</span>
-          <strong className={change == null ? "" : change >= 0 ? "up" : "down"}>
-            {change == null ? "—" : `${change >= 0 ? "+" : "−"}${Math.abs(change).toFixed(1)}%`}
+          <strong className={model.change == null ? "" : model.change >= 0 ? "up" : "down"}>
+            {model.change == null ? "—" : `${model.change >= 0 ? "+" : "−"}${Math.abs(model.change).toFixed(1)}%`}
           </strong>
           <small>
-            {first && latest && first !== latest
-              ? `${formatMonth(first.month)} → ${formatMonth(latest.month)}`
+            {model.first && model.latest && model.first !== model.latest
+              ? `${formatMonth(model.first.month)} → ${formatMonth(model.latest.month)}`
               : t.needsTwoActiveMonths}
           </small>
         </div>
       </div>
 
       <div className="book-visual-grid">
-        <MonthlyBookBars monthly={points} kind={kind} average={average} t={t} />
-        <BookMix rows={financials.breakdown[kind] || []} kind={kind} t={t} />
+        <MonthlyBookBars
+          model={model}
+          kind={kind}
+          source={bookSource}
+          period={period}
+          freshness={freshness}
+          t={t}
+        />
+        <BookMix
+          rows={financials.breakdown[kind] || []}
+          kind={kind}
+          source={bookSource}
+          period={period}
+          freshness={freshness}
+          t={t}
+        />
       </div>
     </section>
   );
 }
 
-function MonthlyBookBars({ monthly, kind, average, t }) {
+function MonthlyBookBars({ model, kind, source, period, freshness, t }) {
+  const monthly = model.points;
+  const selection = useChartSelection();
   if (!monthly.length) {
     return (
       <div className="book-chart-panel">
@@ -484,21 +609,48 @@ function MonthlyBookBars({ monthly, kind, average, t }) {
   const top = 22;
   const bottom = 252;
   const plotWidth = width - left - right;
-  const maximum = Math.max(1, ...monthly.map((point) => point[kind]), average);
+  const extent = chartExtent([...monthly.map((point) => point.value), model.average]);
+  const range = extent.maximum - extent.minimum || 1;
   const x = (index) => left + ((index + 0.5) / monthly.length) * plotWidth;
-  const y = (value) => bottom - (value / maximum) * (bottom - top);
+  const y = (value) => top + ((extent.maximum - value) / range) * (bottom - top);
+  const zeroY = y(0);
   const barWidth = Math.max(8, Math.min(28, (plotWidth / monthly.length) * 0.62));
   const labelStep = Math.max(1, Math.ceil(monthly.length / 8));
+  const direct = new Set(directLabelIndexes(monthly, { denseAfter: 10 }));
+  const axisValues = [...new Set([extent.minimum, 0, extent.maximum])].sort((a, b) => a - b);
+  const tableRows = monthly.map((point) => ({ ...point, label: formatMonth(point.month) }));
+  const summary = monthly.some((point) => point.value === null)
+    ? `${t.ux.bookTrendSummary(t.kindLabels[kind])} ${t.ux.missingValue}`
+    : t.ux.bookTrendSummary(t.kindLabels[kind]);
 
   return (
-    <div className="book-chart-panel">
-      <div className="book-panel-head">
-        <div>
-          <strong>{t.monthlyBookTrend(t.kindLabels[kind])}</strong>
-          <span>{t.monthlyBookTrendSub}</span>
-        </div>
-        <span className="average-key">{t.averageLine}</span>
-      </div>
+    <BusinessChart
+      title={t.monthlyBookTrend(t.kindLabels[kind])}
+      subtitle={t.monthlyBookTrendSub}
+      metric={t.kindLabels[kind]}
+      unit={t.ux.currencyUnit}
+      period={period}
+      source={source}
+      freshness={freshness}
+      axes={{ x: t.ux.monthAxis, y: t.ux.amountAxis }}
+      legend={[
+        { key: kind, label: t.kindLabels[kind], color: SERIES[kind], shape: "square" },
+        { key: "average", label: t.averageLine, color: "var(--text-muted)", shape: "dash" },
+      ]}
+      summary={summary}
+      rows={tableRows}
+      columns={[
+        { key: "label", label: t.month },
+        {
+          key: "value",
+          label: t.kindLabels[kind],
+          numeric: true,
+          render: (row) => formatChartValue(row.value, "currency"),
+        },
+      ]}
+      copy={t.ux}
+      className="book-chart-panel"
+    >
       <div className="book-chart-scroll">
         <svg
           viewBox={`0 0 ${width} ${height}`}
@@ -506,38 +658,62 @@ function MonthlyBookBars({ monthly, kind, average, t }) {
           role="img"
           aria-label={t.monthlyBookTrend(t.kindLabels[kind])}
         >
-          {[0, 0.5, 1].map((ratio) => {
-            const gridY = y(maximum * ratio);
+          {axisValues.map((value) => {
+            const gridY = y(value);
             return (
-              <g key={ratio}>
+              <g key={value}>
                 <line x1={left} x2={width - right} y1={gridY} y2={gridY} className="chart-grid" />
                 <text x={left - 10} y={gridY + 4} className="chart-axis-label">
-                  {formatMoney(maximum * ratio, { compact: true })}
+                  {formatChartValue(value, "currency", { compact: true })}
                 </text>
               </g>
             );
           })}
+          <line x1={left} x2={width - right} y1={zeroY} y2={zeroY} className="chart-zero-line" />
           <line
             x1={left}
             x2={width - right}
-            y1={y(average)}
-            y2={y(average)}
+            y1={y(model.average)}
+            y2={y(model.average)}
             className="book-average-line"
           />
           {monthly.map((point, index) => {
-            const value = point[kind];
+            const value = point.value;
+            if (value === null) {
+              return (
+                <text
+                  key={point.month}
+                  x={x(index)}
+                  y={bottom - 5}
+                  className="chart-month-label"
+                  textAnchor="middle"
+                >
+                  —
+                </text>
+              );
+            }
+            const valueY = y(value);
+            const fact = chartFact(monthly, index, t.kindLabels[kind], formatMonth(point.month), t);
             return (
-              <g key={point.month}>
+              <g key={point.month} className="chart-mark" {...selection.bind(fact)}>
                 <rect
                   x={x(index) - barWidth / 2}
-                  y={y(value)}
+                  y={Math.min(valueY, zeroY)}
                   width={barWidth}
-                  height={Math.max(bottom - y(value), 1)}
+                  height={Math.max(Math.abs(zeroY - valueY), 1)}
                   rx="5"
                   className={`book-bar ${kind}${value === 0 ? " empty" : ""}`}
-                >
-                  <title>{`${formatMonth(point.month)} · ${formatMoney(value)}`}</title>
-                </rect>
+                />
+                {direct.has(index) && (
+                  <text
+                    x={x(index)}
+                    y={Math.max(12, Math.min(valueY, zeroY) - 7)}
+                    className="chart-direct-label"
+                    textAnchor="middle"
+                  >
+                    {formatChartValue(value, "currency", { compact: true })}
+                  </text>
+                )}
                 {(index % labelStep === 0 || index === monthly.length - 1) && (
                   <text x={x(index)} y={height - 20} className="chart-month-label" textAnchor="middle">
                     {formatMonth(point.month)}
@@ -548,66 +724,122 @@ function MonthlyBookBars({ monthly, kind, average, t }) {
           })}
         </svg>
       </div>
-    </div>
+      <ChartTooltip fact={selection.active} copy={t.ux} id={selection.tooltipId} />
+    </BusinessChart>
   );
 }
 
-function BookMix({ rows, kind, t }) {
+function BookMix({ rows, kind, source, period, freshness, t }) {
+  const selection = useChartSelection();
+  const model = buildBookMix(rows);
   if (!rows.length) {
     return (
-      <div className="book-mix-panel">
-        <div className="book-panel-head">
-          <div>
-            <strong>{t.bookMixTitle}</strong>
-            <span>{t.bookMixSub}</span>
-          </div>
-        </div>
+      <BusinessChart
+        title={t.bookMixTitle}
+        subtitle={t.bookMixSub}
+        metric={t.kindLabels[kind]}
+        unit={t.ux.currencyUnit}
+        period={period}
+        source={source}
+        freshness={freshness}
+        summary={t.ux.categoryShareSummary}
+        copy={t.ux}
+        className="book-mix-panel"
+      >
         <div className="empty-mini">{t.noBreakdown}</div>
-      </div>
+      </BusinessChart>
     );
   }
 
-  const shown = rows.slice(0, 6);
-  const total = shown.reduce((sum, row) => sum + row.amount, 0) || 1;
+  const shown = model.rows;
   let cursor = 0;
-  const stops = shown.map((row, index) => {
+  const stops = model.eligible ? shown.map((row, index) => {
     const start = cursor;
-    cursor += (row.amount / total) * 100;
+    cursor += row.share;
     return `${MIX_COLORS[kind][index]} ${start.toFixed(1)}% ${cursor.toFixed(1)}%`;
-  });
-  const largestShare = (shown[0].amount / total) * 100;
+  }) : [];
+  const points = shown.map((row) => ({ value: row.value }));
+  const unavailable = model.reason === "negative"
+    ? t.ux.shareUnavailableNegative
+    : t.ux.donutUnavailable;
 
   return (
-    <div className="book-mix-panel">
-      <div className="book-panel-head">
-        <div>
-          <strong>{t.bookMixTitle}</strong>
-          <span>{t.bookMixSub}</span>
-        </div>
-      </div>
+    <BusinessChart
+      title={t.bookMixTitle}
+      subtitle={t.bookMixSub}
+      metric={t.kindLabels[kind]}
+      unit={t.ux.currencyUnit}
+      period={period}
+      source={source}
+      freshness={freshness}
+      legend={shown.map((row, index) => ({
+        key: row.key,
+        label: row.name,
+        color: MIX_COLORS[kind][index],
+        shape: index % 2 ? "circle" : "square",
+      }))}
+      summary={model.eligible ? t.ux.categoryShareSummary : unavailable}
+      rows={shown}
+      columns={[
+        { key: "name", label: t.ux.category },
+        {
+          key: "value",
+          label: t.value,
+          numeric: true,
+          render: (row) => formatChartValue(row.value, "currency"),
+        },
+        {
+          key: "share",
+          label: t.ux.share,
+          numeric: true,
+          render: (row) => row.share === null
+            ? t.notAvailable
+            : formatChartValue(row.share, "percent", { maximumFractionDigits: 1 }),
+        },
+      ]}
+      copy={t.ux}
+      className="book-mix-panel"
+    >
       <div className="book-mix-content">
-        <div
-          className="mix-donut"
-          style={{ background: `conic-gradient(${stops.join(",")})` }}
-          role="img"
-          aria-label={t.bookMixAria(t.kindLabels[kind])}
-        >
-          <div>
-            <strong>{largestShare.toFixed(1)}%</strong>
-            <span>{t.largestDriver}</span>
+        {model.eligible ? (
+          <div
+            className="mix-donut"
+            style={{ background: `conic-gradient(${stops.join(",")})` }}
+            aria-hidden="true"
+          >
+            <div>
+              <strong>{formatChartValue(shown[0].share, "percent", { maximumFractionDigits: 1 })}</strong>
+              <span>{t.largestDriver}</span>
+            </div>
           </div>
-        </div>
+        ) : <div className="empty-mini">{unavailable}</div>}
         <div className="mix-legend">
           {shown.map((row, index) => (
-            <div key={row.name}>
+            <div
+              className="chart-mark-button"
+              key={row.key}
+              {...selection.bind(chartFact(
+                points,
+                index,
+                t.kindLabels[kind],
+                row.name,
+                t,
+                row.share,
+                false,
+              ))}
+            >
               <i style={{ background: MIX_COLORS[kind][index] }} />
-              <span title={row.name}>{row.name}</span>
-              <strong>{((row.amount / total) * 100).toFixed(1)}%</strong>
+              <span>{row.name}</span>
+              <strong>
+                {formatChartValue(row.value, "currency")}
+                {row.share === null ? "" : ` · ${formatChartValue(row.share, "percent", { maximumFractionDigits: 1 })}`}
+              </strong>
             </div>
           ))}
         </div>
       </div>
-    </div>
+      <ChartTooltip fact={selection.active} copy={t.ux} id={selection.tooltipId} />
+    </BusinessChart>
   );
 }
 
@@ -712,26 +944,53 @@ function BusinessInsights({ financials, t }) {
   );
 }
 
-function Breakdown({ financials, t }) {
+function Breakdown({ financials, period, freshness, t }) {
   const available = KINDS.filter((kind) => financials.breakdown[kind]?.length);
   const [kind, setKind] = useState(
     available[0] || financials.kinds[0] || "sales",
   );
+  const selection = useChartSelection();
   useEffect(() => {
     if (!available.includes(kind)) {
       setKind(available[0] || financials.kinds[0] || "sales");
     }
   }, [financials]);
 
-  const rows = financials.breakdown[kind] || [];
-  const maximum = Math.max(1, ...rows.map((row) => row.amount));
+  const rows = (financials.breakdown[kind] || []).map((row, index) => ({
+    key: row.name || `category-${index}`,
+    name: row.name,
+    amount: finiteChartValue(row.amount),
+  }));
+  const points = rows.map((row) => ({ value: row.amount }));
+  const extent = chartExtent(points.map((point) => point.value));
+  const range = extent.maximum - extent.minimum || 1;
+  const position = (value) => ((value - extent.minimum) / range) * 100;
+  const zeroPosition = position(0);
   return (
-    <section className="card">
+    <BusinessChart
+      title={t.breakdownTitle}
+      subtitle={t.breakdownSub}
+      metric={t.kindLabels[kind]}
+      unit={t.ux.currencyUnit}
+      period={period}
+      source={t.ux.financeSource(t.kindLabels[kind])}
+      freshness={freshness}
+      axes={{ x: t.ux.amountAxis, y: t.ux.category }}
+      summary={t.breakdownSub}
+      rows={rows}
+      columns={[
+        { key: "name", label: t.ux.category },
+        {
+          key: "amount",
+          label: t.value,
+          numeric: true,
+          render: (row) => formatChartValue(row.amount, "currency"),
+        },
+      ]}
+      copy={t.ux}
+    >
       <div className="card-title-row">
-        <div>
-          <h3>{t.breakdownTitle}</h3>
-          <p className="sub">{t.breakdownSub}</p>
-        </div>
+        <span />
         <div className="mini-tabs" aria-label={t.breakdownTitle}>
           {financials.kinds.map((candidate) => (
             <button
@@ -749,47 +1008,98 @@ function Breakdown({ financials, t }) {
         <div className="empty-mini">{t.noBreakdown}</div>
       ) : (
         <div className="finance-rank">
-          {rows.map((row) => (
-            <div className="finance-rank-row" key={row.name}>
+          {rows.map((row, index) => {
+            const valuePosition = row.amount === null ? zeroPosition : position(row.amount);
+            const left = Math.min(zeroPosition, valuePosition);
+            const width = Math.abs(valuePosition - zeroPosition);
+            const fact = chartFact(points, index, t.kindLabels[kind], row.name, t, null, false);
+            return (
+            <div
+              className="finance-rank-row chart-mark-button"
+              key={row.key}
+              {...selection.bind(fact)}
+            >
               <div className="finance-rank-label">
                 <span>{row.name}</span>
-                <strong>{formatMoney(row.amount)}</strong>
+                <strong>{formatChartValue(row.amount, "currency")}</strong>
               </div>
-              <div className="finance-rank-track">
+              <div className="finance-rank-track" style={{ position: "relative" }}>
+                <span
+                  aria-hidden="true"
+                  style={{
+                    position: "absolute",
+                    insetBlock: 0,
+                    left: `${zeroPosition}%`,
+                    borderLeft: "1px dashed var(--text-muted)",
+                  }}
+                />
                 <i
                   className={kind}
-                  style={{ width: `${(row.amount / maximum) * 100}%` }}
+                  style={{ position: "absolute", left: `${left}%`, width: `${Math.max(width, row.amount === 0 ? 0.5 : 0)}%` }}
                 />
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
-    </section>
+      <ChartTooltip fact={selection.active} copy={t.ux} id={selection.tooltipId} />
+    </BusinessChart>
   );
 }
 
-function Counterparties({ financials, t }) {
+function Counterparties({ financials, period, freshness, t }) {
   const kindsWithRows = KINDS.filter(
     (kind) => financials.counterparties[kind]?.length,
   );
   const [kind, setKind] = useState(
     kindsWithRows[0] || financials.kinds[0] || "sales",
   );
+  const selection = useChartSelection();
   useEffect(() => {
     if (!kindsWithRows.includes(kind)) {
       setKind(kindsWithRows[0] || financials.kinds[0] || "sales");
     }
   }, [financials]);
-  const rows = financials.counterparties[kind] || [];
+  const rows = (financials.counterparties[kind] || []).map((row, index) => ({
+    key: row.party || `party-${index}`,
+    party: row.party,
+    amount: finiteChartValue(row.amount),
+    transactions: finiteChartValue(row.transactions),
+  }));
+  const points = rows.map((row) => ({ value: row.amount }));
 
   return (
-    <section className="card">
+    <BusinessChart
+      title={t.counterpartyTitle}
+      subtitle={t.counterpartySub}
+      metric={t.kindLabels[kind]}
+      unit={t.ux.currencyUnit}
+      period={period}
+      source={t.ux.financeSource(t.kindLabels[kind])}
+      freshness={freshness}
+      axes={{ x: t.ux.amountAxis, y: t.ux.category }}
+      summary={t.counterpartySub}
+      rows={rows}
+      columns={[
+        { key: "party", label: t.counterpartyTitle },
+        {
+          key: "amount",
+          label: t.value,
+          numeric: true,
+          render: (row) => formatChartValue(row.amount, "currency"),
+        },
+        {
+          key: "transactions",
+          label: t.transactions,
+          numeric: true,
+          render: (row) => formatChartValue(row.transactions),
+        },
+      ]}
+      copy={t.ux}
+    >
       <div className="card-title-row">
-        <div>
-          <h3>{t.counterpartyTitle}</h3>
-          <p className="sub">{t.counterpartySub}</p>
-        </div>
+        <span />
         <select
           className="light-select"
           value={kind}
@@ -808,22 +1118,36 @@ function Counterparties({ financials, t }) {
       ) : (
         <div className="counterparty-list">
           {rows.map((row, index) => (
-            <div className="counterparty-row" key={row.party}>
+            <div
+              className="counterparty-row chart-mark-button"
+              key={row.key}
+              {...selection.bind(chartFact(
+                points,
+                index,
+                t.kindLabels[kind],
+                row.party,
+                t,
+                null,
+                false,
+              ))}
+            >
               <span className="counterparty-number">{index + 1}</span>
               <span className="counterparty-name">
                 {row.party}
                 <small>{t.transactionCount(row.transactions)}</small>
               </span>
-              <strong>{formatMoney(row.amount)}</strong>
+              <strong>{formatChartValue(row.amount, "currency")}</strong>
             </div>
           ))}
         </div>
       )}
-    </section>
+      <ChartTooltip fact={selection.active} copy={t.ux} id={selection.tooltipId} />
+    </BusinessChart>
   );
 }
 
-function PeriodTable({ monthly, pnlComplete, t }) {
+function PeriodTable({ monthly, pnlComplete, connectedKinds, t }) {
+  const connected = new Set(connectedKinds || []);
   return (
     <section className="card period-table-card">
       <div className="card-title-row">
@@ -854,21 +1178,27 @@ function PeriodTable({ monthly, pnlComplete, t }) {
             {monthly.map((point) => (
               <tr key={point.month}>
                 <td>{formatMonth(point.month)}</td>
-                <td className="num">{formatMoney(point.sales)}</td>
-                <td className="num">{formatMoney(point.purchase)}</td>
-                <td className="num">{formatMoney(point.expense)}</td>
+                <td className="num">
+                  {connected.has("sales") ? formatChartValue(point.sales, "currency") : t.ux.notConnected}
+                </td>
+                <td className="num">
+                  {connected.has("purchase") ? formatChartValue(point.purchase, "currency") : t.ux.notConnected}
+                </td>
+                <td className="num">
+                  {connected.has("expense") ? formatChartValue(point.expense, "currency") : t.ux.notConnected}
+                </td>
                 <td className="num positive-number">
-                  {point.profit ? formatMoney(point.profit) : "—"}
+                  {point.profit ? formatChartValue(point.profit, "currency") : "—"}
                 </td>
                 <td className="num negative-number">
-                  {point.loss ? formatMoney(point.loss) : "—"}
+                  {point.loss ? formatChartValue(point.loss, "currency") : "—"}
                 </td>
                 <td
                   className={`num ${
                     point.net_result >= 0 ? "positive-number" : "negative-number"
                   }`}
                 >
-                  {formatSignedMoney(point.net_result)}
+                  {formatChartValue(point.net_result, "currency")}
                 </td>
               </tr>
             ))}

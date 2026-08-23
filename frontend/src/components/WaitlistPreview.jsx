@@ -1,7 +1,12 @@
 import { formatMoney } from "../api";
+import {
+  comparisonFromPrevious,
+  directLabelIndexes,
+  formatChartValue,
+} from "../chartModel";
+import { buildSamplePreview } from "../financePresentation";
 import { LANGS } from "../i18n";
 import {
-  IconBox,
   IconChart,
   IconCheck,
   IconFile,
@@ -14,13 +19,28 @@ import {
   IconWallet,
 } from "../icons";
 import BrandLogo from "./BrandLogo";
+import BusinessChart, { ChartTooltip, useChartSelection } from "./BusinessChart";
 import ProductShowcase from "./ProductShowcase";
 import ThemeToggle from "./ThemeToggle";
 
-const MONTHLY_SALES = [310000, 370000, 420000, 400000, 510000, 550000, 640000, 720000];
-const PRODUCT_VALUES = [1240000, 980000, 710000, 450000];
-const MAX_SALES = Math.max(...MONTHLY_SALES);
-const MAX_PRODUCT = Math.max(...PRODUCT_VALUES);
+function comparisonText(comparison, t) {
+  if (!comparison || comparison.percent === null) return null;
+  const percent = Math.abs(comparison.percent).toFixed(1);
+  if (comparison.direction === "up") return t.ux.markComparedUp(percent);
+  if (comparison.direction === "down") return t.ux.markComparedDown(percent);
+  return t.ux.markComparedSame;
+}
+
+function sampleFact(row, metric, format, t, comparison = null) {
+  const value = formatChartValue(row.value, format, { maximumFractionDigits: 1 });
+  return {
+    label: row.label,
+    metric,
+    value,
+    comparison: comparisonText(comparison, t),
+    ariaLabel: `${row.label}. ${metric}. ${value}`,
+  };
+}
 
 export default function WaitlistPreview({
   t,
@@ -31,6 +51,13 @@ export default function WaitlistPreview({
   result,
   onBack,
 }) {
+  const sample = buildSamplePreview(t.demoMonths, t.demoExpenseLabels, t.demoProducts);
+  const salesSelection = useChartSelection();
+  const costSelection = useChartSelection();
+  const productSelection = useChartSelection();
+  const directSales = new Set(directLabelIndexes(sample.monthly));
+  const maxSales = Math.max(...sample.monthly.map((row) => row.value));
+  const maxProduct = Math.max(...sample.products.map((row) => row.value));
   const kpis = [
     [t.demoSales, 3920000, t.demoSalesFoot, <IconChart />],
     [t.demoProfit, 1020000, t.demoProfitFoot, <IconTrendUp />],
@@ -102,7 +129,7 @@ export default function WaitlistPreview({
             </span>
             <strong>{t.demoExecutiveReport}</strong>
             <p>{t.demoReportBody}</p>
-            <div className="report-teaser-bars">
+            <div className="report-teaser-bars" aria-hidden="true">
               <i style={{ height: "38%" }} />
               <i style={{ height: "52%" }} />
               <i style={{ height: "47%" }} />
@@ -139,26 +166,51 @@ export default function WaitlistPreview({
           </div>
 
           <div className="demo-visual-grid">
-            <article className="demo-panel demo-sales-panel">
-              <div className="demo-panel-head">
-                <div>
-                  <span>{t.demoTrendEyebrow}</span>
-                  <h3>{t.demoSalesTrend}</h3>
-                </div>
-                <strong>+132%</strong>
-              </div>
+            <BusinessChart
+              title={t.demoSalesTrend}
+              subtitle={t.demoTrendEyebrow}
+              metric={t.demoSales}
+              unit={t.ux.currencyUnit}
+              period={t.ux.samplePeriod}
+              source={t.ux.sampleSource}
+              freshness={t.ux.sampleFreshness}
+              axes={{ x: t.ux.monthAxis, y: t.ux.amountAxis }}
+              summary={`${t.ux.sampleChartSummary} ${t.ux.sampleFirstToLatest(sample.firstToLatestPercent.toFixed(1))}`}
+              rows={sample.monthly}
+              columns={[
+                { key: "label", label: t.month },
+                {
+                  key: "value",
+                  label: t.demoSales,
+                  numeric: true,
+                  render: (row) => formatChartValue(row.value, "currency"),
+                },
+              ]}
+              copy={t.ux}
+              className="demo-panel demo-sales-panel"
+            >
               <div
                 className="demo-sales-chart"
-                role="img"
-                aria-label={t.demoSalesTrend}
               >
-                {MONTHLY_SALES.map((value, index) => (
-                  <div className="demo-month" key={t.demoMonths[index]}>
-                    <span>{formatMoney(value, { compact: true })}</span>
+                {sample.monthly.map((row, index) => (
+                  <div
+                    className="demo-month chart-mark-button"
+                    key={row.key}
+                    {...salesSelection.bind(sampleFact(
+                      row,
+                      t.demoSales,
+                      "currency",
+                      t,
+                      comparisonFromPrevious(sample.monthly, index),
+                    ))}
+                  >
+                    <span style={directSales.has(index) ? { opacity: 1 } : undefined}>
+                      {formatChartValue(row.value, "currency", { compact: true })}
+                    </span>
                     <div>
-                      <i style={{ height: `${(value / MAX_SALES) * 100}%` }} />
+                      <i style={{ height: `${(row.value / maxSales) * 100}%` }} />
                     </div>
-                    <small>{t.demoMonths[index]}</small>
+                    <small>{row.label}</small>
                   </div>
                 ))}
               </div>
@@ -166,65 +218,111 @@ export default function WaitlistPreview({
                 <IconTrendUp width={14} height={14} />
                 {t.demoTrendInsight}
               </p>
-            </article>
+              <ChartTooltip fact={salesSelection.active} copy={t.ux} id={salesSelection.tooltipId} />
+            </BusinessChart>
 
-            <article className="demo-panel demo-mix-panel">
-              <div className="demo-panel-head">
-                <div>
-                  <span>{t.demoCostEyebrow}</span>
-                  <h3>{t.demoCostMix}</h3>
-                </div>
-              </div>
+            <BusinessChart
+              title={t.demoCostMix}
+              subtitle={t.demoCostEyebrow}
+              metric={t.demoCostMix}
+              unit={t.ux.percentUnit}
+              period={t.ux.samplePeriod}
+              source={t.ux.sampleSource}
+              freshness={t.ux.sampleFreshness}
+              legend={sample.costs.map((row, index) => ({
+                key: row.key,
+                label: row.label,
+                color: ["var(--purchase)", "var(--accent)", "var(--sales)", "var(--text-muted)"][index],
+                shape: index % 2 ? "circle" : "square",
+              }))}
+              summary={t.ux.sampleChartSummary}
+              rows={sample.costs}
+              columns={[
+                { key: "label", label: t.ux.category },
+                {
+                  key: "value",
+                  label: t.ux.percentage,
+                  numeric: true,
+                  render: (row) => formatChartValue(row.value, "percent", { maximumFractionDigits: 1 }),
+                },
+              ]}
+              copy={t.ux}
+              className="demo-panel demo-mix-panel"
+            >
               <div className="demo-mix-body">
                 <div
                   className="demo-donut"
-                  role="img"
-                  aria-label={t.demoCostMix}
+                  aria-hidden="true"
                 >
                   <div>
-                    <strong>54.6%</strong>
+                    <strong>{formatChartValue(sample.costs[0].value, "percent", { maximumFractionDigits: 1 })}</strong>
                     <span>{t.demoLargestCost}</span>
                   </div>
                 </div>
                 <div className="demo-mix-list">
-                  {t.demoExpenseLabels.map((label, index) => (
-                    <div key={label}>
+                  {sample.costs.map((row, index) => (
+                    <div
+                      className="chart-mark-button"
+                      key={row.key}
+                      {...costSelection.bind(sampleFact(row, t.demoCostMix, "percent", t))}
+                    >
                       <i className={`mix-${index}`} />
-                      <span>{label}</span>
-                      <strong>{[54.6, 21.8, 14.1, 9.5][index]}%</strong>
+                      <span>{row.label}</span>
+                      <strong>{formatChartValue(row.value, "percent", { maximumFractionDigits: 1 })}</strong>
                     </div>
                   ))}
                 </div>
               </div>
-            </article>
+              <ChartTooltip fact={costSelection.active} copy={t.ux} id={costSelection.tooltipId} />
+            </BusinessChart>
 
-            <article className="demo-panel demo-products-panel">
-              <div className="demo-panel-head">
-                <div>
-                  <span>{t.demoProductEyebrow}</span>
-                  <h3>{t.demoTopProducts}</h3>
-                </div>
-                <IconBox />
-              </div>
+            <BusinessChart
+              title={t.demoTopProducts}
+              subtitle={t.demoProductEyebrow}
+              metric={t.productValue}
+              unit={t.ux.currencyUnit}
+              period={t.ux.samplePeriod}
+              source={t.ux.sampleSource}
+              freshness={t.ux.sampleFreshness}
+              axes={{ x: t.ux.amountAxis, y: t.productName }}
+              summary={t.ux.sampleChartSummary}
+              rows={sample.products}
+              columns={[
+                { key: "label", label: t.productName },
+                {
+                  key: "value",
+                  label: t.productValue,
+                  numeric: true,
+                  render: (row) => formatChartValue(row.value, "currency"),
+                },
+              ]}
+              copy={t.ux}
+              className="demo-panel demo-products-panel"
+            >
               <div className="demo-product-list">
-                {t.demoProducts.map((product, index) => (
-                  <div key={product}>
+                {sample.products.map((row, index) => (
+                  <div
+                    className="chart-mark-button"
+                    key={row.key}
+                    {...productSelection.bind(sampleFact(row, t.productValue, "currency", t))}
+                  >
                     <span className="demo-product-rank">0{index + 1}</span>
                     <div>
-                      <span>{product}</span>
+                      <span>{row.label}</span>
                       <i>
                         <b
                           style={{
-                            width: `${(PRODUCT_VALUES[index] / MAX_PRODUCT) * 100}%`,
+                            width: `${(row.value / maxProduct) * 100}%`,
                           }}
                         />
                       </i>
                     </div>
-                    <strong>{formatMoney(PRODUCT_VALUES[index], { compact: true })}</strong>
+                    <strong>{formatChartValue(row.value, "currency")}</strong>
                   </div>
                 ))}
               </div>
-            </article>
+              <ChartTooltip fact={productSelection.active} copy={t.ux} id={productSelection.tooltipId} />
+            </BusinessChart>
 
             <article className="demo-panel demo-ai-panel">
               <div className="demo-ai-orb"><IconSpark /></div>

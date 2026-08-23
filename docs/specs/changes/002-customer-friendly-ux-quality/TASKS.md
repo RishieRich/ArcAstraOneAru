@@ -2,20 +2,22 @@
 
 | Field | Value |
 |---|---|
-| Status | SLICE-01 through SLICE-06 ready for owner review |
+| Status | SLICE-01 through SLICE-06 accepted; SLICE-07 through SLICE-15 in progress |
 | Approved specification | SPEC.md, approved 2026-08-22 |
 | Approved plan | PLAN.md, approved and revalidated 2026-08-23 |
 | Delivery | 29 proposed owner-authorized review slices |
 | Product-code gate | Stage-0 unavailable live cases explicitly waived by owner on 2026-08-23 |
-| Authorized batch | SLICE-01 through SLICE-06 |
-| Deployment | Frontend live on production for owner acceptance; SLICE-07 onward remains unauthorized |
+| Authorized batch | SLICE-01 through SLICE-15 |
+| Deployment | SLICE-01 through SLICE-06 live; current SLICE-07 through SLICE-15 work is local-only |
 
 The owner approved this task list and authorized SLICE-01 through SLICE-06 on 2026-08-23.
 After the in-app browser listed no session, the owner explicitly directed the agent to use safe
 alternatives and continue rather than treat that tool limitation as a blocker. Stage 0 is
 recorded with unavailable real-data cases marked `Not verified`; SLICE-04 through SLICE-06 are
 implemented, locally verified, committed, pushed to `main`, and deployed to the production
-frontend on the owner's separate 2026-08-23 authorization. Nothing beyond SLICE-06 has started.
+frontend on the owner's separate 2026-08-23 authorization. On 2026-08-23 the owner authorized
+dependent implementation through SLICE-15, which records acceptance of SLICE-01 through
+SLICE-06. SLICE-16 and later remain unauthorized.
 
 ## How you control the work
 

@@ -4,14 +4,14 @@
 |---|---|
 | Status | Approved by owner on 2026-08-23 |
 | Approved specification | `SPEC.md`, approved 2026-08-22 |
-| Product-code gate | Owner waived the unavailable in-app-only baseline on 2026-08-23; task list and SLICE-01 through SLICE-06 are authorized |
+| Product-code gate | Owner waived the unavailable in-app-only baseline on 2026-08-23; SLICE-01 through SLICE-15 are authorized |
 | Expected deploy target | Frontend only |
 
 The plan is approved and revalidated under constitution v1.2.0. The owner approved `TASKS.md`
-and authorized SLICE-01 through SLICE-06 on 2026-08-23. After the in-app browser listed no
-session, the owner explicitly waived that exclusive-tool gate and directed use of safe local
-alternatives. SLICE-04 through SLICE-06 are implemented and ready for owner review; later slices
-remain unauthorized.
+and authorized SLICE-01 through SLICE-06 on 2026-08-23, then accepted that batch by authorizing
+dependent work through SLICE-15. The in-app browser still lists no session, so rendered
+production acceptance remains owner-observed and unavailable cases stay `Not verified`.
+SLICE-16 and later remain unauthorized.
 
 ## Requirement coverage
 
