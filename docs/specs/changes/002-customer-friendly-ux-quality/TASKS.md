@@ -2,13 +2,14 @@
 
 | Field | Value |
 |---|---|
-| Status | SLICE-01 through SLICE-06 accepted; SLICE-07 through SLICE-15 in progress |
+| Status | SLICE-01 through SLICE-06 live in production, owner review pending; SLICE-07 through SLICE-15 implemented, tested, built, live-reviewed locally and pushed to `main`, ready for owner review |
 | Approved specification | SPEC.md, approved 2026-08-22 |
 | Approved plan | PLAN.md, approved and revalidated 2026-08-23 |
 | Delivery | 29 proposed owner-authorized review slices |
 | Product-code gate | Stage-0 unavailable live cases explicitly waived by owner on 2026-08-23 |
 | Authorized batch | SLICE-01 through SLICE-15 |
-| Deployment | SLICE-01 through SLICE-06 live; current SLICE-07 through SLICE-15 work is local-only |
+| Deployment | SLICE-01 through SLICE-06 live in production. SLICE-07 through SLICE-15 are committed and pushed to `main` (commit `6294d74`) but **not deployed** — the production frontend still serves only Slice 1-6; deployment needs separate owner authorization as it did for Slice 1-6. |
+| Documentation correction (2026-08-23, later session) | SLICE-07 through SLICE-15 were coded and pushed in an earlier session, but this file's per-slice rows and `VERIFICATION.md` were never updated and still read "Proposed; not authorized". A later session ran `npm test` (39/39 pass), `npm run build` (pass), and the missing live-UI evidence pass, then corrected the statuses below to match reality. See `VERIFICATION.md` for the evidence. |
 
 The owner approved this task list and authorized SLICE-01 through SLICE-06 on 2026-08-23.
 After the in-app browser listed no session, the owner explicitly directed the agent to use safe
@@ -191,7 +192,7 @@ SLICE-04 unless the owner explicitly waives an unavailable check and records the
 
 ### SLICE-07 - Receivables answer first
 
-- **Status:** Proposed; not authorized
+- **Status:** Ready for owner review — implemented, tested, built, and live-verified locally on 2026-08-23
 - **Requirements:** REQ-008 through REQ-011, REQ-028 through REQ-034
 - **Prerequisites:** SLICE-06 accepted
 - **Likely files:** App.jsx, ReceivablesOverview.jsx, DataNotes.jsx, summary model/test, styles.css, i18n.js
@@ -204,7 +205,7 @@ SLICE-04 unless the owner explicitly waives an unavailable check and records the
 
 ### SLICE-08 - Finance answer first
 
-- **Status:** Proposed; not authorized
+- **Status:** Ready for owner review — implemented, tested, built, and live-verified locally on 2026-08-23
 - **Requirements:** REQ-008 through REQ-011, REQ-028 through REQ-034
 - **Prerequisites:** SLICE-07 accepted
 - **Likely files:** FinancialOverview.jsx, FinancialUpload.jsx, summary model/test, styles.css, i18n.js
@@ -217,7 +218,7 @@ SLICE-04 unless the owner explicitly waives an unavailable check and records the
 
 ### SLICE-09 - Smart Excel meaning and hierarchy
 
-- **Status:** Proposed; not authorized
+- **Status:** Ready for owner review — implemented, tested, built, and live-verified locally on 2026-08-23
 - **Requirements:** REQ-008 through REQ-011, REQ-017, REQ-028 through REQ-034
 - **Prerequisites:** SLICE-08 accepted
 - **Likely files:** SmartDataExplorer.jsx, a Smart presentation model/test, styles.css, i18n.js
@@ -235,7 +236,7 @@ family and may adjust the shared component only when existing accepted behavior 
 
 ### SLICE-10 - Shared chart contract and Aging chart pilot
 
-- **Status:** Proposed; not authorized
+- **Status:** Ready for owner review — implemented, tested, built, and live-verified locally on 2026-08-23 (all 7 fixture-gallery edge cases exercised)
 - **Requirements:** REQ-012 through REQ-017, REQ-028 through REQ-031, REQ-033, REQ-034
 - **Prerequisites:** SLICE-09 accepted and chart inventory accepted
 - **Likely files:** AgingChart.jsx, new small chart model/frame/table/tooltip components and tests,
@@ -252,7 +253,7 @@ family and may adjust the shared component only when existing accepted behavior 
 
 ### SLICE-11 - Remaining receivables charts
 
-- **Status:** Proposed; not authorized
+- **Status:** Ready for owner review, generic-contract evidence only — implemented, tested, and built on 2026-08-23; live evidence confirms DueTimeline applies the shared chart contract (context/table), but filter/aging/due-meaning regression was not re-exercised live this session beyond the automated tests
 - **Requirements:** REQ-010, REQ-012 through REQ-017, REQ-028 through REQ-031, REQ-033, REQ-034
 - **Prerequisites:** SLICE-10 accepted
 - **Likely files:** DueTimeline.jsx, ReceivablesOverview.jsx, shared chart files, tests, styles.css, i18n.js
@@ -265,7 +266,7 @@ family and may adjust the shared component only when existing accepted behavior 
 
 ### SLICE-12 - Financial main trend
 
-- **Status:** Proposed; not authorized
+- **Status:** Ready for owner review, generic-contract evidence only — implemented, tested, and built on 2026-08-23; live evidence confirms the trend chart applies the shared contract with a filled context and exact-value table, but per-series value/sign/legend comparison against source monthly rows was not individually re-exercised live this session beyond the automated tests
 - **Requirements:** REQ-010, REQ-012 through REQ-017, REQ-028 through REQ-031, REQ-033, REQ-034
 - **Prerequisites:** SLICE-11 accepted
 - **Likely files:** FinancialOverview.jsx, shared chart files, finance chart tests, styles.css, i18n.js
@@ -278,7 +279,7 @@ family and may adjust the shared component only when existing accepted behavior 
 
 ### SLICE-13 - Finance Book Explorer charts
 
-- **Status:** Proposed; not authorized
+- **Status:** Ready for owner review, generic-contract evidence only — implemented, tested, and built on 2026-08-23; live evidence confirms Book Explorer applies the shared contract, but switching between individual book types was not exercised live this session beyond the automated tests
 - **Requirements:** REQ-010, REQ-012 through REQ-017, REQ-028 through REQ-031, REQ-033, REQ-034
 - **Prerequisites:** SLICE-12 accepted
 - **Likely files:** FinancialOverview.jsx, shared chart files, Book Explorer tests, styles.css, i18n.js
@@ -291,7 +292,7 @@ family and may adjust the shared component only when existing accepted behavior 
 
 ### SLICE-14 - Finance product and ranking visuals
 
-- **Status:** Proposed; not authorized
+- **Status:** Ready for owner review, generic-contract evidence only — implemented, tested, and built on 2026-08-23; live evidence confirms the product ranking chart applies the shared contract, but the missing-unit case and sample-preview classification were not individually exercised live this session beyond the automated tests
 - **Requirements:** REQ-010, REQ-012 through REQ-017, REQ-028 through REQ-031, REQ-033, REQ-034
 - **Prerequisites:** SLICE-13 accepted
 - **Likely files:** FinancialOverview.jsx, ProductAnalytics.jsx, WaitlistPreview.jsx where it
@@ -305,7 +306,7 @@ family and may adjust the shared component only when existing accepted behavior 
 
 ### SLICE-15 - Smart Excel line, bar, and donut charts
 
-- **Status:** Proposed; not authorized
+- **Status:** Ready for owner review — implemented, tested, built, and live-verified locally on 2026-08-23; the live fixture included one line, one bar and one donut chart, each rendering with the shared contract and an exact-value table
 - **Requirements:** REQ-010 through REQ-017, REQ-028 through REQ-034
 - **Prerequisites:** SLICE-14 accepted
 - **Likely files:** SmartDataExplorer.jsx, shared chart files, Smart chart tests, styles.css, i18n.js

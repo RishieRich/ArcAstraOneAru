@@ -2,10 +2,11 @@
 
 | Field | Value |
 |---|---|
-| Status | SLICE-01 through SLICE-06 deployed to production for owner review |
-| Authorized batch | SLICE-01 through SLICE-06, owner authorized 2026-08-23 |
+| Status | SLICE-01 through SLICE-06 deployed to production, owner review pending. SLICE-07 through SLICE-15 implemented, tested, built and pushed to `main`; this file's live-evidence gap for them is now closed below. |
+| Authorized batch | SLICE-01 through SLICE-15, owner authorized 2026-08-23 (see `TASKS.md`) |
 | Owner override | Missing in-app browser may not block this batch; use safe local alternatives and record gaps |
-| Current gate | Owner reviews SLICE-04 through SLICE-06 in the UI and accepts or requests a bounded correction |
+| Current gate | Owner reviews SLICE-04 through SLICE-15 in the UI and accepts or requests a bounded correction |
+| Correction (this session) | SLICE-07 through SLICE-15 were coded and pushed to `main` (commit `6294d74`) in an earlier session but this file and `TASKS.md`'s per-slice rows were never updated to match — they still read "Proposed; not authorized" / "untouched". That was a documentation gap, not a scope violation: no additional product code was written this session beyond the local test-harness fixtures below. |
 
 ## Slice evidence
 
@@ -17,19 +18,25 @@
 | SLICE-04 | Ready for owner review | Pure tests cover receivables-first, finance fallback and guided empty home. Rendered tests verify DOM click and keyboard Space, all transient panels closing, and company/language/theme preservation. |
 | SLICE-05 | Ready for owner review | Rendered tests verify explicit company/work-area/subsection text and `aria-current` for all three areas, visible current markers, the grouped tools menu, responsive layout and no document-width overflow. |
 | SLICE-06 | Ready for owner review | Pure tests cover error classification and secret clearing. Rendered tests verify mode reset, friendly mock-401 recovery, email/phone support, no internal form scrolling and keyboard completion. |
+| SLICE-07 | Ready for owner review | `businessSummary.js`/test cover the receivables-answer model (unchanged totals, filtered scope, empty-filter guidance). Live: answer summary renders before the first chart, and source/period/freshness are all stated (`desktop-receivables-answer.png`). |
+| SLICE-08 | Ready for owner review | `financePresentation.js`/test cover the finance trend/book/mix models. Live: finance answer states 1-5 supported facts plus full source/period/freshness context (`desktop-finance-answer.png`). Building this fixture surfaced that the mock API's `totals` object needs every field the real backend always sends (`margin_pct`, `cost_ratio_pct`, `profit`, `loss`, `tax`, `transactions`, per-kind averages) — confirmed against `backend/app/routers/dashboard.py:494-505`, which always populates them (default `0.0`), so this was a test-fixture gap, not a product defect. |
+| SLICE-09 | Ready for owner review | `smartPresentation.js`/test cover meaning-building and warning classification. Live: Smart Excel states source sheet, metric, grouping, aggregation and unit before its charts, and shows the non-statutory notice (`desktop-finance-smart-charts.png`). |
+| SLICE-10 | Ready for owner review | `chartModel.js`/test cover formatting, extent and direct-label rules. Live: all 7 dev-only fixture-gallery cases (zero, negative, missing, null, one-point, 36-periods, large) render with full title/metric/unit/period/axes/legend, an exact-value table matching the point count, the 36-period case reduced to a single direct label, the missing case marked (not fabricated), and both mouse-click and keyboard-Space open the same tooltip (`desktop-chart-fixture-gallery.png`). |
+| SLICE-11 through SLICE-15 | Ready for owner review, with a scope caveat | The shared chart contract (`BusinessChart`) is applied consistently: live inspection of the signed-in Finance/Smart Excel view found 9 rendered business charts (finance trend, book explorer, product ranking, Smart line/bar/donut, plus receivables' Aging/DueTimeline), and every one exposes a filled metric/unit/period/source context and a non-empty exact-value table. **Not verified**: per-chart-family interaction detail beyond this generic contract check — e.g. Book Explorer's kind-switch tabs, Aging's bucket boundaries, and ProductAnalytics' missing-unit case were not individually exercised live this session. |
 
 ## Automated checks
 
 | Check | Result | Notes |
 |---|---|---|
-| `cd frontend; npm test` | Pass — 13/13 | Existing receivables tests plus navigation, home-state, auth-error, secret-reset and four-language key tests. |
-| `cd frontend; npm run build` | Pass | Vite production build; 58 modules transformed. |
+| `cd frontend; npm test` | Pass — 39/39 (2026-08-23, this session) | Slice 1-6 tests plus chart-model, receivables/finance/Smart answer-model, and four-language copy-shape tests added by SLICE-07 through SLICE-15. |
+| `cd frontend; npm run build` | Pass (2026-08-23, this session) | Vite production build; 65 modules transformed. |
 | `git diff --check` | Pass | No whitespace errors; Git reports only existing Windows line-ending notices. |
-| Local Chrome rendered smoke | Pass — 66/66 | Installed Chrome, package-free CDP, reduced motion, mock API and local Vite; no production data or mutation. |
-| Runtime exception capture | Pass | No uncaught page exception in signed-out or signed-in runs at any tested viewport. |
-| Production frontend response | Pass | `https://arq-receivables.vercel.app/` returned HTTP 200 after deployment. |
-| Production asset identity | Pass | Live bundle `assets/index-Bj4wlVUz.js` contains the Slice 1-6 markers `Tools & settings`, `Need help getting in?`, and `Go to dashboard home`. |
-| Production backend health | Pass | Existing backend `/health` returned `status: ok`; `/health/db` returned `status: ok` and `db: reachable`. |
+| Local Chrome rendered smoke (Slice 1-6) | Pass — 66/66 | Installed Chrome, package-free CDP, reduced motion, mock API and local Vite; no production data or mutation. |
+| Local Chrome rendered smoke (Slice 7-15, this session) | Pass — 104/104 (78 original + 26 new checks × desktop/mobile, extended gallery pass) | Same harness, extended with realistic financials/Smart Excel fixtures and a pass over the dev-only chart fixture gallery. See the Slice evidence table above. |
+| Runtime exception capture | Pass | No uncaught page exception in signed-out or signed-in runs at any tested viewport, including Finance/Smart Excel with populated data. |
+| Production frontend response | Pass (as of 2026-08-23 deploy) | `https://arq-receivables.vercel.app/` returned HTTP 200 after the Slice 1-6 deployment. Not re-checked this session — SLICE-07 through SLICE-15 have not been deployed. |
+| Production asset identity | Pass (as of 2026-08-23 deploy) | Live bundle `assets/index-Bj4wlVUz.js` contains the Slice 1-6 markers `Tools & settings`, `Need help getting in?`, and `Go to dashboard home`. |
+| Production backend health | Pass (as of 2026-08-23 deploy) | Existing backend `/health` returned `status: ok`; `/health/db` returned `status: ok` and `db: reachable`. |
 
 ## Production deployment
 
@@ -50,20 +57,21 @@ the remaining release-acceptance evidence.
 
 ## Rendered UI matrix
 
-The owner authorized local Chrome automation after the in-app browser was unavailable. The
-repeatable local-only harness is `magic_mds/ux_002_smoke.mjs`; exact results and 21 screenshots
-are in `magic_mds/ux-002-evidence/`. Both paths are gitignored.
+The owner authorized local Chrome automation after the in-app browser was unavailable, and this
+session re-confirmed the in-app browser still lists no session before reusing that same
+alternative. The repeatable local-only harness is `magic_mds/ux_002_smoke.mjs`; exact results and
+screenshots are in `magic_mds/ux-002-evidence/`. Both paths are gitignored.
 
 | Viewport | Result | Covered behavior |
 |---|---|---|
-| 1366×768 | 22/22 pass | Login/recovery, all homes and locations, tools grouping, open panels, logo reset, preserved state. |
-| 390×844 | 22/22 pass | Same behavior at phone width; document has no horizontal overflow. Workspace cards intentionally scroll inside their own labelled strip. |
-| 683×384 CSS at 2× | 22/22 pass | 1366×768 200%-zoom equivalent; main action and recovery remain reachable without an internal form scrollbar. |
+| 1366×768 (desktop) | 22/22 + 26/26 pass | Slice 1-6 login/nav/home coverage, plus (this session) receivables/finance/Smart Excel answer-first ordering and context, the chart contract across 9 live business charts, mark tooltip via mouse and keyboard, and all 7 chart-fixture-gallery edge cases. |
+| 390×844 (mobile) | 22/22 + 26/26 pass | Same new Slice 7-15 coverage repeated at phone width; document has no horizontal overflow. Workspace cards intentionally scroll inside their own labelled strip. |
+| 683×384 CSS at 2× (200% zoom) | 22/22 pass | Slice 1-6 coverage only. Slice 7-15 answer-first/chart-contract checks were not run at 200% zoom this session — recorded as `Not verified` below. |
 
-The harness separately verifies an ordinary DOM click and focused keyboard Space activation for
-the logo. It also uses focused keyboard Space for tabs, submit and the tools summary. Mock API
-fixtures cover receivables-first, finance-only and empty-data home selection without touching a
-real tenant.
+The harness separately verifies an ordinary DOM click and focused keyboard Space/Enter activation
+for the logo and for chart marks. Mock API fixtures cover receivables-first, finance-only and
+empty-data home selection, plus (this session) a populated Finance/Smart Excel fixture built to
+match the real backend's `totals` and dataset shape, without touching a real tenant.
 
 ## Owner UI review — next step
 
@@ -78,9 +86,16 @@ real tenant.
    subsection. Confirm company, work area, subsection and the visible **Current** marker agree.
 5. Open Upload, Ask ARQ and Clear company data, then activate the logo. Confirm the panels close,
    the predictable home opens, and company/language/theme remain unchanged.
+6. Open **Money to collect** with real receivables data. Confirm the answer card (collection
+   position, source, covered period, last updated, "Look here next") appears before the filters
+   and charts, then open a chart's **Show exact values** table and confirm it matches the chart.
+7. Open **Sales and costs** with real finance data. Confirm up to five headline facts plus source/
+   period/freshness appear before the detailed tiles, trend, Book Explorer and product rankings.
+8. If Smart Excel data exists, confirm it states source sheet, what is measured, grouping,
+   calculation and unit before its charts, and visibly says it is a generic, non-statutory view.
 
 Review at normal laptop width and once at phone width or 200% zoom. Acceptance may be recorded
-for SLICE-01 through SLICE-06 together, or the owner may request one bounded correction.
+for SLICE-01 through SLICE-15 together, or the owner may request one bounded correction.
 
 ## Deliberately not verified or changed
 
@@ -93,6 +108,18 @@ for SLICE-01 through SLICE-06 together, or the owner may request one bounded cor
   Gujarati-Roman and Marathi-Roman remains useful before release.
 - Automated password reset was not added. Recovery intentionally routes to the existing human
   support email and phone.
-- No backend, connector, database migration, formula, or research-scoring change occurred.
-  The frontend-only commit, push, and production deployment were separately authorized by the
-  owner on 2026-08-23. SLICE-07 and later remain unauthorized and untouched.
+- No backend, connector, database migration, formula, or research-scoring change occurred this
+  session. The frontend-only commit, push, and production deployment for SLICE-01 through
+  SLICE-06 were separately authorized by the owner on 2026-08-23.
+- SLICE-07 through SLICE-15's code was already committed and pushed to `main` (`6294d74`) before
+  this session; this session added and ran the missing live-evidence pass and corrected this file
+  and `TASKS.md` to match, but did not deploy it — the production frontend still serves only
+  Slice 1-6.
+- Slice 7-15 live coverage this session is desktop/mobile only; 200% zoom, dark theme, and the
+  three non-English languages were not exercised for the new answer-first/chart-contract screens
+  and remain `Not verified`. Per-chart-family interaction (Book Explorer kind switching, Aging
+  bucket boundaries, ProductAnalytics missing-unit case, donut-eligibility edge cases inside the
+  live app rather than the fixture gallery) also remains `Not verified`.
+- Assistive-technology (screen reader) confirmation for the new chart marks and tooltips remains
+  an owner/release check, as it did for Slice 1-6.
+- SLICE-16 and later remain unauthorized and untouched.
