@@ -74,6 +74,12 @@ export const T = {
     useDarkMode: "Switch to dark mode",
     backendError: "Could not reach the backend",
     lastUpdated: "Last updated",
+    goHome: "Go to dashboard home",
+    currentLocation: "You are viewing",
+    currentSection: "Current section",
+    current: "Current",
+    toolsAndSettings: "Tools & settings",
+    secondaryActions: "Data, language and account tools",
     maxOverdue: (days) => `max ${days} days`,
     // optional Excel imports
     uploadExcel: "Upload Excel",
@@ -366,10 +372,44 @@ export const T = {
     usernamePlaceholder: "testuser or you@company.com",
     password: "Password",
     passwordPlaceholder: "Enter your password",
+    emailPlaceholder: "you@company.com",
     showPassword: "Show password",
     hidePassword: "Hide password",
     pin: "4-digit PIN",
     loginBtn: "Open dashboard",
+    authHelpTitle: "Need help getting in?",
+    loginHelpBody:
+      "Online password reset is not available yet. Contact the ARQ team and we will help you safely.",
+    signupHelpBody:
+      "Having trouble creating your workspace? Contact the ARQ team and we will help you start.",
+    emailSupport: "Email support",
+    callSupport: "Call support",
+    authErrors: {
+      credentials: {
+        title: "Login details do not match",
+        body: "Check your username or email and password, then try again.",
+      },
+      accountExists: {
+        title: "This email already has an account",
+        body: "Choose Log in above. Contact support if you cannot access the account.",
+      },
+      details: {
+        title: "Please check the details",
+        body: "Complete every required field and follow the password rule, then try again.",
+      },
+      wait: {
+        title: "Please wait a moment",
+        body: "Too many attempts were made. Wait briefly, then try again.",
+      },
+      connection: {
+        title: "ARQ cannot connect right now",
+        body: "Check your internet and try again. If it continues, call or email our team below.",
+      },
+      general: {
+        title: "We could not finish that",
+        body: "Try once more. If it still does not work, call or email our team below.",
+      },
+    },
     // public trial signup
     accountAccess: "Account access",
     languagePicker: "Choose language",
@@ -762,6 +802,12 @@ export const T = {
     useDarkMode: "Dark mode par jao",
     backendError: "Backend se connection nahi ho paaya",
     lastUpdated: "Last updated",
+    goHome: "Dashboard home par jao",
+    currentLocation: "Aap yahan ho",
+    currentSection: "Abhi ka section",
+    current: "Abhi",
+    toolsAndSettings: "Tools aur settings",
+    secondaryActions: "Data, language aur account tools",
     maxOverdue: (days) => `max ${days} din`,
     uploadExcel: "Excel upload",
     uploadTitle: "ARQ ko aapka Excel samajhne do",
@@ -1052,10 +1098,44 @@ export const T = {
     usernamePlaceholder: "testuser ya you@company.com",
     password: "Password",
     passwordPlaceholder: "Apna password dalo",
+    emailPlaceholder: "you@company.com",
     showPassword: "Password dikhao",
     hidePassword: "Password chhupao",
     pin: "4-digit PIN",
     loginBtn: "Dashboard kholo",
+    authHelpTitle: "Login mein help chahiye?",
+    loginHelpBody:
+      "Online password reset abhi available nahi hai. ARQ team se contact karo; hum safely help karenge.",
+    signupHelpBody:
+      "Workspace banane mein dikkat hai? ARQ team se contact karo; hum shuru karne mein help karenge.",
+    emailSupport: "Support ko email",
+    callSupport: "Support ko call",
+    authErrors: {
+      credentials: {
+        title: "Login details match nahi hui",
+        body: "Username ya email aur password check karke phir try karo.",
+      },
+      accountExists: {
+        title: "Is email ka account pehle se hai",
+        body: "Upar Log in chuno. Account na khule toh support se contact karo.",
+      },
+      details: {
+        title: "Details ek baar check karo",
+        body: "Saare required fields bharo aur password rule follow karke phir try karo.",
+      },
+      wait: {
+        title: "Thoda ruk kar try karo",
+        body: "Bahut attempts hue hain. Thodi der baad phir try karo.",
+      },
+      connection: {
+        title: "ARQ abhi connect nahi ho pa raha",
+        body: "Internet check karke phir try karo. Problem rahe toh niche call ya email karo.",
+      },
+      general: {
+        title: "Yeh kaam complete nahi hua",
+        body: "Ek baar phir try karo. Problem rahe toh niche call ya email karo.",
+      },
+    },
     // public trial signup
     accountAccess: "Account access",
     languagePicker: "Language chuno",
@@ -1444,6 +1524,12 @@ export const T = {
     useDarkMode: "Dark mode par jao",
     backendError: "Backend sathe connection nathi thayu",
     lastUpdated: "Last updated",
+    goHome: "Dashboard home par jao",
+    currentLocation: "Tame ahi cho",
+    currentSection: "Haal no section",
+    current: "Haal nu",
+    toolsAndSettings: "Tools ane settings",
+    secondaryActions: "Data, language ane account tools",
     maxOverdue: (days) => `max ${days} divas`,
     uploadExcel: "Excel upload",
     uploadTitle: "ARQ ne tamaru Excel samajva do",
@@ -1734,10 +1820,44 @@ export const T = {
     usernamePlaceholder: "testuser athva you@company.com",
     password: "Password",
     passwordPlaceholder: "Tamaru password lakho",
+    emailPlaceholder: "you@company.com",
     showPassword: "Password batavo",
     hidePassword: "Password chupavo",
     pin: "4-digit PIN",
     loginBtn: "Dashboard kholo",
+    authHelpTitle: "Login mate madad joie che?",
+    loginHelpBody:
+      "Online password reset haju nathi. ARQ team ne contact karo; ame tamne safely madad karishu.",
+    signupHelpBody:
+      "Workspace banavama taklif che? ARQ team ne contact karo; ame sharu karvama madad karishu.",
+    emailSupport: "Support ne email",
+    callSupport: "Support ne call",
+    authErrors: {
+      credentials: {
+        title: "Login details match nathi thati",
+        body: "Username athva email ane password check kari fari try karo.",
+      },
+      accountExists: {
+        title: "Aa email nu account pehlethi che",
+        body: "Upar Log in pasand karo. Account na khule to support ne contact karo.",
+      },
+      details: {
+        title: "Details fari check karo",
+        body: "Badha jaruri fields bharo ane password rule follow kari fari try karo.",
+      },
+      wait: {
+        title: "Thodi vaar pachi try karo",
+        body: "Ghana attempts thaya che. Thodu rahine fari try karo.",
+      },
+      connection: {
+        title: "ARQ haal connect nathi thai rahyu",
+        body: "Internet check kari fari try karo. Problem rahe to niche call athva email karo.",
+      },
+      general: {
+        title: "Aa kaam puru nathi thayu",
+        body: "Fari ek vaar try karo. Problem rahe to niche call athva email karo.",
+      },
+    },
     // public trial signup
     accountAccess: "Account access",
     languagePicker: "Language pasand karo",
@@ -2131,6 +2251,12 @@ T.mr = {
   useDarkMode: "Dark mode la ja",
   backendError: "Backend paryant pohachta ala nahi",
   lastUpdated: "Shevatcha update",
+  goHome: "Dashboard home var ja",
+  currentLocation: "Tumhi ithe aahat",
+  currentSection: "Sadhyacha section",
+  current: "Sadhya",
+  toolsAndSettings: "Tools ani settings",
+  secondaryActions: "Data, language ani account tools",
   maxOverdue: (days) => `max ${days} divas`,
   uploadExcel: "Smart Excel upload",
   uploadTitle: "ARQ la tumcha Excel samju dya",
@@ -2390,6 +2516,7 @@ T.mr = {
   usernamePlaceholder: "testuser kinva you@company.com",
   password: "Password",
   passwordPlaceholder: "Tumcha password",
+  emailPlaceholder: "you@company.com",
   createPasswordPlaceholder: "Strong password tayar kara",
   passwordRule: "Kamit kami 8 characters, ek letter ani ek number.",
   hidePassword: "Password lapva",
@@ -2397,6 +2524,39 @@ T.mr = {
   loggingIn: "Log in hotoy…",
   creatingWorkspace: "Workspace tayar hotoy…",
   loginBtn: "Dashboard ughda",
+  authHelpTitle: "Login sathi madat havi aahe?",
+  loginHelpBody:
+    "Online password reset ajun available nahi. ARQ team la contact kara; amhi surakshitpane madat karu.",
+  signupHelpBody:
+    "Workspace tayar kartana adchan aahe? ARQ team la contact kara; amhi suruvat karayla madat karu.",
+  emailSupport: "Support la email",
+  callSupport: "Support la call",
+  authErrors: {
+    credentials: {
+      title: "Login details julat nahit",
+      body: "Username kiwa email ani password tapasun punha try kara.",
+    },
+    accountExists: {
+      title: "Ya email che account adhich aahe",
+      body: "Var Log in nivda. Account ughadat nasel tar support la contact kara.",
+    },
+    details: {
+      title: "Details punha tapasa",
+      body: "Sarv required fields bhara ani password rule palun punha try kara.",
+    },
+    wait: {
+      title: "Thoda vel thambun try kara",
+      body: "Khup attempts zhale aahet. Thodya velane punha try kara.",
+    },
+    connection: {
+      title: "ARQ sadhya connect hot nahi",
+      body: "Internet tapasun punha try kara. Problem rahili tar khali call kiwa email kara.",
+    },
+    general: {
+      title: "He kaam purna zhale nahi",
+      body: "Punha ekda try kara. Problem rahili tar khali call kiwa email kara.",
+    },
+  },
   startFreeTrial: "Free workspace suru kara",
   loginFooter: "Tumcha data tumchya company access purtach.",
   signupSecurity: "Password secure hash madhye store hoto; raw password nahi.",

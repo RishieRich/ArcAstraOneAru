@@ -17,6 +17,7 @@ git_ignore_data_ref/
 # Internal working docs (local only, not for repo)
 magic_mds/
 /REVIEW_SLICED_SDD_README.md
+/rishis_skills/
 
 # Local state & logs
 exports/

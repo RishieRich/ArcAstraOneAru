@@ -143,6 +143,15 @@
   background: linear-gradient(135deg, var(--research-violet), #5245bf);
   box-shadow: 0 6px 16px rgba(89,72,204,.24);
 }
+.research-current-section {
+  padding: 2px 6px;
+  color: #30266f;
+  background: rgba(255,255,255,.82);
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 800;
+}
 
 .research-capability-grid {
   display: grid;

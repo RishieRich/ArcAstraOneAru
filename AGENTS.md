@@ -6,9 +6,13 @@ loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way â€
 brief, not two drifting copies. The tracked engineering constitution, baseline specifications,
 change workflow, and ADRs live under `docs/` and govern future behavior changes.
 
-Last verified against the repo: **2026-08-22** (repository-native SDD constitution v1.1 now
-requires bounded work and explicit stop conditions; baseline specs, change templates, ADRs, and
-draft change specs are tracked; no product behavior changed. Connector v0.2.0
+Last verified against the repo: **2026-08-23** (repository-native SDD constitution v1.2 now
+requires bounded work and owner-authorized review slices. Change 002's SLICE-01 through
+SLICE-06 are implemented and ready for owner review: predictable logo-home, explicit dashboard
+location, grouped secondary tools, and plain login recovery/support. Frontend tests (13) and a
+66-assertion local rendered Chrome smoke pass; the change is not deployed and SLICE-07 onward
+remain unauthorized.
+Baseline specs, change templates, and ADRs are tracked. Connector v0.2.0
 reset-registration source, 89 offline tests and an unsigned Windows
 x64 internal build were previously validated; it is not a client release because this machine
 has no SignTool or code-signing certificate. Receivables filters and email-confirmed cleanup
@@ -360,6 +364,13 @@ Tracked documentation available in every clone:
 | `docs/decisions/` | Architecture Decision Records for durable technical choices. |
 | `archive/` | Tracked historical/reference material that is not used at runtime. |
 
+### Active SDD changes
+
+| Change | State | Next allowed action |
+|---|---|---|
+| `001-unexpected-empty-sync-quarantine` | Specification draft; implementation blocked | Owner reviews the specification. |
+| `002-customer-friendly-ux-quality` | SLICE-01 through SLICE-06 ready for owner review; local tests/build and 66/66 rendered Chrome assertions pass; not deployed; real-data Stage-0 gaps remain recorded | Owner reviews the five journeys in `VERIFICATION.md`, then accepts the batch or requests one bounded correction. Do not start SLICE-07 without authorization. |
+
 ### Local-only implementation notes (`magic_mds/`)
 
 `magic_mds/` is gitignored â€” these files exist in the local working copy only, never in the repo.
@@ -384,6 +395,7 @@ If they are missing, you are in a fresh clone and this file is the only brief yo
 | `PUBLIC_TRIAL_SIGNUP.md` | first-10 signup capacity, isolated tenant creation, waitlist and migration 0006 |
 | `SMART_EXCEL.md` | multi-sheet fallback model, metric/chart inference, dedup boundary and migration 0007 |
 | `RESEARCH_AGENT.md` | ICP scoring, bounded Tavily discovery, evidence scoring, curation and UI behavior |
+| `ux_002_smoke.mjs` / `ux-002-evidence/` | Local-only package-free Chrome harness, exact results and screenshots for change 002 SLICE-04 through SLICE-06. |
 
 ## 11. Working agreement for agents
 
@@ -395,6 +407,12 @@ If they are missing, you are in a fresh clone and this file is the only brief yo
   `Approved` by the owner. Resolve blocking decisions first.
 - Build the plan and tasks from numbered requirements. Every implementation task and
   verification row cites the requirements it covers.
+- `TASKS.md` uses vertical review slices, normally sized for one focused 45-60 minute session.
+  The size is a planning guide, never a false passing condition.
+- Do not start product code until the owner approves the task list and explicitly authorizes
+  named slices or a named batch. Stop after the last authorized slice.
+- Every UI slice includes its checks and ends with a recorded live UI review. If a slice is too
+  large, leave a safe passing checkpoint and propose smaller slices for owner approval.
 - Create an ADR only for a lasting architecture choice, not ordinary implementation detail.
 - After verification and release, update the affected baseline specs and this file when its
   architecture, endpoint, environment, deployment, or trap summary changed.

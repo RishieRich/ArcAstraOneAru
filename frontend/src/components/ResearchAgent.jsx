@@ -21,7 +21,13 @@ function LinkIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M21 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5" /></svg>;
 }
 
-export default function ResearchAgent({ tenantId, t, onAuthError }) {
+export default function ResearchAgent({
+  tenantId,
+  t,
+  currentLabel,
+  onSectionChange,
+  onAuthError,
+}) {
   const copy = t.research;
   const [view, setView] = useState("home");
   const [icp, setIcp] = useState(null);
@@ -207,6 +213,11 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
     )
     : 0;
 
+  function selectView(nextView) {
+    setView(nextView);
+    onSectionChange?.(nextView);
+  }
+
   return (
     <section className="research-agent">
       <header className="research-hero">
@@ -230,13 +241,15 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
             key={item}
             type="button"
             aria-pressed={view === item}
-            onClick={() => setView(item)}
+            aria-current={view === item ? "page" : undefined}
+            onClick={() => selectView(item)}
           >
             {item === "home" && <IconSpark />}
             {item === "icp" && <IconChart />}
             {item === "customers" && <IconUsers />}
             {item === "suppliers" && <IconBox />}
             {copy[item]}
+            {view === item && <span className="research-current-section">{currentLabel}</span>}
           </button>
         ))}
       </nav>
@@ -250,7 +263,7 @@ export default function ResearchAgent({ tenantId, t, onAuthError }) {
       {view === "home" && (
         <ResearchHome
           copy={copy}
-          setView={setView}
+          setView={selectView}
           icp={icp}
           busy={busy === "profile"}
         />

@@ -13,6 +13,12 @@
 |---|---|---|---|
 | REQ-001 | TEST-001 | Not run | |
 
+## Slice evidence
+
+| Slice | Authorized scope | Checks | Observable review | Result |
+|---|---|---|---|---|
+| SLICE-01 | | | | Not run |
+
 ## Commands and results
 
 ```text

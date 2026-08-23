@@ -24,10 +24,25 @@ export function clearSession() {
 
 export class AuthError extends Error {}
 
+export class ApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+  }
+}
+
 async function detail(res) {
   try {
     const body = await res.json();
-    return body.detail || `Request failed (${res.status})`;
+    if (typeof body.detail === "string") return body.detail;
+    if (Array.isArray(body.detail)) {
+      const messages = body.detail
+        .map((item) => (typeof item?.msg === "string" ? item.msg : ""))
+        .filter(Boolean);
+      if (messages.length) return messages.join(" ");
+    }
+    return `Request failed (${res.status})`;
   } catch {
     return `Request failed (${res.status})`;
   }
@@ -42,7 +57,7 @@ async function request(path, options = {}) {
     clearSession();
     throw new AuthError(await detail(res));
   }
-  if (!res.ok) throw new Error(await detail(res));
+  if (!res.ok) throw new ApiError(await detail(res), res.status);
   return res.json();
 }
 
@@ -52,7 +67,7 @@ export async function login(email, password) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, password }),
   });
-  if (!res.ok) throw new Error(await detail(res));
+  if (!res.ok) throw new ApiError(await detail(res), res.status);
   const session = await res.json();
   saveSession(session);
   return session;
@@ -69,7 +84,7 @@ export async function signup({ fullName, companyName, email, password }) {
       password,
     }),
   });
-  if (!res.ok) throw new Error(await detail(res));
+  if (!res.ok) throw new ApiError(await detail(res), res.status);
   const result = await res.json();
   if (result.status === "active") saveSession(result);
   return result;

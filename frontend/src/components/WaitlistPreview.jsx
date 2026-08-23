@@ -41,7 +41,7 @@ export default function WaitlistPreview({
   return (
     <div className="waitlist-experience">
       <header className="waitlist-topbar">
-        <BrandLogo compact />
+        <BrandLogo compact onHome={onBack} homeLabel={t.goHome} />
         <div className="waitlist-brand">
           <strong>ARQ Astra</strong>
           <span>{t.demoIntelligencePreview}</span>

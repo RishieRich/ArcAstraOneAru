@@ -21,6 +21,13 @@ Do not complete this plan until `SPEC.md` is approved.
 
 1.
 
+## Proposed review-slice sequence
+
+List the coherent outcomes that `TASKS.md` will turn into owner-authorized slices. A normal
+slice targets 45-60 focused minutes and includes supporting checks plus one observable result.
+
+1. `<slice outcome>`
+
 ## Test strategy
 
 - Unit:
@@ -35,6 +42,9 @@ Do not complete this plan until `SPEC.md` is approved.
 - Maximum equivalent retries before reporting a blocker: 3
 - Maximum unresolved review rounds before owner decision: 3
 - Cancellation or pause condition:
+- Slice sizing: normally 45-60 focused minutes; stop green and reslice if the outcome is larger
+- UI review: live UI check at the end of every UI slice
+- Authorization: stop after the last owner-authorized slice
 
 ## Rollout and recovery
 
@@ -54,3 +64,4 @@ List required ADRs, or state `No ADR required`.
 - [ ] Compatibility and migration order reviewed
 - [ ] Tests and failure paths reviewed
 - [ ] Rollout and recovery reviewed
+- [ ] Proposed slices are coherent, independently reviewable, and safely bounded

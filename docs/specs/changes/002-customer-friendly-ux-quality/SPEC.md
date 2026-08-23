@@ -8,6 +8,7 @@
 | Risk | High |
 | Baseline specs | Identity/access, receivables, financial imports, AI/research, operations |
 | Supporting review | `UX_AUDIT.md` |
+| Delivery model | Owner-authorized review slices |
 | Related change | 001 — unexpected empty sync quarantine |
 
 ## Outcome
@@ -59,7 +60,8 @@ correct understanding of financial source/period and the no-automatic-contact bo
 
 - **REQ-005 — Simple sign-in:** On supported laptop and mobile sizes, the sign-in fields and
   main submit button must be visible without an internal form scrollbar. Product explanation
-  may remain, but must not obstruct account access. Current Animations are good see if those can be further improvised.
+  may remain, but must not obstruct or delay account access. Animation changes are optional,
+  must honor reduced motion, and must not compete with the form or recovery message.
 - **REQ-006 — Clear modes:** Sign in and free-trial signup must have distinct headings, fields,
   requirements, and submit actions. Switching modes must not leave misleading errors or secrets.
 - **REQ-007 — Useful recovery:** Login, signup, and connectivity failures must use plain language,
@@ -215,14 +217,23 @@ correct understanding of financial source/period and the no-automatic-contact bo
 
 ## Constitution impact
 
-Rules 2–7 and 9–12 apply. No constitutional amendment is expected.
+Rules 2–7 and 9–14 apply. No product-rule amendment is required. This specification was
+revalidated after the review-slice rule was ratified in constitution v1.2.0.
+
+## Delivery boundary
+
+The approved requirements and product decisions remain unchanged. Implementation is divided in
+`TASKS.md` into owner-authorized review slices, normally sized for one focused 45-60 minute
+session. Every UI slice includes supporting checks and ends with a live UI review. If a slice is
+too large, it stops at a passing checkpoint and is split for owner approval; elapsed time never
+creates a false pass.
 
 ## Contract and data impact
 
 - Frontend: navigation, information hierarchy, chart interaction, labels, responsive behavior,
   accessibility, all four translations, and tests will change after approval.
-- Backend/API: no formula change is assumed. The approved plan must identify whether clearer
-  business evidence needs additive response fields such as explicit periods or ranking facts.
+- Backend/API: no formula or response change is planned. If live evidence proves an API fact is
+  missing, stop and amend the specification and plan before crossing that boundary.
 - Database/migration: none expected. Any proposed migration requires separate owner approval.
 - Connector: no behavior change expected.
 - Security/privacy: no weakening of login, tenant checks, evidence boundaries, or cleanup.
@@ -246,15 +257,30 @@ Rules 2–7 and 9–12 apply. No constitutional amendment is expected.
 - **DEC-007 — Live review:** Complete a current-build in-app-browser or owner-observed session
   as Plan Stage 0 before product code starts. If the browser is unavailable after one connection
   attempt in a work session, stop and record the blocker instead of retrying indefinitely.
+- **DEC-008 — Current home signal:** For this frontend change, trusted receivables means the
+  authorized metrics response reports `has_receivables_data`. This does not claim that Change
+  001 empty-sync quarantine is released.
+- **DEC-009 — Freshness wording:** Always show the relevant exact last-update time. Use `stale`
+  only when a source supplies an explicit stale state; do not invent an age threshold here.
+- **DEC-010 — Attention fact:** Prefer one existing deterministic urgent alert, then a watch
+  alert, then the latest valid period change. Stable source order breaks ties; do not create an
+  AI or opaque composite score.
+- **DEC-011 — Direct chart labels:** Label the latest and distinct high/low values when readable,
+  label a shared point once, and reduce to the latest value on dense or small layouts. The exact
+  tooltip and data alternative still expose every value.
+- **DEC-012 — Usability calculation:** Ordinary-task success is unprompted completed tasks divided
+  by attempted ordinary tasks, reported per participant and combined. Source/period and
+  no-contact understanding are reported separately and both require 100% correctness.
 
 ## Approval and implementation gates
 
 - [x] Owner reviewed and accepted the UX audit/specification direction on 2026-08-22
 - [x] Requirements and acceptance scenarios reviewed
 - [x] Non-goals accepted
-- [x] DEC-001 through DEC-005 resolved using the specification recommendations
+- [x] DEC-001 through DEC-012 resolved using the specification recommendations
 - [x] Owner approved the specification for planning on 2026-08-22
+- [x] Revalidated under constitution v1.2.0 on 2026-08-23; requirements did not change
 - [ ] Live current-build review completed before product implementation
 
-Product code remains blocked until the plan is approved and the live-review gate is completed
-or the owner explicitly waives it with the unverified risk recorded.
+Product code remains blocked until the live-review gate is completed (or explicitly waived with
+the risk recorded), `TASKS.md` is approved, and the owner authorizes named slices.

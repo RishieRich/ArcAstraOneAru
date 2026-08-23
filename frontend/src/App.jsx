@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AuthError, clearSession, fetchCompanies, fetchMetrics,
   formatMoney, formatWhen, loadSession,
@@ -34,6 +34,11 @@ import {
   filterBills,
   hasScopedReceivableFilters,
 } from "./receivables";
+import {
+  defaultHomeView,
+  homeNavigationState,
+  workspaceLocation,
+} from "./navigation";
 
 export default function App() {
   const [lang, setLang] = useState(() => {
@@ -98,8 +103,10 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
   const [loading, setLoading] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
   const [view, setView] = useState("receivables");
+  const [researchSection, setResearchSection] = useState("home");
   const [chatOpen, setChatOpen] = useState(false);
   const [showCleanup, setShowCleanup] = useState(false);
+  const toolsRef = useRef(null);
   const researchEnabled = import.meta.env.VITE_RESEARCH_ENABLED !== "false";
 
   useEffect(() => {
@@ -129,7 +136,7 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
     fetchMetrics(tenantId)
       .then((next) => {
         setData(next);
-        if (!next.has_receivables_data && next.has_financial_data) setView("financial");
+        setView(defaultHomeView(next));
       })
       .catch((e) => {
         if (e instanceof AuthError) return onLogout();
@@ -169,47 +176,61 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
     }
   }
 
+  function closeTools() {
+    toolsRef.current?.removeAttribute("open");
+  }
+
+  function handleHome() {
+    const next = homeNavigationState({
+      view,
+      showUpload,
+      chatOpen,
+      showCleanup,
+      toolsOpen: Boolean(toolsRef.current?.open),
+    }, data);
+    setView(next.view);
+    setShowUpload(next.showUpload);
+    setChatOpen(next.chatOpen);
+    setShowCleanup(next.showCleanup);
+    closeTools();
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
+
   const totals = data?.totals;
   const isTrial = session.account_type === "free_trial";
+  const location = workspaceLocation(view, t, researchSection);
 
   return (
     <div className="app">
       <header className="header">
-        <BrandLogo compact />
-        <div className="brand">
-          <h1>ARQ Astra</h1>
-          <p>{t.tagline}</p>
+        <div className="header-brand-home">
+          <BrandLogo compact onHome={handleHome} homeLabel={t.goHome} />
+          <div className="brand">
+            <h1>ARQ Astra</h1>
+            <p>{t.tagline}</p>
+          </div>
         </div>
 
         <div className="spacer" />
 
-        {isTrial && <span className="trial-header-badge">{t.freeTrial}</span>}
-
-        <div className="lang-group">
-          {LANGS.map((l) => (
-            <button key={l.id} onClick={() => setLang(l.id)} aria-pressed={lang === l.id}>
-              {l.label}
-            </button>
-          ))}
+        <div className="header-company-context">
+          {isTrial && <span className="trial-header-badge">{t.freeTrial}</span>}
+          <div className="picker">
+            <label htmlFor="company">{t.company}</label>
+            <select
+              id="company"
+              value={tenantId}
+              onChange={(event) => {
+                closeTools();
+                setTenantId(event.target.value);
+              }}
+            >
+              {companies.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+          </div>
         </div>
-
-        <div className="picker">
-          <label htmlFor="company">{t.company}</label>
-          <select
-            id="company"
-            value={tenantId}
-            onChange={(event) => {
-              setView("receivables");
-              setTenantId(event.target.value);
-            }}
-          >
-            {companies.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
-
-        <ThemeToggle theme={theme} setTheme={setTheme} t={t} compact />
 
         <button
           className="icon-btn ai-trigger"
@@ -220,20 +241,80 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
           {t.askArq}
         </button>
 
-        <button
-          className="icon-btn upload-trigger"
-          type="button"
-          onClick={() => setShowUpload((open) => !open)}
-          aria-expanded={showUpload}
+        <details
+          className="header-tools"
+          ref={toolsRef}
+          onKeyDown={(event) => {
+            if (event.key === "Escape") {
+              closeTools();
+              toolsRef.current?.querySelector("summary")?.focus();
+            }
+          }}
         >
-          <IconUpload width={15} height={15} />
-          {t.uploadExcel}
-        </button>
+          <summary className="icon-btn">{t.toolsAndSettings}</summary>
+          <div className="header-tools-panel" role="group" aria-label={t.secondaryActions}>
+            <button
+              className="header-tool-action upload-trigger"
+              type="button"
+              onClick={() => {
+                setShowUpload((open) => !open);
+                closeTools();
+              }}
+              aria-expanded={showUpload}
+            >
+              <IconUpload width={15} height={15} />
+              {t.uploadExcel}
+            </button>
 
-        <button className="icon-btn" onClick={onLogout} title={session.email}>
-          <IconLogout width={15} height={15} />
-          {t.logout}
-        </button>
+            {data && (
+              <button
+                className="header-tool-action cleanup-menu-action"
+                type="button"
+                onClick={() => {
+                  setShowCleanup(true);
+                  closeTools();
+                }}
+              >
+                <IconTrash width={14} height={14} />
+                {t.cleanupData}
+              </button>
+            )}
+
+            <div className="header-tool-setting">
+              <span>{t.languagePicker}</span>
+              <div className="lang-group" aria-label={t.languagePicker}>
+                {LANGS.map((language) => (
+                  <button
+                    type="button"
+                    key={language.id}
+                    onClick={() => {
+                      setLang(language.id);
+                      closeTools();
+                    }}
+                    aria-pressed={lang === language.id}
+                  >
+                    {language.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="header-tool-row">
+              <ThemeToggle
+                theme={theme}
+                setTheme={(next) => {
+                  setTheme(next);
+                  closeTools();
+                }}
+                t={t}
+              />
+              <button className="header-tool-action" type="button" onClick={onLogout} title={session.email}>
+                <IconLogout width={15} height={15} />
+                {t.logout}
+              </button>
+            </div>
+          </div>
+        </details>
       </header>
 
       <div className="shell">
@@ -257,19 +338,19 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
           {!error && !loading && data && (
             <>
               <div className="subhead">
-                <h2>{data.tenant_name}</h2>
+                <div className="workspace-location" aria-label={t.currentLocation}>
+                  <span className="workspace-location-label">{t.currentLocation}</span>
+                  <div className="workspace-location-trail">
+                    <strong>{data.tenant_name}</strong>
+                    <span aria-hidden="true">›</span>
+                    <span>{location.area}</span>
+                  </div>
+                  <p><strong>{t.currentSection}:</strong> {location.subsection}</p>
+                </div>
                 <span className="meta">
                   <span className="dot-live" />
                   {t.lastUpdated}: {formatWhen(data.last_activity_at || data.last_sync_at)}
                 </span>
-                <button
-                  className="cleanup-trigger"
-                  type="button"
-                  onClick={() => setShowCleanup(true)}
-                >
-                  <IconTrash width={14} height={14} />
-                  {t.cleanupData}
-                </button>
               </div>
 
               {showUpload && (
@@ -293,35 +374,56 @@ function Dashboard({ t, lang, setLang, theme, setTheme, session, onLogout }) {
                 <button
                   type="button"
                   aria-pressed={view === "receivables"}
+                  aria-current={view === "receivables" ? "page" : undefined}
                   onClick={() => setView("receivables")}
                 >
                   <IconRupee width={16} height={16} />
-                  <span><strong>{t.receivablesView}</strong><small>{t.receivablesViewSub}</small></span>
+                  <span>
+                    <strong>{t.receivablesView}</strong>
+                    <small>{t.receivablesViewSub}</small>
+                    {view === "receivables" && <em className="current-workspace">{t.current}</em>}
+                  </span>
                 </button>
                 {data.has_financial_data && (
                   <button
                     type="button"
                     aria-pressed={view === "financial"}
+                    aria-current={view === "financial" ? "page" : undefined}
                     onClick={() => setView("financial")}
                   >
                     <IconChart width={16} height={16} />
-                    <span><strong>{t.financialView}</strong><small>{t.financialViewSub}</small></span>
+                    <span>
+                      <strong>{t.financialView}</strong>
+                      <small>{t.financialViewSub}</small>
+                      {view === "financial" && <em className="current-workspace">{t.current}</em>}
+                    </span>
                   </button>
                 )}
                 {researchEnabled && (
                   <button className="agents-nav"
                     type="button"
                     aria-pressed={view === "research"}
+                    aria-current={view === "research" ? "page" : undefined}
                     onClick={() => setView("research")}
                   >
                     <IconSpark width={16} height={16} />
-                    <span><strong>{t.research.nav}</strong><small>{t.agentsViewSub}</small></span>
+                    <span>
+                      <strong>{t.research.nav}</strong>
+                      <small>{t.agentsViewSub}</small>
+                      {view === "research" && <em className="current-workspace">{t.current}</em>}
+                    </span>
                   </button>
                 )}
               </nav>
 
               {view === "research" && researchEnabled ? (
-                <ResearchAgent tenantId={tenantId} t={t} onAuthError={onLogout} />
+                <ResearchAgent
+                  tenantId={tenantId}
+                  t={t}
+                  currentLabel={t.current}
+                  onSectionChange={setResearchSection}
+                  onAuthError={onLogout}
+                />
               ) : view === "financial" && data.has_financial_data ? (
                 <>
                   {data.smart_data?.has_data && (

@@ -2,10 +2,11 @@
 
 | Field | Value |
 |---|---|
-| Version | 1.1.0 |
+| Version | 1.2.0 |
 | Status | Ratified |
 | Owner | Rishi |
 | Ratified | 2026-08-22 |
+| Last amended | 2026-08-23 |
 | Review cadence | Before each release; full review every quarter |
 
 This constitution governs all product and engineering changes. A specification, plan,
@@ -94,6 +95,23 @@ At that boundary, work stops and the blocker, evidence, and owner decision neede
 A review gate may have at most three unresolved revision rounds before the owner chooses to
 approve, narrow, split, defer, or reject the work. A time box never converts incomplete or
 unverified work into success; it makes the unfinished state explicit and prevents endless work.
+
+## 14. Changes are delivered through owner-authorized review slices
+
+An approved plan must become a `TASKS.md` made of vertical review slices before product code
+changes. A slice targets roughly one focused work session, normally 45-60 minutes, but this is a
+sizing guide rather than a timer or a reason to claim incomplete work as complete.
+
+Each slice must name its requirements, prerequisites, one coherent outcome, likely files,
+checks, observable review result, and safe stop condition. A UI slice ends with a live UI check;
+a non-visual slice ends with equivalent inspectable evidence. Supporting tests and the build
+belong inside the same slice as the behavior they protect.
+
+The owner approves the task list and then explicitly authorizes named slices or a named batch.
+An agent stops after the last authorized slice and records its evidence separately. If a slice
+proves too large, unsafe, or blocked, stop at a passing checkpoint and propose smaller slices for
+owner approval. Do not split an atomic migration, release, or recovery action merely to meet the
+sizing guide.
 
 ## Governance
 

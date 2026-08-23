@@ -4,11 +4,14 @@
 |---|---|
 | Status | Approved by owner on 2026-08-23 |
 | Approved specification | `SPEC.md`, approved 2026-08-22 |
-| Product-code gate | Live current-build review and task-list approval |
+| Product-code gate | Owner waived the unavailable in-app-only baseline on 2026-08-23; task list and SLICE-01 through SLICE-06 are authorized |
 | Expected deploy target | Frontend only |
 
-The plan is approved. Product code remains blocked because Stage 0 is open and the task list
-still requires owner review. The in-app browser had no available session on 2026-08-22.
+The plan is approved and revalidated under constitution v1.2.0. The owner approved `TASKS.md`
+and authorized SLICE-01 through SLICE-06 on 2026-08-23. After the in-app browser listed no
+session, the owner explicitly waived that exclusive-tool gate and directed use of safe local
+alternatives. SLICE-04 through SLICE-06 are implemented and ready for owner review; later slices
+remain unauthorized.
 
 ## Requirement coverage
 
@@ -61,6 +64,8 @@ still requires owner review. The in-app browser had no available session on 2026
 - Deterministic view models expected: small pure modules under `frontend/src/` for home choice,
   summary facts, chart facts, and error presentation so the existing Node test runner can test
   behavior without a new framework.
+- Live edge-state review expected: a development-only fixture gallery for chart and state inputs;
+  it must not expose a production test route or introduce a UI framework.
 - Styling and language: `frontend/src/styles.css`, `ResearchAgent.css`, and `i18n.js`.
 - Tests: keep `node --test`; add focused `*.test.js` files for navigation models, chart models,
   business summaries, edge cases, research presentation, and translation-key parity.
@@ -75,70 +80,73 @@ still requires owner review. The in-app browser had no available session on 2026
 
 ## Implementation sequence
 
-### Stage 0 — capture the live baseline
+`TASKS.md` defines the exact 29-slice sequence. Tests are written before or with the behavior in
+the same vertical slice, rather than as one large test-only stage.
 
-Run one current-build audit covering the approved device sizes, zoom, themes, languages,
-keyboard/touch-sized controls, core data states, finance/Smart Excel, and research evidence.
-Append each observation to `UX_AUDIT.md` with steps, actual result, expected result, severity,
-evidence, recommendation, and linked requirement.
+### Stage 0 — live current-build baseline (SLICE-01 through SLICE-03)
 
-If a financial, security, tenant, or external-action boundary is wrong, stop and revise the
-spec. In-scope UX findings become tasks. Out-of-scope findings go into a separate change.
+Audit login/navigation, dashboards/charts, then snapshot/research. Record actual and expected
+behavior in `UX_AUDIT.md`. Stop and revise the approved artifacts if a financial, security,
+tenant, or external-action boundary is contradicted.
 
-### Stage 1 — establish deterministic UX models and checks
+### Stage 1 — entry and navigation (SLICE-04 through SLICE-06)
 
-Add failing tests for home-state selection, summary facts, chart fact models, missing-data
-treatment, error mapping, and recursive i18n key parity. Preserve the existing five receivables
-tests. No visual behavior changes in this stage.
+Deliver predictable logo-home behavior, clear location and a calmer header, then simple
+sign-in/signup/recovery. Each result is independently live-reviewable.
 
-### Stage 2 — navigation and sign-in
+### Stage 2 — answer-first business views (SLICE-07 through SLICE-09)
 
-Implement logo-home behavior, clear location, a calmer header, simple sign-in/trial modes,
-plain recovery actions, and state preservation. Review desktop, phone, zoom, and keyboard flow.
+Improve receivables, finance, and Smart Excel separately, preserving their deterministic facts
+and keeping detailed operator evidence available.
 
-### Stage 3 — answer-first business hierarchy
+### Stage 3 — exact accessible charts (SLICE-10 through SLICE-16)
 
-Add short source/period/freshness summaries to receivables and financial views. Reduce repeated
-headline prominence and move detailed diagnostics/history behind clear disclosure without
-removing operator access.
+Pilot the shared chart contract on Aging, then apply it by bounded chart family to remaining
+receivables, finance, Smart Excel, product/ranking, and printable report visuals.
 
-### Stage 4 — shared graph quality
+### Stage 4 — My business snapshot (SLICE-17 through SLICE-18)
 
-Build the reusable chart frame, exact tooltip, keyboard/touch interaction, direct labels, and
-data-table alternative. Apply it first to financial and Smart Excel graphs, then to receivables
-and report charts. Verify each chart before moving to the next.
+Deliver the renamed top-fact view first, then ranking explanations, the connected/missing
+evidence checklist, distinct evidence types, and deterministic next checks.
 
-### Stage 5 — My business snapshot
+### Stage 5 — customer and supplier research (SLICE-19 through SLICE-20)
 
-Rename and restructure the current area around strongest recorded product/customer, collection
-priority, concentration/change, missing evidence, and next checks. Replace the readiness
-percentage with a connected/missing checklist and keep all evidence types distinct.
+Simplify the brief separately from candidate hierarchy and create/copy safety. Research scoring,
+evidence, review authority, and no-automatic-contact behavior remain unchanged.
 
-### Stage 6 — research polish
+### Stage 6 — cross-product quality closure (SLICE-21 through SLICE-23)
 
-Keep scoring and evidence logic unchanged. Simplify the research brief, result-card hierarchy,
-advanced-detail disclosure, review actions, and create/copy wording.
+Close calm states and raw warnings, four-language readability, then keyboard/screen-reader,
+themes, responsive layouts, print, and unchanged-behavior regression.
 
-### Stage 7 — language, accessibility, and responsive finish
+### Stage 7 — representative usability (SLICE-24 through SLICE-28)
 
-Complete all four languages, type size, focus and heading order, themes, 200% zoom, reduced
-motion, print behavior, and every calm state. Run the full build and regression matrix.
+Approve one neutral script, run each of three participants as a separate slice, calculate the
+specified result, and propose separately authorized correction slices from evidence.
 
-### Stage 8 — usability and release evidence
+### Stage 8 — release evidence (SLICE-29)
 
-Run three moderated sessions, including Gujarati-first and Marathi-first users. Fix only issues
-inside the approved requirements; otherwise create a new change. Complete `VERIFICATION.md`,
-then ask the owner for release approval.
+Reconcile all requirements and acceptance scenarios, run final checks and live smoke, and stop
+for owner release approval. Deployment, commit, and push are outside this authorization.
+
+Each slice targets one focused session, normally 45-60 minutes, includes its tests/build and one
+live UI journey or equivalent inspectable evidence. The target is a sizing guide, not a timer.
+The owner approves the task list, then authorizes named slices or a named batch. Work stops after
+the last authorized slice. Oversized work stops at a passing checkpoint and is resliced.
 
 ## Test strategy
 
-- **TEST-001 — Baseline:** live observation inventory with screenshots or owner-observed notes.
+- **TEST-001 — Baseline:** three bounded live observation slices with screenshots or
+  owner-observed notes.
 - **TEST-002 — Navigation:** pure state tests plus mouse/keyboard home and location checks.
 - **TEST-003 — Login:** mode, error/recovery, laptop, phone, zoom, and secret-clearing checks.
 - **TEST-004 — Hierarchy:** summary order, unique prominence, source, period, and freshness.
-- **TEST-005 — Chart meaning:** chart inventory, title/unit/axes/legend/direct-label checks.
+- **TEST-005 — Chart meaning:** explicit chart inventory plus title/unit/axes/legend/direct-label
+  checks using the resolved latest/high/low density rule.
 - **TEST-006 — Chart access:** exact values through mouse, keyboard, touch, table, and print.
-- **TEST-007 — Chart edges:** zero, negative, null, missing, one point, 36 months, large values.
+  Node tests protect the fact model; live evidence proves the interactions and accessibility.
+- **TEST-007 — Chart edges:** development-only fixtures for zero, negative, null, missing, one
+  point, 36 months, and large values.
 - **TEST-008 — Snapshot:** evidence-backed summaries, ranking facts, checklist, and next checks.
 - **TEST-009 — Research:** brief, disabled reason, scannable result, evidence, review, create/copy.
 - **TEST-010 — Languages:** recursive key parity and changed journeys in all four modes.
@@ -146,7 +154,9 @@ then ask the owner for release approval.
 - **TEST-012 — States:** loading, empty, partial, stale, error, no access, and recovery action.
 - **TEST-013 — Safety regression:** existing receivables tests, production build, deterministic
   fixture comparisons, and review that auth/formulas/scoring/cleanup/authority did not change.
-- **TEST-014 — Usability:** task success, confusion, terminology, and evidence-led corrections.
+- **TEST-014 — Usability:** three separately recorded participants; unprompted completed ordinary
+  tasks divided by attempted ordinary tasks, with source/period and no-contact understanding
+  reported separately.
 
 The backend test suite will not run for this frontend-only change because it uses configured
 Neon rather than a hermetic test database. No live database write is part of verification.
@@ -155,8 +165,16 @@ Neon rather than a hermetic test database. No live database write is part of ver
 
 - Browser connection: one connection attempt per work session. If unavailable, record the
   blocker and use an owner-observed session later; do not switch to an unsupported browser tool.
-- Live baseline audit: maximum 90 minutes for one pass. Unchecked cases remain `Not verified`.
-- Implementation: one stage at a time. A stage must pass its relevant tests before the next.
+- Owner override for the authorized SLICE-01 through SLICE-06 batch (2026-08-23): the missing
+  in-app session must not block progress. Local Chrome automation with mock data may supply
+  rendered interaction evidence; real-data and assistive-technology gaps remain `Not verified`.
+- Slice sizing: normally 45-60 focused minutes. It is not a hard timer or a passing condition.
+- Live baseline audit: split across bounded slices. Unchecked cases remain `Not verified`.
+- Implementation: only named owner-authorized slices. Stop after the last authorized slice.
+- Review: every UI slice ends with its named live journey; record evidence separately before
+  dependent work. If unavailable, stop the slice as incomplete rather than claiming a pass.
+- Oversized work: leave a safe passing checkpoint and propose smaller continuation slices. Do
+  not split an atomic release or recovery action merely to meet the sizing target.
 - Equivalent failure: maximum three attempts. Then stop with command/output, suspected cause,
   and the owner decision or external condition needed.
 - Review: maximum three unresolved rounds at the spec, plan, or release gate; the owner then
@@ -180,6 +198,7 @@ Neon rather than a hermetic test database. No live database write is part of ver
 ## Decision record
 
 - `ADR-002` governs bounded work and stop conditions.
+- `ADR-003` governs owner-authorized review slices and per-slice evidence.
 - No product architecture ADR is required: the plan keeps the current React/CSS architecture,
   API boundary, deterministic metrics, and provider authority.
 
@@ -189,5 +208,6 @@ Neon rather than a hermetic test database. No live database write is part of ver
 - [x] Compatibility and no-migration boundary reviewed
 - [x] Tests, failure paths, work bounds, and stop conditions documented
 - [x] Rollout and recovery documented
+- [x] Revalidated under constitution v1.2.0 and the owner-authorized slice model
 - [ ] Stage 0 live current-build review completed or explicitly waived with risk recorded
 - [x] Owner approved this plan on 2026-08-23

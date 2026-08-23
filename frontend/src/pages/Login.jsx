@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { login, signup } from "../api";
+import { authErrorCopy, resetAuthModeState } from "../authPresentation";
 import BrandLogo from "../components/BrandLogo";
 import ProductShowcase from "../components/ProductShowcase";
 import ThemeToggle from "../components/ThemeToggle";
@@ -26,7 +27,7 @@ export default function Login({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState("");
+  const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [waitlisted, setWaitlisted] = useState(null);
 
@@ -44,17 +45,39 @@ export default function Login({
         /\d/.test(password));
 
   function switchMode(nextMode) {
-    setMode(nextMode);
-    setError("");
-    setPassword("");
-    setWaitlisted(null);
+    const next = resetAuthModeState({
+      mode,
+      fullName,
+      companyName,
+      email,
+      password,
+      showPassword,
+      error,
+      waitlisted,
+    }, nextMode);
+    setMode(next.mode);
+    setFullName(next.fullName);
+    setCompanyName(next.companyName);
+    setPassword(next.password);
+    setShowPassword(next.showPassword);
+    setError(next.error);
+    setWaitlisted(next.waitlisted);
+  }
+
+  function returnHome() {
+    switchMode("login");
+    window.scrollTo({ top: 0, behavior: "auto" });
+  }
+
+  function clearError() {
+    if (error) setError(null);
   }
 
   async function submit(event) {
     event.preventDefault();
     if (!ready) return;
     setBusy(true);
-    setError("");
+    setError(null);
     try {
       if (mode === "login") {
         onSuccess(await login(email.trim().toLowerCase(), password));
@@ -71,10 +94,12 @@ export default function Login({
       } else {
         setWaitlisted(result);
         setPassword("");
+        setShowPassword(false);
       }
     } catch (requestError) {
-      setError(requestError.message);
+      setError(authErrorCopy(requestError, t, mode));
       setPassword("");
+      setShowPassword(false);
     } finally {
       setBusy(false);
     }
@@ -89,7 +114,7 @@ export default function Login({
         theme={theme}
         setTheme={setTheme}
         result={waitlisted}
-        onBack={() => switchMode("login")}
+        onBack={returnHome}
       />
     );
   }
@@ -98,7 +123,7 @@ export default function Login({
     <div className="login-screen">
       <header className="login-topbar">
         <div className="login-topbrand">
-          <BrandLogo compact />
+          <BrandLogo compact onHome={returnHome} homeLabel={t.goHome} />
           <div>
             <strong>ARQ Astra</strong>
             <span>{t.tagline}</span>
@@ -152,6 +177,7 @@ export default function Login({
         <form
           className={`login-card${error ? " error" : ""}`}
           onSubmit={submit}
+          aria-busy={busy}
         >
           <div className="auth-tabs" role="tablist" aria-label={t.accountAccess}>
             <button
@@ -159,6 +185,7 @@ export default function Login({
               role="tab"
               aria-selected={mode === "login"}
               onClick={() => switchMode("login")}
+              disabled={busy}
             >
               {t.signInTab}
             </button>
@@ -167,6 +194,7 @@ export default function Login({
               role="tab"
               aria-selected={mode === "signup"}
               onClick={() => switchMode("signup")}
+              disabled={busy}
             >
               {t.signUpTab}
             </button>
@@ -192,7 +220,10 @@ export default function Login({
                     autoFocus
                     placeholder={t.fullNamePlaceholder}
                     value={fullName}
-                    onChange={(event) => setFullName(event.target.value)}
+                    onChange={(event) => {
+                      setFullName(event.target.value);
+                      clearError();
+                    }}
                   />
 
                   <label htmlFor="company-name">{t.companyName}</label>
@@ -203,7 +234,10 @@ export default function Login({
                     autoComplete="organization"
                     placeholder={t.companyNamePlaceholder}
                     value={companyName}
-                    onChange={(event) => setCompanyName(event.target.value)}
+                    onChange={(event) => {
+                      setCompanyName(event.target.value);
+                      clearError();
+                    }}
                   />
                 </>
               )}
@@ -217,9 +251,12 @@ export default function Login({
                 type={mode === "login" ? "text" : "email"}
                 autoComplete={mode === "login" ? "username" : "email"}
                 autoFocus={mode === "login"}
-                placeholder={mode === "login" ? t.usernamePlaceholder : "you@company.com"}
+                placeholder={mode === "login" ? t.usernamePlaceholder : t.emailPlaceholder}
                 value={email}
-                onChange={(event) => setEmail(event.target.value)}
+                onChange={(event) => {
+                  setEmail(event.target.value);
+                  clearError();
+                }}
               />
 
               <label htmlFor="password">{t.password}</label>
@@ -236,7 +273,10 @@ export default function Login({
                       : t.createPasswordPlaceholder
                   }
                   value={password}
-                  onChange={(event) => setPassword(event.target.value)}
+                  onChange={(event) => {
+                    setPassword(event.target.value);
+                    clearError();
+                  }}
                 />
                 <button
                   type="button"
@@ -250,7 +290,12 @@ export default function Login({
                 <small className="password-hint">{t.passwordRule}</small>
               )}
 
-              {error && <div className="login-error">{error}</div>}
+              {error && (
+                <div className="login-error" role="alert" aria-live="polite">
+                  <strong>{error.title}</strong>
+                  <span>{error.body}</span>
+                </div>
+              )}
 
               <button className="login-btn" type="submit" disabled={!ready}>
                 {busy
@@ -266,6 +311,17 @@ export default function Login({
                 <IconShield width={14} height={14} />
                 {mode === "login" ? t.loginFooter : t.signupSecurity}
               </div>
+
+              <aside className="auth-support" aria-label={t.authHelpTitle}>
+                <div>
+                  <strong>{t.authHelpTitle}</strong>
+                  <span>{mode === "login" ? t.loginHelpBody : t.signupHelpBody}</span>
+                </div>
+                <div className="auth-support-links">
+                  <a href={`mailto:${t.contactEmail}`}>{t.emailSupport}</a>
+                  <a href={`tel:${t.contactPhone.replace(/\s/g, "")}`}>{t.callSupport}</a>
+                </div>
+              </aside>
           </>
         </form>
         <div className="mobile-product-preview">

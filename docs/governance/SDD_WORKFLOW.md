@@ -34,13 +34,23 @@ architecture decision.
 
 ### 4. Create `TASKS.md`
 
-Split the plan into small tasks. Every task cites requirement IDs such as `REQ-003`.
-Tests normally come before or with the behavior they verify.
+Split the plan into vertical review slices. Each slice targets one focused session, normally
+45-60 minutes, and names its requirement IDs, prerequisites, outcome, likely files, checks,
+live or inspectable review, and safe stop condition. This duration is a sizing guide, not a
+timer. Tests and build checks belong in the same slice as the behavior they protect.
 
-### 5. Implement one task at a time
+The owner reviews and approves the complete task list before any product-code slice starts.
 
-Ask the agent to implement specific task IDs, run the relevant checks, and report exactly
-what changed. Do not authorize unrelated cleanup inside a feature change.
+### 5. Implement only authorized slices
+
+Ask the agent to implement named slice IDs, for example `Start SLICE-03` or
+`Start SLICE-03 through SLICE-04`. The agent runs the listed checks, records the result, and
+stops after the last authorized slice. A UI slice ends with a live UI check; a non-visual slice
+ends with equivalent inspectable evidence. Do not authorize unrelated cleanup inside a slice.
+
+If a slice becomes too large or unsafe, stop at a passing checkpoint and propose smaller slices
+for owner approval. Do not use elapsed time to mark unfinished work complete, and do not split
+an atomic migration, release, or recovery action merely to fit the target.
 
 ### 6. Complete `VERIFICATION.md`
 
@@ -74,6 +84,9 @@ After release:
 | Scope | Owner | Outcome and non-goals are clear |
 | Specification | Owner | Requirements and acceptance scenarios are approved |
 | Plan | Owner or designated reviewer | Risks, tests, rollout, and recovery are credible |
+| Task list | Owner | Slices are coherent, reviewable, bounded, and cover every requirement |
+| Slice execution | Owner | Specific slice IDs or a specific batch are authorized |
+| Slice acceptance | Owner | Evidence and the observable result are accepted before dependent work |
 | Release | Owner | Diff and verification evidence match the approved spec |
 
 An agent may prepare every artifact. It may not approve its own work.
@@ -81,6 +94,11 @@ An agent may prepare every artifact. It may not approve its own work.
 ## Bounded execution
 
 - Every `PLAN.md` states its work limits and stop conditions.
+- A review slice normally targets 45-60 focused minutes, includes its checks, and produces one
+  observable result. It is not a hard timer or a promise that uncertain work will fit exactly.
+- Stop after the last owner-authorized slice. Do not silently continue into the next slice.
+- If a slice cannot finish safely, leave the repository at a passing checkpoint, record what is
+  incomplete, and propose a smaller replacement or continuation slice for approval.
 - Do not retry the same failed operation more than three times unless new evidence changes the
   approach. Record the failure and ask for the required decision instead.
 - After three unresolved review rounds at one gate, the owner chooses to approve, narrow, split,
