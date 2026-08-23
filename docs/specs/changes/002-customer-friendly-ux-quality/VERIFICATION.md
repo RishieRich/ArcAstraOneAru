@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | SLICE-01 through SLICE-06 ready for owner review; not deployed |
+| Status | SLICE-01 through SLICE-06 deployed to production for owner review |
 | Authorized batch | SLICE-01 through SLICE-06, owner authorized 2026-08-23 |
 | Owner override | Missing in-app browser may not block this batch; use safe local alternatives and record gaps |
 | Current gate | Owner reviews SLICE-04 through SLICE-06 in the UI and accepts or requests a bounded correction |
@@ -27,6 +27,26 @@
 | `git diff --check` | Pass | No whitespace errors; Git reports only existing Windows line-ending notices. |
 | Local Chrome rendered smoke | Pass — 66/66 | Installed Chrome, package-free CDP, reduced motion, mock API and local Vite; no production data or mutation. |
 | Runtime exception capture | Pass | No uncaught page exception in signed-out or signed-in runs at any tested viewport. |
+| Production frontend response | Pass | `https://arq-receivables.vercel.app/` returned HTTP 200 after deployment. |
+| Production asset identity | Pass | Live bundle `assets/index-Bj4wlVUz.js` contains the Slice 1-6 markers `Tools & settings`, `Need help getting in?`, and `Go to dashboard home`. |
+| Production backend health | Pass | Existing backend `/health` returned `status: ok`; `/health/db` returned `status: ok` and `db: reachable`. |
+
+## Production deployment
+
+| Field | Evidence |
+|---|---|
+| Owner authorization | Commit, push, and live deployment requested on 2026-08-23 |
+| Git branch and source commit | `main` at `a84c1fb` (`feat(frontend): deliver UX quality slices 1-6`) |
+| Frontend target | Existing Vercel project `arq-receivables` |
+| Deployment | `dpl_9FrVjmcLiQnte5JykVhXYmnGKHBV`, state `READY` |
+| Production alias | `https://arq-receivables.vercel.app` |
+| Backend | Not redeployed; no backend code changed |
+| Release state | Live for owner acceptance; SLICE-01 through SLICE-06 are not marked accepted until the owner completes the UI review |
+
+The in-app browser listed no available session during the post-deploy check. The public page,
+deployed bundle, and backend health were verified directly. A real signed-in production journey
+was not attempted because no production credentials were supplied; the owner review below is
+the remaining release-acceptance evidence.
 
 ## Rendered UI matrix
 
@@ -73,5 +93,6 @@ for SLICE-01 through SLICE-06 together, or the owner may request one bounded cor
   Gujarati-Roman and Marathi-Roman remains useful before release.
 - Automated password reset was not added. Recovery intentionally routes to the existing human
   support email and phone.
-- No backend, connector, database migration, formula, research scoring, deployment, commit or
-  push action occurred. SLICE-07 and later remain unauthorized and untouched.
+- No backend, connector, database migration, formula, or research-scoring change occurred.
+  The frontend-only commit, push, and production deployment were separately authorized by the
+  owner on 2026-08-23. SLICE-07 and later remain unauthorized and untouched.

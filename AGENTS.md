@@ -8,10 +8,10 @@ change workflow, and ADRs live under `docs/` and govern future behavior changes.
 
 Last verified against the repo: **2026-08-23** (repository-native SDD constitution v1.2 now
 requires bounded work and owner-authorized review slices. Change 002's SLICE-01 through
-SLICE-06 are implemented and ready for owner review: predictable logo-home, explicit dashboard
-location, grouped secondary tools, and plain login recovery/support. Frontend tests (13) and a
-66-assertion local rendered Chrome smoke pass; the change is not deployed and SLICE-07 onward
-remain unauthorized.
+SLICE-06 are implemented and live on the production frontend for owner review: predictable
+logo-home, explicit dashboard location, grouped secondary tools, and plain login
+recovery/support. Frontend tests (13), a 66-assertion local rendered Chrome smoke, production
+asset checks, and backend health checks pass. SLICE-07 onward remains unauthorized.
 Baseline specs, change templates, and ADRs are tracked. Connector v0.2.0
 reset-registration source, 89 offline tests and an unsigned Windows
 x64 internal build were previously validated; it is not a client release because this machine
@@ -359,7 +359,7 @@ Tracked documentation available in every clone:
 | `ROADMAP.md` | Public product and agent roadmap with maturity labels, release gates, safety boundaries and 18-month direction. |
 | `docs/governance/CONSTITUTION.md` | Ratified product and engineering rules that ordinary changes may not weaken. |
 | `docs/governance/SDD_WORKFLOW.md` | Simple spec → plan → tasks → verification workflow and approval gates. |
-| `docs/specs/baseline/` | Intended current behavior for the six major product capability areas. |
+| `docs/specs/baseline/` | Intended current behavior for the seven major product capability areas. |
 | `docs/specs/changes/` | One auditable folder per proposed or completed behavior change. |
 | `docs/decisions/` | Architecture Decision Records for durable technical choices. |
 | `archive/` | Tracked historical/reference material that is not used at runtime. |
@@ -369,7 +369,7 @@ Tracked documentation available in every clone:
 | Change | State | Next allowed action |
 |---|---|---|
 | `001-unexpected-empty-sync-quarantine` | Specification draft; implementation blocked | Owner reviews the specification. |
-| `002-customer-friendly-ux-quality` | SLICE-01 through SLICE-06 ready for owner review; local tests/build and 66/66 rendered Chrome assertions pass; not deployed; real-data Stage-0 gaps remain recorded | Owner reviews the five journeys in `VERIFICATION.md`, then accepts the batch or requests one bounded correction. Do not start SLICE-07 without authorization. |
+| `002-customer-friendly-ux-quality` | SLICE-01 through SLICE-06 live on `https://arq-receivables.vercel.app` for owner review; local tests/build, 66/66 rendered Chrome assertions, production assets, and backend health pass; real-data Stage-0 gaps remain recorded | Owner reviews the five journeys in `VERIFICATION.md`, then accepts the batch or requests one bounded correction. Do not start SLICE-07 without authorization. |
 
 ### Local-only implementation notes (`magic_mds/`)
 

@@ -8,12 +8,14 @@
 | Delivery | 29 proposed owner-authorized review slices |
 | Product-code gate | Stage-0 unavailable live cases explicitly waived by owner on 2026-08-23 |
 | Authorized batch | SLICE-01 through SLICE-06 |
+| Deployment | Frontend live on production for owner acceptance; SLICE-07 onward remains unauthorized |
 
 The owner approved this task list and authorized SLICE-01 through SLICE-06 on 2026-08-23.
 After the in-app browser listed no session, the owner explicitly directed the agent to use safe
 alternatives and continue rather than treat that tool limitation as a blocker. Stage 0 is
 recorded with unavailable real-data cases marked `Not verified`; SLICE-04 through SLICE-06 are
-implemented and locally verified. Nothing beyond SLICE-06 has started.
+implemented, locally verified, committed, pushed to `main`, and deployed to the production
+frontend on the owner's separate 2026-08-23 authorization. Nothing beyond SLICE-06 has started.
 
 ## How you control the work
 
@@ -521,6 +523,9 @@ family and may adjust the shared component only when existing accepted behavior 
 - [x] Each implementation slice includes tests, build, four-language work, a live UI result, and a stop
 - [x] Broad chart, research, accessibility, and usability work is split into reviewable outcomes
 - [x] Unknown usability corrections require new bounded child slices and owner authorization
-- [x] No backend, API, migration, connector, deploy, commit, or push is authorized
+- [x] The original slice authorization excluded backend, API, migration, connector, deploy,
+  commit, and push actions
+- [x] Owner separately authorized the Slice 1-6 commit, `main` push, and frontend deployment
+  on 2026-08-23; no backend, API, migration, or connector action was authorized
 - [ ] Stage 0 live baseline completed or explicitly waived with risk recorded
 - [x] Owner approved this task list and authorized SLICE-01 through SLICE-06 on 2026-08-23
