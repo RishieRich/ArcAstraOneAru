@@ -6,12 +6,22 @@ loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way �
 brief, not two drifting copies. The tracked engineering constitution, baseline specifications,
 change workflow, and ADRs live under `docs/` and govern future behavior changes.
 
-Last verified against the repo: **2026-08-23** (repository-native SDD constitution v1.2 now
-requires bounded work and owner-authorized review slices. Change 002's SLICE-01 through
-SLICE-06 are implemented and live on the production frontend for owner review: predictable
-logo-home, explicit dashboard location, grouped secondary tools, and plain login
-recovery/support. Frontend tests (13), a 66-assertion local rendered Chrome smoke, production
-asset checks, and backend health checks pass. SLICE-07 onward remains unauthorized.
+Last verified against the repo: **2026-08-31** (owner asked the agent to work through all
+pending Change-002 slices in sequence. Current state: SLICE-01 through SLICE-06 are live in
+production, owner review pending. SLICE-07 through SLICE-15 are coded, tested, built and
+pushed to `main` (commit `6294d74`, doc-corrected in `402acfd`) but **not deployed** — prod
+frontend still serves only Slice 1-6. SLICE-16 (one-page report charts/print) was implemented
+and tested this session but is **uncommitted** in the working tree as of this note — the next
+agent must check `git status` for `frontend/src/components/OnePageReport.jsx`,
+`frontend/src/styles.css`, and the two `docs/specs/changes/002-.../{TASKS,VERIFICATION}.md`
+files, and either commit them (owner already authorized "complete and develop all pending
+items in sequence") or verify the state before continuing. SLICE-17 through SLICE-23 are
+real, sizable remaining work (SLICE-17/18 rewrite an 858-line `ResearchAgent.jsx` to rename
+its ICP/readiness-score view to "My business snapshot" — read `TASKS.md` in that change folder
+before touching it). SLICE-24 through SLICE-27 need real human usability participants
+(Gujarati-first, Marathi-first, one more) that no agent can supply — that is a hard stop, not
+a judgment call; ask the owner how to proceed when you reach it. SLICE-29 (release) depends on
+those. Full detail: `docs/specs/changes/002-customer-friendly-ux-quality/{TASKS,VERIFICATION}.md`.
 Baseline specs, change templates, and ADRs are tracked. Connector v0.2.0
 reset-registration source, 89 offline tests and an unsigned Windows
 x64 internal build were previously validated; it is not a client release because this machine
@@ -369,7 +379,7 @@ Tracked documentation available in every clone:
 | Change | State | Next allowed action |
 |---|---|---|
 | `001-unexpected-empty-sync-quarantine` | Specification draft; implementation blocked | Owner reviews the specification. |
-| `002-customer-friendly-ux-quality` | SLICE-01 through SLICE-06 live on `https://arq-receivables.vercel.app` for owner review; local tests/build, 66/66 rendered Chrome assertions, production assets, and backend health pass; real-data Stage-0 gaps remain recorded | Owner reviews the five journeys in `VERIFICATION.md`, then accepts the batch or requests one bounded correction. Do not start SLICE-07 without authorization. |
+| `002-customer-friendly-ux-quality` | SLICE-01–06 live in prod, owner review pending. SLICE-07–15 coded/tested/built/pushed to `main` but not deployed. SLICE-16 coded/tested this session (2026-08-31), check `git status` — may be uncommitted. SLICE-17–23 not started (real remaining work). SLICE-24–29 blocked on owner-provided human usability participants. | Owner authorized "complete all pending slices in sequence" on 2026-08-31 — no further per-slice authorization needed for code slices 16–23. Continue from `TASKS.md`/`VERIFICATION.md` in that folder. Stop and ask the owner only at SLICE-24 (needs real participants). |
 
 ### Local-only implementation notes (`magic_mds/`)
 

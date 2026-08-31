@@ -320,7 +320,7 @@ family and may adjust the shared component only when existing accepted behavior 
 
 ### SLICE-16 - One-page report charts and print
 
-- **Status:** Proposed; not authorized
+- **Status:** Ready for owner review, code-only — implemented and built 2026-08-31; automated tests pass; live print-preview and screen-reader confirmation not yet performed this session
 - **Requirements:** REQ-010, REQ-012 through REQ-017, REQ-028 through REQ-031, REQ-033, REQ-034
 - **Prerequisites:** SLICE-15 accepted
 - **Likely files:** OnePageReport.jsx, shared chart files, report tests, print styles, i18n.js

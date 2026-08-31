@@ -316,6 +316,7 @@ svg .chart-mark:focus-visible > path {
   .business-chart-canvas { display: none !important; }
   .chart-data-details > summary { display: none !important; }
   .chart-data-details:not([open]) > :not(summary) { display: block !important; }
+  .no-print { display: none !important; }
 }
 
 :root[data-theme="dark"] {
@@ -3044,17 +3045,32 @@ th.num { text-align: right; padding-right: 0; }
   gap: 10px;
 }
 .report-section-head small { color: #77818d; font-size: 9px; }
+.report-chart-context {
+  margin: 2px 0 0;
+  color: #6a7480;
+  font-size: 9px;
+  line-height: 1.5;
+}
 .report-monthly-chart { display: block; width: 100%; height: 188px; margin-top: 4px; }
 .report-monthly-chart line { stroke: #ccd2d8; stroke-width: 1; }
 .report-monthly-chart rect.positive { fill: #ed8b18; }
 .report-monthly-chart rect.negative { fill: #d84a4a; }
 .report-monthly-chart text { fill: #727c87; font-size: 8px; }
+.report-monthly-chart .chart-mark { cursor: pointer; outline: none; touch-action: manipulation; }
+.report-monthly-chart .chart-mark:focus-visible > rect { stroke: #18202a; stroke-width: 2px; }
+.report-monthly-chart text.report-value-label { fill: #18202a; font-size: 8.5px; font-weight: 750; }
 .report-ranking { display: grid; gap: 11px; margin-top: 16px; }
 .report-ranking > div {
   display: grid;
   grid-template-columns: minmax(110px, 1fr) minmax(90px, 1.2fr) 64px;
   gap: 8px;
   align-items: center;
+  cursor: pointer;
+}
+.report-ranking > div.chart-mark-button:focus-visible {
+  outline: 2px solid #ed8b18;
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 .report-ranking span {
   overflow: hidden;
