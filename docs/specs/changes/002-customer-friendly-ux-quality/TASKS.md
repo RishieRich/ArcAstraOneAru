@@ -7,7 +7,7 @@
 | Approved plan | PLAN.md, approved and revalidated 2026-08-23 |
 | Delivery | 29 proposed owner-authorized review slices |
 | Product-code gate | Stage-0 unavailable live cases explicitly waived by owner on 2026-08-23 |
-| Authorized batch | SLICE-01 through SLICE-15 |
+| Authorized batch | SLICE-01 through SLICE-23 (owner authorized completing pending code slices in sequence on 2026-08-31) |
 | Deployment | SLICE-01 through SLICE-06 live in production. SLICE-07 through SLICE-15 are committed and pushed to `main` (commit `6294d74`) but **not deployed** — the production frontend still serves only Slice 1-6; deployment needs separate owner authorization as it did for Slice 1-6. |
 | Documentation correction (2026-08-23, later session) | SLICE-07 through SLICE-15 were coded and pushed in an earlier session, but this file's per-slice rows and `VERIFICATION.md` were never updated and still read "Proposed; not authorized". A later session ran `npm test` (39/39 pass), `npm run build` (pass), and the missing live-UI evidence pass, then corrected the statuses below to match reality. See `VERIFICATION.md` for the evidence. |
 
@@ -18,7 +18,9 @@ recorded with unavailable real-data cases marked `Not verified`; SLICE-04 throug
 implemented, locally verified, committed, pushed to `main`, and deployed to the production
 frontend on the owner's separate 2026-08-23 authorization. On 2026-08-23 the owner authorized
 dependent implementation through SLICE-15, which records acceptance of SLICE-01 through
-SLICE-06. SLICE-16 and later remain unauthorized.
+SLICE-06. On 2026-08-31, the owner authorized the remaining code slices through SLICE-23 in
+sequence; commit, push, and deploy remain separate owner decisions. SLICE-24 through SLICE-27
+still require owner-provided human usability participants.
 
 ## How you control the work
 
@@ -335,7 +337,7 @@ family and may adjust the shared component only when existing accepted behavior 
 
 ### SLICE-17 - Clear purpose and supported top facts
 
-- **Status:** Proposed; not authorized
+- **Status:** Ready for owner review — implemented, tested and built locally on 2026-08-31; rendered live review is not verified because no in-app browser session was available
 - **Requirements:** REQ-008 through REQ-011, REQ-018, REQ-019, REQ-022, REQ-023, REQ-028 through REQ-034
 - **Prerequisites:** SLICE-16 accepted
 - **Likely files:** ResearchAgent.jsx, a pure snapshot model/test, ResearchAgent.css, i18n.js
@@ -350,7 +352,7 @@ family and may adjust the shared component only when existing accepted behavior 
 
 ### SLICE-18 - Ranking evidence, readiness checklist, and next checks
 
-- **Status:** Proposed; not authorized
+- **Status:** Ready for owner review — implemented, tested and built locally on 2026-08-31; rendered live review is not verified because no in-app browser session was available
 - **Requirements:** REQ-020 through REQ-023, REQ-028 through REQ-034
 - **Prerequisites:** SLICE-17 accepted
 - **Likely files:** ResearchAgent.jsx, snapshot model/test, ResearchAgent.css, i18n.js
@@ -366,7 +368,7 @@ family and may adjust the shared component only when existing accepted behavior 
 
 ### SLICE-19 - Simpler research brief
 
-- **Status:** Proposed; not authorized
+- **Status:** Ready for owner review — implemented, tested and built locally on 2026-08-31; rendered live review is not verified because no in-app browser session was available
 - **Requirements:** REQ-007, REQ-011, REQ-024, REQ-025, REQ-028 through REQ-032, REQ-034
 - **Prerequisites:** SLICE-18 accepted
 - **Likely files:** ResearchAgent.jsx, ResearchAgent.css, research presentation tests, i18n.js

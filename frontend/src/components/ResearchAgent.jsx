@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  deliverResearchCandidates, fetchResearchCandidates, formatMoney,
+  deliverResearchCandidates, fetchResearchCandidates, formatMoney, formatWhen,
   fetchLatestResearch, generateResearchIcp, getResearchIcp, runCustomerResearch,
   runMaterialResearch, updateResearchCandidate,
 } from "../api";
@@ -8,6 +8,8 @@ import {
   IconBox, IconChart, IconCheck, IconEye, IconNote, IconRefresh,
   IconSend, IconShield, IconSpark, IconUsers,
 } from "../icons";
+import { buildBusinessSnapshot } from "../snapshotPresentation";
+import { customerBriefState, supplierBriefState } from "../researchPresentation";
 import "./ResearchAgent.css";
 
 const VIEWS = ["home", "icp", "customers", "suppliers"];
@@ -205,14 +207,8 @@ export default function ResearchAgent({
     [candidates, filter],
   );
   const approvedCount = candidates.filter((row) => row.status === "approved").length;
-  const hasCustomerSeed = Boolean(icp?.profile?.top_products?.length);
-  const readiness = icp
-    ? Math.round(
-      (icp.data_completeness.available_count /
-        icp.data_completeness.total_count) * 100,
-    )
-    : 0;
-
+  const customerState = customerBriefState(icp?.profile, customerBrief);
+  const supplierState = supplierBriefState(supplierBrief);
   function selectView(nextView) {
     setView(nextView);
     onSectionChange?.(nextView);
@@ -269,10 +265,9 @@ export default function ResearchAgent({
         />
       )}
       {view === "icp" && (
-        <IcpView
+        <BusinessSnapshotView
           copy={copy}
           icp={icp}
-          readiness={readiness}
           busy={busy === "icp"}
           refresh={refreshIcp}
         />
@@ -283,7 +278,9 @@ export default function ResearchAgent({
           copy={copy}
           busy={busy}
           onRun={runCustomers}
-          runDisabled={!hasCustomerSeed && !customerBrief.industry.trim()}
+          runDisabled={!customerState.canRun}
+          disabledReason={customerState.reason && copy.researchDisabled[customerState.reason]}
+          intro={copy.customerBriefIntro}
           summary={activeWorkspace.summary}
           candidates={visibleCandidates}
           allCandidates={candidates}
@@ -302,6 +299,7 @@ export default function ResearchAgent({
             <ResearchField
               label={copy.geography}
               hint={copy.optional}
+              purpose={copy.geographyPurpose}
               value={customerBrief.geography}
               placeholder={copy.placeholders.geography}
               onChange={(value) =>
@@ -310,6 +308,7 @@ export default function ResearchAgent({
             <ResearchField
               label={copy.industry}
               hint={copy.optional}
+              purpose={copy.industryPurpose}
               value={customerBrief.industry}
               placeholder={copy.placeholders.industry}
               onChange={(value) =>
@@ -324,7 +323,9 @@ export default function ResearchAgent({
           copy={copy}
           busy={busy}
           onRun={runSuppliers}
-          runDisabled={!supplierBrief.product || !supplierBrief.baseline}
+          runDisabled={!supplierState.canRun}
+          disabledReason={supplierState.reason && copy.researchDisabled[supplierState.reason]}
+          intro={copy.supplierBriefIntro}
           summary={activeWorkspace.summary}
           candidates={visibleCandidates}
           allCandidates={candidates}
@@ -342,6 +343,8 @@ export default function ResearchAgent({
           <div className="research-form-grid three">
             <ResearchField
               label={copy.product}
+              hint={copy.required}
+              purpose={copy.productPurpose}
               value={supplierBrief.product}
               placeholder={copy.placeholders.product}
               onChange={(value) =>
@@ -350,6 +353,7 @@ export default function ResearchAgent({
             <ResearchField
               label={copy.specification}
               hint={copy.optional}
+              purpose={copy.specificationPurpose}
               value={supplierBrief.specification}
               placeholder={copy.placeholders.specification}
               onChange={(value) =>
@@ -357,6 +361,8 @@ export default function ResearchAgent({
             />
             <ResearchField
               label={copy.baseline}
+              hint={copy.required}
+              purpose={copy.baselinePurpose}
               value={supplierBrief.baseline}
               type="number"
               placeholder={copy.placeholders.baseline}
@@ -438,7 +444,7 @@ function AgentActionPlan({ copy, icp, busy }) {
 
 function ResearchHome({ copy, setView, icp, busy }) {
   const cards = [
-    { id: "icp", icon: <IconChart />, number: "01", title: copy.understandTitle, body: copy.understandBody, meta: icp ? copy.profileAvailable : copy.startHere },
+    { id: "icp", icon: <IconChart />, number: "01", title: copy.businessSnapshotTitle, body: copy.businessSnapshotBody, meta: icp ? copy.profileAvailable : copy.startHere },
     { id: "customers", icon: <IconUsers />, number: "02", title: copy.customerTitle, body: copy.customerBody, meta: copy.searchNeeded },
     { id: "suppliers", icon: <IconBox />, number: "03", title: copy.supplierTitle, body: copy.supplierBody, meta: copy.searchNeeded },
   ];
@@ -467,42 +473,26 @@ function ResearchHome({ copy, setView, icp, busy }) {
   );
 }
 
-function IcpView({ copy, icp, readiness, busy, refresh }) {
-  const profile = icp?.profile;
-  const snapshot = profile?.snapshot || {};
-  const topProduct = profile?.top_products?.[0];
-  const topCustomer = profile?.best_customers?.[0];
-  const topCollection = profile?.collection_priorities?.[0];
-  const narrative = topProduct && topCustomer
-    ? copy.salesSnapshot(
-      topProduct.name,
-      topProduct.revenue_share_pct,
-      topCustomer.name,
-    )
-    : topCollection
-      ? copy.collectionSnapshot(
-        topCollection.name,
-        formatMoney(topCollection.outstanding, { compact: true }),
-      )
-      : copy.emptySnapshot;
-  const snapshotStats = [
-    [snapshot.products_analyzed, copy.productsChecked],
-    [snapshot.customers_analyzed, copy.customersChecked],
-    [snapshot.sales_value_analyzed
-      ? formatMoney(snapshot.sales_value_analyzed, { compact: true })
-      : null, copy.salesChecked],
-    [snapshot.outstanding_analyzed
-      ? formatMoney(snapshot.outstanding_analyzed, { compact: true })
-      : null, copy.outstandingChecked],
-    [snapshot.open_bills_analyzed, copy.billsChecked],
-  ].filter(([value]) => value);
+function BusinessSnapshotView({ copy, icp, busy, refresh }) {
+  const snapshot = buildBusinessSnapshot(icp || {});
+  const attention = snapshot.attention;
+  const factCards = [
+    snapshot.topProduct && { label: copy.strongestProduct, body: copy.productFact(snapshot.topProduct.name, formatMoney(snapshot.topProduct.revenue), snapshot.topProduct.revenue_share_pct) },
+    snapshot.topCustomer && { label: copy.strongestCustomer, body: copy.customerFact(snapshot.topCustomer.name, formatMoney(snapshot.topCustomer.revenue), snapshot.topCustomer.orders) },
+    snapshot.topCollection && { label: copy.collectionPriority, body: copy.collectionFact(snapshot.topCollection.name, formatMoney(snapshot.topCollection.overdue || snapshot.topCollection.outstanding), snapshot.topCollection.max_overdue_days) },
+    attention && { label: copy.attention, body: attention.type === "urgentCollection"
+      ? copy.urgentCollectionFact(attention.row.party, formatMoney(attention.row.amount), attention.row.overdue_days)
+      : attention.type === "productConcentration"
+        ? copy.productConcentrationFact(attention.row.product, attention.row.share_pct)
+        : copy.customerFollowUpFact(attention.row.customer, attention.row.orders) },
+  ].filter(Boolean);
 
   return (
     <div className="research-panel research-icp-view">
       <div className="research-panel-heading">
         <div>
-          <span className="panel-kicker">{copy.icp}</span>
-          <h3>{copy.understandTitle}</h3>
+          <span className="panel-kicker">{copy.snapshot}</span>
+          <h3>{copy.businessSnapshotTitle}</h3>
         </div>
         <button className="research-primary" type="button" disabled={busy} onClick={refresh}>
           <IconRefresh className={busy ? "spin" : ""} />
@@ -510,57 +500,39 @@ function IcpView({ copy, icp, readiness, busy, refresh }) {
         </button>
       </div>
       {!icp ? (
-        <EmptyState icon={<IconChart />} title={copy.emptyTitle} body={copy.understandBody} />
+        <EmptyState icon={<IconChart />} title={copy.emptyTitle} body={copy.businessSnapshotBody} />
       ) : (
         <>
-          <div className="icp-summary-grid">
-            <div className="icp-readiness">
-              <div
-                className="readiness-ring"
-                style={{ "--progress": `${readiness * 3.6}deg` }}
-                aria-label={`${copy.readiness}: ${readiness}%`}
-              >
-                <span><strong>{readiness}%</strong><small>{copy.readiness}</small></span>
-              </div>
-            </div>
-            <div className="icp-narrative">
-              <span className="panel-kicker">{copy.snapshot}</span>
-              <p>{narrative}</p>
-              <div className="icp-stat-row">
-                {snapshotStats.map(([value, label]) => (
-                  <span key={label}><strong>{value}</strong>{label}</span>
-                ))}
-              </div>
-            </div>
+          <div className="snapshot-context" aria-label={copy.snapshotContext}>
+            <span><strong>{copy.source}</strong>{copy.snapshotSource(snapshot.hasSales, snapshot.hasReceivables)}</span>
+            <span><strong>{copy.period}</strong>{snapshot.salesPeriod ? copy.snapshotSalesPeriod(snapshot.salesPeriod.from, snapshot.salesPeriod.to) : copy.snapshotSalesPeriodUnavailable}</span>
+            <span><strong>{copy.freshness}</strong>{snapshot.generatedAt ? copy.snapshotFreshness(formatWhen(snapshot.generatedAt)) : copy.snapshotFreshnessUnavailable}</span>
           </div>
-          {(profile.top_products.length > 0 || profile.best_customers.length > 0) && (
-            <div className="icp-columns">
-            <RankedList
-              title={copy.topProducts}
-              rows={profile.top_products}
-              render={(row) => `${formatMoney(row.revenue, { compact: true })} · ${row.revenue_share_pct}%`}
-            />
-            <RankedList
-              title={copy.bestCustomers}
-              rows={profile.best_customers}
-              render={(row) => `${row.icp_score}/100 · ${copy.ordersLabel(row.orders)}`}
-            />
+          {factCards.length ? (
+            <div className="snapshot-facts">
+              {factCards.map((fact) => <article key={fact.label}><span>{fact.label}</span><p>{fact.body}</p></article>)}
             </div>
+          ) : <EmptyState icon={<IconChart />} title={copy.emptySnapshotTitle} body={copy.emptySnapshot} />}
+          {snapshot.missingEvidence.length > 0 && (
+            <section className="snapshot-evidence">
+              <div><span className="panel-kicker">{copy.missingEvidence}</span><p>{copy.missingEvidenceBody}</p></div>
+              <ul>{snapshot.missingEvidence.map((item) => <li key={item.id}><IconNote /><span><strong>{copy.evidenceItems[item.id]}</strong>{copy.evidencePrevents[item.prevents]}</span></li>)}</ul>
+            </section>
           )}
-          {profile.collection_priorities?.length > 0 && (
-            <CollectionPriorities rows={profile.collection_priorities} copy={copy} />
+          {(snapshot.products.length > 0 || snapshot.customers.length > 0 || snapshot.collections.length > 0) && (
+            <section className="snapshot-rankings">
+              <div className="snapshot-rankings-heading"><span className="panel-kicker">{copy.rankingEvidence}</span><p>{copy.rankingEvidenceBody}</p></div>
+              <div className="icp-columns">
+                <RankedList title={copy.recordedSalesProducts} rows={snapshot.products} render={(row) => copy.productEvidence(formatMoney(row.revenue), row.revenue_share_pct, row.orders, row.customers, row.last_sale || copy.noRecordedDate)} />
+                <RankedList title={copy.recordedSalesCustomers} rows={snapshot.customers} render={(row) => copy.customerEvidence(formatMoney(row.revenue), row.orders, row.recency_days, row.last_order || copy.noRecordedDate)} />
+              </div>
+              {snapshot.collections.length > 0 && <CollectionPriorities rows={snapshot.collections} copy={copy} />}
+            </section>
           )}
           <div className="icp-method">
             <IconShield />
             <div><strong>{copy.method}</strong><p>{copy.rankingMethodBody}</p></div>
           </div>
-          {icp.data_completeness.needs_more_data.length > 0 && (
-            <div className="needs-data">
-              <span>{copy.needsData}</span>
-              {icp.data_completeness.needs_more_data.map((item) =>
-                <small key={item}>{copy.dataNeeds[item] || item}</small>)}
-            </div>
-          )}
         </>
       )}
     </div>
@@ -571,7 +543,7 @@ function CollectionPriorities({ rows, copy }) {
   return (
     <div className="collection-priorities">
       <div className="queue-heading">
-        <div><span className="panel-kicker">{copy.actionPlan}</span><p>{copy.actionPlanSub}</p></div>
+        <div><span className="panel-kicker">{copy.currentReceivables}</span><p>{copy.collectionEvidenceHeading}</p></div>
         <span className="queue-count">{rows.length}</span>
       </div>
       <div className="collection-priority-grid">
@@ -580,7 +552,7 @@ function CollectionPriorities({ rows, copy }) {
             <span>{String(index + 1).padStart(2, "0")}</span>
             <div>
               <strong>{row.name}</strong>
-              <small>{copy.collectionMeta(row.bill_count, row.max_overdue_days)}</small>
+              <small>{copy.collectionEvidence(row.bill_count, row.max_overdue_days, formatMoney(row.outstanding))}</small>
             </div>
             <b>{formatMoney(row.overdue || row.outstanding, { compact: true })}</b>
           </article>
@@ -598,17 +570,17 @@ function RankedList({ title, rows, render }) {
         <div className="icp-list-row" key={row.name}>
           <span className="rank">{String(index + 1).padStart(2, "0")}</span>
           <span><strong>{row.name}</strong><small>{render(row)}</small></span>
-          <span className="micro-bar"><i style={{ width: `${Math.max(12, row.revenue_share_pct || row.icp_score)}%` }} /></span>
+          <span className="micro-bar"><i style={{ width: `${Math.max(12, row.revenue_share_pct || 12)}%` }} /></span>
         </div>
       ))}
     </div>
   );
 }
 
-function ResearchField({ label, hint, value, onChange, placeholder, type = "text" }) {
+function ResearchField({ label, hint, purpose, value, onChange, placeholder, type = "text" }) {
   return (
     <label className="research-field">
-      <span>{label}{hint && <small>{hint}</small>}</span>
+      <span>{label}{hint && <small>{hint}</small>}{purpose && <em>{purpose}</em>}</span>
       <input
         type={type}
         min={type === "number" ? "0" : undefined}
@@ -623,7 +595,7 @@ function ResearchField({ label, hint, value, onChange, placeholder, type = "text
 function ResearchWorkspace({
   kind, copy, busy, onRun, runDisabled, summary, candidates, allCandidates,
   filter, setFilter, expanded, setExpanded, decide, approvedCount,
-  deliver, delivery, copyDelivery, copied, children,
+  deliver, delivery, copyDelivery, copied, disabledReason, intro, children,
 }) {
   const isSearching = busy === kind || busy === "loading-results";
   return (
@@ -634,9 +606,10 @@ function ResearchWorkspace({
           <h3>{kind === "customers" ? copy.customerTitle : copy.supplierTitle}</h3>
         </div>
       </div>
+      <p className="research-brief-intro">{intro}</p>
       {children}
-      {kind === "customers" && runDisabled && (
-        <div className="research-helper"><IconNote />{copy.customerNeedsProduct}</div>
+      {runDisabled && (
+        <div className="research-helper"><IconNote />{disabledReason}</div>
       )}
       <button
         className="research-primary research-run"
