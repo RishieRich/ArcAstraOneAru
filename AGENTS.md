@@ -6,7 +6,47 @@ loads `CLAUDE.md`, which is a one-line pointer to this file. Keep it that way �
 brief, not two drifting copies. The tracked engineering constitution, baseline specifications,
 change workflow, and ADRs live under `docs/` and govern future behavior changes.
 
-Last verified against the repo: **2026-08-31** (owner asked the agent to work through all
+Last verified against the repo: **2026-09-13** (owner authorized Change 003 SLICE-01 through
+SLICE-05 in conversation. SLICE-01 (evidence inventory) is done —
+`docs/specs/changes/003-.../EVIDENCE.md` — and finds that **real captured Tally evidence exists
+for only receivables** (`connector/tests/fixtures/{bills_receivable,debtor_ledgers,
+list_of_companies}.xml`, live-captured 2026-07-11 against ARQ's own test companies); nine of
+eleven Section-5 domains (payables, sales, purchases, receipts/payments, notes, journal/contra,
+inventory, cash/bank, and most of ledgers/accounts) have **zero** captured Tally evidence
+anywhere in the repo. SLICE-02 is half-done: receivables mapped honestly with every open question
+named (`contracts/open-bills.md` — no party GUID in the Bills Receivable report, multi-bill
+grouping unconfirmed, no completeness signal, all-age scope unconfirmed); payables is blocked, no
+evidence. **SLICE-03, SLICE-04, and SLICE-05 are blocked, not completed** — this is a hard stop,
+not a shortfall: no session working from a repository checkout has a live TallyPrime connection to
+capture the missing evidence, and the task list's own rules forbid inventing a contract from
+`PLAN.md`'s candidate table. Closing this requires either the owner (or a connector-side session
+actually running next to a real/test TallyPrime instance) to follow the capture procedure in
+`EVIDENCE.md` §5, or an owner decision to re-scope SLICE-03/04/05 to what limited evidence can ever
+support. Owner then authorized SLICE-06 through SLICE-10 the same day and later authorized
+continuation through SLICE-25. **SLICE-06 is accepted by the owner (2026-09-06)**
+(`contracts/protocol.md`, real synthetic capacity probe in `evidence/capacity_probe.py` — found
+the proposed 1,000-fact/1 MiB chunk bounds aren't simultaneously safe, revised to whichever-first
+— and accepted ADR-004/005/006 in `docs/decisions/`). **SLICE-07 is accepted (2026-09-13)**:
+`backend/tests/conftest.py` requires a distinct `ARQ_TEST_DATABASE_URL` before importing app
+modules; the owner configured a separate Neon branch; and the unsafe-config guards plus a real
+unique-tenant create/read/delete/confirm-absent check passed (4 focused tests total, no production
+DB or credential output). **SLICE-08 is done, Ready for owner review (2026-09-13)**:
+`backend/migrations/0009_capability_policy.sql` adds `tenant_configuration`
+(`pilot_eligible`/`configuration_revision`/`cleanup_generation`) and `tenant_capability_policy`
+(`is_allowed`/`is_enabled`, DB-level enabled-implies-allowed check); `backend/app/capability_policy.py`
+provides the read/write primitives (default-off eligibility, transactional initial-selection,
+cleanup). `backend/tests/test_capability_policy.py` (11 tests) plus the full backend suite (84
+tests total) pass against the isolated Neon branch. Migration applied to production and code
+pushed to `main`; there is no new API route yet, so this deploy has no visible dashboard change —
+it only adds the schema/module the next slices (09/10/15) will call. One judgment call is flagged
+in the module's docstring for owner confirmation: cleanup currently preserves the allowed
+capability set and pilot-eligibility rather than clearing them too.
+
+**Session checkpoint 2026-09-13:** Owner asked to resume work through SLICE-08 and deploy. SLICE-07
+accepted, SLICE-08 implemented/tested/deployed as above. Next action: owner reviews SLICE-08, then
+SLICE-09 (run and evidence persistence schema). Live Tally evidence remains the separate blocker
+for SLICE-03/04/05 and SLICE-25.
+Prior note retained below: owner asked the agent to work through all
 pending Change-002 slices in sequence. Current state: SLICE-01 through SLICE-06 are live in
 production, owner review pending. SLICE-07 through SLICE-15 are coded, tested, built and
 pushed to `main` (commit `6294d74`, doc-corrected in `402acfd`) but **not deployed** — prod
@@ -380,6 +420,7 @@ Tracked documentation available in every clone:
 |---|---|---|
 | `001-unexpected-empty-sync-quarantine` | Specification draft; implementation blocked | Owner reviews the specification. |
 | `002-customer-friendly-ux-quality` | SLICE-01–06 live in prod, owner review pending. SLICE-07–15 coded/tested/built/pushed to `main` but not deployed. SLICE-16 coded/tested this session (2026-08-31), check `git status` — may be uncommitted. SLICE-17–23 not started (real remaining work). SLICE-24–29 blocked on owner-provided human usability participants. | Owner authorized "complete all pending slices in sequence" on 2026-08-31 — no further per-slice authorization needed for code slices 16–23. Continue from `TASKS.md`/`VERIFICATION.md` in that folder. Stop and ask the owner only at SLICE-24 (needs real participants). |
+| `003-essential-tally-data-foundation` | Owner approved `SPEC.md`/`PLAN.md` on 2026-09-05, authorized continuation through SLICE-25, and accepted SLICE-06/ADR-004/005/006. SLICE-01 done. SLICE-02 half-done (receivables mapped, payables blocked). **SLICE-03/04/05 blocked — no Tally evidence for those domains.** SLICE-07 accepted 2026-09-13. SLICE-08 done, Ready for owner review, deployed (capability policy/generation schema, no visible UI change). SLICE-09 onward not started. | Owner reviews SLICE-08, then start SLICE-09. Domain work dependent on SLICE-03/04/05 still requires live Tally evidence. |
 
 ### Local-only implementation notes (`magic_mds/`)
 
