@@ -42,20 +42,27 @@ it only adds the schema/module the next slices (09/10/15) will call. One judgmen
 in the module's docstring for owner confirmation: cleanup currently preserves the allowed
 capability set and pilot-eligibility rather than clearing them too.
 
-**Session checkpoint 2026-09-13:** Owner asked to resume work through SLICE-08 and deploy. SLICE-07
-accepted, SLICE-08 implemented/tested/deployed as above. Next action: owner reviews SLICE-08, then
-SLICE-09 (run and evidence persistence schema). Live Tally evidence remains the separate blocker
-for SLICE-03/04/05 and SLICE-25.
+**Session checkpoint 2026-09-13 (later same day):** Owner asked to "complete work till slice 15."
+Change 002 SLICE-07 through SLICE-15 were already coded/tested/pushed (commit `6294d74`) from an
+earlier session; the only remaining step was the production deploy, which the task list gates
+behind separate owner authorization. Confirmed that scope with the owner, then ran `npm test`
+(46/46), `npm run build`, and `npx vercel@latest --prod --yes` from `frontend/`. **SLICE-01
+through SLICE-15 are now live in production** at `https://arq-receivables.vercel.app`
+(`dpl_28z4HKCRYfxzX6pkTh8qukaU5cCE`). Verified post-deploy: HTTP 200, live bundle
+`assets/index-BeSrGSZs.js` matches the local build byte-for-byte (483,997 bytes) and contains the
+Slice-10+ chart-contract marker `Show exact values`; backend `/health` and `/health/db` unaffected
+(no backend code touched). SLICE-16 was **deliberately left undeployed** — its print-preview and
+screen-reader live evidence is still outstanding, so it stays committed-only (`3c94663`) until that
+evidence pass runs. None of SLICE-01–15 are marked **Accepted** yet — that still needs the owner's
+own UI review pass (see `VERIFICATION.md`'s "Owner UI review — next step" section). Full detail:
+`docs/specs/changes/002-customer-friendly-ux-quality/{TASKS,VERIFICATION}.md`.
+
+**Session checkpoint 2026-09-13 (earlier that day):** Owner asked to resume work through SLICE-08
+(Change 003) and deploy. SLICE-07 accepted, SLICE-08 implemented/tested/deployed as above. Next
+action: owner reviews SLICE-08, then SLICE-09 (run and evidence persistence schema). Live Tally
+evidence remains the separate blocker for SLICE-03/04/05 and SLICE-25.
 Prior note retained below: owner asked the agent to work through all
-pending Change-002 slices in sequence. Current state: SLICE-01 through SLICE-06 are live in
-production, owner review pending. SLICE-07 through SLICE-15 are coded, tested, built and
-pushed to `main` (commit `6294d74`, doc-corrected in `402acfd`) but **not deployed** — prod
-frontend still serves only Slice 1-6. SLICE-16 (one-page report charts/print) was implemented
-and tested this session but is **uncommitted** in the working tree as of this note — the next
-agent must check `git status` for `frontend/src/components/OnePageReport.jsx`,
-`frontend/src/styles.css`, and the two `docs/specs/changes/002-.../{TASKS,VERIFICATION}.md`
-files, and either commit them (owner already authorized "complete and develop all pending
-items in sequence") or verify the state before continuing. SLICE-17 through SLICE-23 are
+pending Change-002 slices in sequence. SLICE-17 through SLICE-23 are
 real, sizable remaining work (SLICE-17/18 rewrite an 858-line `ResearchAgent.jsx` to rename
 its ICP/readiness-score view to "My business snapshot" — read `TASKS.md` in that change folder
 before touching it). SLICE-24 through SLICE-27 need real human usability participants
@@ -419,7 +426,7 @@ Tracked documentation available in every clone:
 | Change | State | Next allowed action |
 |---|---|---|
 | `001-unexpected-empty-sync-quarantine` | Specification draft; implementation blocked | Owner reviews the specification. |
-| `002-customer-friendly-ux-quality` | SLICE-01–06 live in prod, owner review pending. SLICE-07–15 coded/tested/built/pushed to `main` but not deployed. SLICE-16 coded/tested this session (2026-08-31), check `git status` — may be uncommitted. SLICE-17–23 not started (real remaining work). SLICE-24–29 blocked on owner-provided human usability participants. | Owner authorized "complete all pending slices in sequence" on 2026-08-31 — no further per-slice authorization needed for code slices 16–23. Continue from `TASKS.md`/`VERIFICATION.md` in that folder. Stop and ask the owner only at SLICE-24 (needs real participants). |
+| `002-customer-friendly-ux-quality` | **SLICE-01–15 live in prod (deployed 2026-09-13), owner review pending.** SLICE-16 coded/tested/pushed to `main` (`3c94663`) but deliberately not deployed — its live print-preview/screen-reader evidence is still outstanding. SLICE-17–19 coded/tested locally, awaiting a live-review pass. SLICE-20–23 not started (real remaining work). SLICE-24–29 blocked on owner-provided human usability participants. | Owner reviews the live SLICE-01–15 UI (see VERIFICATION.md's review steps). Next code work: a live-evidence pass for SLICE-16, then deploy it; SLICE-17–19 still need a live-review pass. Owner authorized "complete all pending slices in sequence" on 2026-08-31 — no further per-slice authorization needed for code slices, but **each production deploy is still a separate owner-gated action** (per TASKS.md). Stop and ask the owner only at SLICE-24 (needs real participants) or before the next deploy. |
 | `003-essential-tally-data-foundation` | Owner approved `SPEC.md`/`PLAN.md` on 2026-09-05, authorized continuation through SLICE-25, and accepted SLICE-06/ADR-004/005/006. SLICE-01 done. SLICE-02 half-done (receivables mapped, payables blocked). **SLICE-03/04/05 blocked — no Tally evidence for those domains.** SLICE-07 accepted 2026-09-13. SLICE-08 done, Ready for owner review, deployed (capability policy/generation schema, no visible UI change). SLICE-09 onward not started. | Owner reviews SLICE-08, then start SLICE-09. Domain work dependent on SLICE-03/04/05 still requires live Tally evidence. |
 
 ### Local-only implementation notes (`magic_mds/`)

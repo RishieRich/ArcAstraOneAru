@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | SLICE-01 through SLICE-06 deployed to production, owner review pending. SLICE-07 through SLICE-15 implemented, tested, built and pushed to `main`; this file's live-evidence gap for them is now closed below. SLICE-16 is committed in `3c94663`, code-only and not deployed. SLICE-17 through SLICE-19 are implemented, tested and built locally, awaiting owner review; their rendered live review is not verified because this session has no in-app browser. SLICE-20 through SLICE-23 are owner-authorized code work not yet started. SLICE-24 through SLICE-27 require owner-provided human usability participants that no agent can supply. |
+| Status | SLICE-01 through SLICE-15 deployed to production (2026-09-13), owner review pending. SLICE-16 is committed in `3c94663`, code-only and not deployed (its print-preview/screen-reader evidence is still not verified, so it was deliberately left out of this deploy). SLICE-17 through SLICE-19 are implemented, tested and built locally, awaiting owner review; their rendered live review is not verified because this session has no in-app browser. SLICE-20 through SLICE-23 are owner-authorized code work not yet started. SLICE-24 through SLICE-27 require owner-provided human usability participants that no agent can supply. |
 | Authorized batch | SLICE-01 through SLICE-23; owner extended authorization to the remaining code slices on 2026-08-31 (see `TASKS.md`) |
 | Owner override | Missing in-app browser may not block this batch; use safe local alternatives and record gaps |
 | Current gate | Owner reviews SLICE-04 through SLICE-19 in the UI and accepts or requests a bounded correction; SLICE-20 through SLICE-23 remain authorized code work. |
@@ -38,9 +38,9 @@
 | Local Chrome rendered smoke (Slice 1-6) | Pass — 66/66 | Installed Chrome, package-free CDP, reduced motion, mock API and local Vite; no production data or mutation. |
 | Local Chrome rendered smoke (Slice 7-15, this session) | Pass — 104/104 (78 original + 26 new checks × desktop/mobile, extended gallery pass) | Same harness, extended with realistic financials/Smart Excel fixtures and a pass over the dev-only chart fixture gallery. See the Slice evidence table above. |
 | Runtime exception capture | Pass | No uncaught page exception in signed-out or signed-in runs at any tested viewport, including Finance/Smart Excel with populated data. |
-| Production frontend response | Pass (as of 2026-08-23 deploy) | `https://arq-receivables.vercel.app/` returned HTTP 200 after the Slice 1-6 deployment. Not re-checked this session — SLICE-07 through SLICE-15 have not been deployed. |
-| Production asset identity | Pass (as of 2026-08-23 deploy) | Live bundle `assets/index-Bj4wlVUz.js` contains the Slice 1-6 markers `Tools & settings`, `Need help getting in?`, and `Go to dashboard home`. |
-| Production backend health | Pass (as of 2026-08-23 deploy) | Existing backend `/health` returned `status: ok`; `/health/db` returned `status: ok` and `db: reachable`. |
+| Production frontend response | Pass (as of 2026-09-13 deploy) | `https://arq-receivables.vercel.app/` returned HTTP 200 after the Slice 7-15 deployment. |
+| Production asset identity | Pass (as of 2026-09-13 deploy) | Live bundle `assets/index-BeSrGSZs.js` (483,997 bytes, matching the local `npm run build` output exactly) contains the Slice 10+ chart-contract marker `Show exact values` and `aria-current`. |
+| Production backend health | Pass (as of 2026-09-13 check) | Backend `/health` returned `status: ok`; `/health/db` returned `status: ok`, `db: reachable`, 11 tenants. No backend code changed this deploy. |
 
 ## Production deployment
 
@@ -53,6 +53,19 @@
 | Production alias | `https://arq-receivables.vercel.app` |
 | Backend | Not redeployed; no backend code changed |
 | Release state | Live for owner acceptance; SLICE-01 through SLICE-06 are not marked accepted until the owner completes the UI review |
+
+### Second deployment — SLICE-07 through SLICE-15 (2026-09-13)
+
+| Field | Evidence |
+|---|---|
+| Owner authorization | Owner asked to "complete work till slice 15" on 2026-09-13; agent confirmed the scope was the production deploy (the only remaining step, since 07-15 were already coded/tested/pushed) before deploying. SLICE-16 was deliberately excluded from this deploy since its live print-preview/screen-reader evidence is still outstanding. |
+| Git branch and source commit | `main` at `e344de3` (HEAD at deploy time; frontend code for 07-15 unchanged since `6294d74`) |
+| Pre-deploy checks | `npm test` 46/46 pass; `npm run build` pass (67 modules, `dist/assets/index-D0sYCwzz.css`, `dist/assets/index-_y8QaGzT.js`) |
+| Frontend target | Existing Vercel project `arq-receivables`, deployed from `frontend/` via `npx vercel@latest --prod --yes` |
+| Deployment | `dpl_28z4HKCRYfxzX6pkTh8qukaU5cCE`, state `READY` |
+| Production alias | `https://arq-receivables.vercel.app` (confirmed HTTP 200, live bundle `assets/index-BeSrGSZs.js` = 483,997 bytes matching the local build, containing the `Show exact values`/`aria-current` chart-contract markers) |
+| Backend | Not redeployed; not touched. `/health` and `/health/db` re-checked post-deploy: both `status: ok`, 11 tenants reachable. |
+| Release state | SLICE-01 through SLICE-15 are now live in production. None are marked **Accepted** yet — that still requires the owner's UI review per the "Owner UI review — next step" section below. SLICE-16 remains committed but undeployed. |
 
 The in-app browser listed no available session during the post-deploy check. The public page,
 deployed bundle, and backend health were verified directly. A real signed-in production journey

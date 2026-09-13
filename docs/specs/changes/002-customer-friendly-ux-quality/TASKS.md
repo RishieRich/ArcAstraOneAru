@@ -2,14 +2,15 @@
 
 | Field | Value |
 |---|---|
-| Status | SLICE-01 through SLICE-06 live in production, owner review pending; SLICE-07 through SLICE-15 implemented, tested, built, live-reviewed locally and pushed to `main`, ready for owner review |
+| Status | SLICE-01 through SLICE-15 live in production (deployed 2026-09-13), owner review pending. SLICE-16 implemented, tested, built and pushed to `main`, but deliberately not yet deployed (print-preview/screen-reader evidence outstanding). |
 | Approved specification | SPEC.md, approved 2026-08-22 |
 | Approved plan | PLAN.md, approved and revalidated 2026-08-23 |
 | Delivery | 29 proposed owner-authorized review slices |
 | Product-code gate | Stage-0 unavailable live cases explicitly waived by owner on 2026-08-23 |
 | Authorized batch | SLICE-01 through SLICE-23 (owner authorized completing pending code slices in sequence on 2026-08-31) |
-| Deployment | SLICE-01 through SLICE-06 live in production. SLICE-07 through SLICE-15 are committed and pushed to `main` (commit `6294d74`) but **not deployed** — the production frontend still serves only Slice 1-6; deployment needs separate owner authorization as it did for Slice 1-6. |
+| Deployment | SLICE-01 through SLICE-15 live in production as of 2026-09-13 (`dpl_28z4HKCRYfxzX6pkTh8qukaU5cCE`, `https://arq-receivables.vercel.app`). SLICE-16 is committed and pushed to `main` (commit `3c94663`) but **not deployed** — deliberately excluded because its live print-preview/screen-reader evidence is still outstanding; deploying it needs a separate live-evidence pass first, then owner authorization the same way Slice 1-6 and Slice 7-15 each did. |
 | Documentation correction (2026-08-23, later session) | SLICE-07 through SLICE-15 were coded and pushed in an earlier session, but this file's per-slice rows and `VERIFICATION.md` were never updated and still read "Proposed; not authorized". A later session ran `npm test` (39/39 pass), `npm run build` (pass), and the missing live-UI evidence pass, then corrected the statuses below to match reality. See `VERIFICATION.md` for the evidence. |
+| Deploy correction (2026-09-13) | Owner asked to "complete work till slice 15"; confirmed scope meant the production deploy (the only remaining step for already-coded/tested slices 07-15), then ran `npm test` (46/46), `npm run build`, and `npx vercel@latest --prod --yes` from `frontend/`. Live bundle verified by byte size and content marker. See `VERIFICATION.md`'s "Second deployment" section. |
 
 The owner approved this task list and authorized SLICE-01 through SLICE-06 on 2026-08-23.
 After the in-app browser listed no session, the owner explicitly directed the agent to use safe
